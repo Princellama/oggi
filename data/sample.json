@@ -1,0 +1,233 @@
+{
+  "day": {
+    "id": "demo-day",
+    "date": "2026-10-05",
+    "pass": "Morning",
+    "shape": "Normal",
+    "headline": "Meetings bookend the day, Eric — the middle is yours for the three returns.",
+    "mapCaption": "Nearly all the weight is at Kahala — five tax matters, three of them returns to finish before Wednesday — with one item each at Kakaako, Kalihi and Hawaii Kai.",
+    "intentions": "",
+    "previousIntentions": "Close Daryl's return before lunch.",
+    "log": "",
+    "edits": "",
+    "timezone": "Asia/Tokyo",
+    "acts": [
+      {
+        "time": "8:30 – 11 AM",
+        "text": "A FLOWN session first, then the Galera follow-up call — the morning has a shape before you open the inbox."
+      },
+      {
+        "time": "11 AM – 3 PM",
+        "text": "Nothing booked. The returns fit here, Daryl's first because his deadline lands while you are at sea."
+      },
+      {
+        "time": "3 PM onward",
+        "text": "The Devoted training at four, then an open evening before Tuesday's last full day on land."
+      }
+    ],
+    "events": [
+      {
+        "start": "2026-10-05T08:30:00+09:00",
+        "end": "2026-10-05T10:00:00+09:00",
+        "title": "FLOWN — To-Do Dome (3 blocks)",
+        "where": "flown.com",
+        "weight": 2
+      },
+      {
+        "start": "2026-10-05T10:15:00+09:00",
+        "end": "2026-10-05T10:45:00+09:00",
+        "title": "Call Cathy Galera — living benefits follow-up",
+        "where": "Phone",
+        "weight": 1
+      },
+      {
+        "start": "2026-10-05T16:00:00+09:00",
+        "end": "2026-10-05T17:00:00+09:00",
+        "title": "Devoted broker training",
+        "where": "Zoom",
+        "weight": 2
+      },
+      {
+        "start": "2026-10-05T18:30:00+09:00",
+        "end": "2026-10-05T19:00:00+09:00",
+        "title": "Optional: AEP office hours",
+        "where": "Zoom",
+        "weight": 1,
+        "optional": true
+      }
+    ],
+    "motifs": [
+      {
+        "kind": "sun",
+        "at": "middle"
+      }
+    ],
+    "tomorrow": "Tuesday opens with nothing booked until noon; you chose to carry Daryl's return and the Guam reply."
+  },
+  "items": [
+    {
+      "id": "d1",
+      "key": "daryl-extension",
+      "title": "Daryl’s return, finished before you board Wednesday",
+      "place": "Kahala",
+      "list": "Needs attention",
+      "status": "Open",
+      "order": 1,
+      "sentence": "You put it on the list this afternoon, and his note to the practice address on Saturday still has no answer. The extended deadline is the fifteenth and you are at sea from the seventh, so tomorrow is the last full day on land to close it.",
+      "sourcePhrase": "note to the practice address on Saturday",
+      "link": "https://mail.google.com/",
+      "task": "https://app.notion.com/3f08f469b67481b69de0dd5729f5905e",
+      "carries": 1,
+      "note": "",
+      "decision": null,
+      "mapLabel": "Daryl’s return"
+    },
+    {
+      "id": "d2",
+      "key": "kikuyo-return",
+      "title": "Kikuyo Prothe’s return, moved up to as soon as possible",
+      "place": "Kahala",
+      "list": "Needs attention",
+      "status": "Open",
+      "order": 2,
+      "sentence": "The task had sat in Notion since the thirtieth of September; it now reads due today at the top urgency. Her People row notes she is tagged for tax in TaxDome but no 2025 return was found there.",
+      "sourcePhrase": "now reads due today",
+      "link": "https://app.notion.com/",
+      "task": null,
+      "carries": 0,
+      "note": "",
+      "decision": null,
+      "mapLabel": "Kikuyo’s return"
+    },
+    {
+      "id": "d3",
+      "key": "isaac-return",
+      "title": "Isaac’s return, with his documents already in",
+      "place": "Kahala",
+      "list": "Needs attention",
+      "status": "Closed",
+      "order": 3,
+      "sentence": "TaxDome showed his e-file request completed on the fifteenth of September, and the new task in Notion is due today.",
+      "sourcePhrase": "showed his e-file request completed",
+      "link": "https://mail.google.com/",
+      "task": null,
+      "carries": 0,
+      "note": "",
+      "decision": null,
+      "mapLabel": "Isaac’s return"
+    },
+    {
+      "id": "d4",
+      "key": "louis-adjustment",
+      "title": "Rona is still waiting to hear why her refund was short",
+      "place": "Kahala",
+      "list": "Needs attention",
+      "status": "Open",
+      "order": 4,
+      "sentence": "Her question has sat unanswered since last Monday evening — the state refund landed about two thousand dollars under what the return showed.",
+      "sourcePhrase": "has sat unanswered since last Monday evening",
+      "link": "https://mail.google.com/",
+      "task": null,
+      "carries": 11,
+      "note": "",
+      "decision": null,
+      "mapLabel": "Rona’s refund"
+    },
+    {
+      "id": "d5",
+      "key": "fpb-guam",
+      "title": "Guam has asked a third time for a time to call",
+      "place": "Kahala",
+      "list": "Needs attention",
+      "status": "Open",
+      "order": 5,
+      "sentence": "The last two messages arrived on Wednesday asking for a date and a convenient time, and nothing has gone back.",
+      "sourcePhrase": "arrived on Wednesday",
+      "link": "https://mail.google.com/",
+      "task": null,
+      "carries": 7,
+      "note": "Might be spam or phishing.",
+      "decision": null,
+      "mapLabel": "Guam call time"
+    },
+    {
+      "id": "d6",
+      "key": "gws-declined",
+      "title": "The card behind your practice email was declined",
+      "place": "Hawaii Kai",
+      "list": "Needs attention",
+      "status": "Open",
+      "order": 6,
+      "sentence": "Google wrote on Thursday that the bank declined the payment for the barayugacpa.com account. That domain carries your practice mail while you travel.",
+      "sourcePhrase": "wrote on Thursday",
+      "link": "https://mail.google.com/",
+      "task": null,
+      "carries": 1,
+      "note": "",
+      "decision": null,
+      "mapLabel": "Card declined"
+    },
+    {
+      "id": "d7",
+      "key": "aep-at-sea",
+      "title": "Open enrolment starts while you are at sea",
+      "place": "Kakaako",
+      "list": "Needs attention",
+      "status": "Open",
+      "order": 7,
+      "sentence": "The season opens on the fifteenth, ten days out, and you are on the ship from Wednesday until the eighteenth.",
+      "sourcePhrase": "opens on the fifteenth",
+      "link": "https://app.notion.com/",
+      "task": null,
+      "carries": 1,
+      "note": "",
+      "decision": null,
+      "mapLabel": "Enrolment opens"
+    },
+    {
+      "id": "d8",
+      "key": "convention-ranking",
+      "title": "Eight convention choices need ranking, and nobody has the deadline",
+      "place": "Kalihi",
+      "list": "Needs attention",
+      "status": "Open",
+      "order": 8,
+      "sentence": "The ranking table in Notion is still empty and the deadline still unrecorded.",
+      "sourcePhrase": "ranking table in Notion",
+      "link": "https://app.notion.com/",
+      "task": null,
+      "carries": 1,
+      "note": "",
+      "decision": null,
+      "mapLabel": "Convention ranking"
+    },
+    {
+      "id": "r1",
+      "key": "r-tailscale",
+      "title": "Don’s exit node is shared with you",
+      "place": "Hawaii Kai",
+      "list": "Resolved",
+      "status": "Closed",
+      "order": 1,
+      "sentence": "Your brother shared his device over Tailscale this morning.",
+      "sourcePhrase": "shared his device over Tailscale",
+      "link": "https://mail.google.com/",
+      "carries": 0,
+      "note": ""
+    },
+    {
+      "id": "r2",
+      "key": "r-stripe",
+      "title": "A Stripe payout lands today",
+      "place": "Home",
+      "list": "Resolved",
+      "status": "Closed",
+      "order": 2,
+      "sentence": "Stripe sent word this morning that the payout of $310.99 is expected to arrive today.",
+      "sourcePhrase": "sent word this morning",
+      "link": "https://mail.google.com/",
+      "carries": 0,
+      "note": ""
+    }
+  ]
+}

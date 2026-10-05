@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#F9F9F7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Brief">
+  <title>Brief</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/icon-180.png">
+  <link rel="preload" href="/fonts/fraunces-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <symbol id="g-tax" viewBox="0 0 24 24"><path d="M6 3 H15 L19 7 V21 H6 Z M15 3 V7 H19 M16 11.5 H9.5 M16 14.5 H11 M16 17.5 H13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="g-medicare" viewBox="0 0 24 24"><path d="M12 3 L19.5 6 V12 C19.5 16.5 16 19.8 12 21 C8 19.8 4.5 16.5 4.5 12 V6 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="g-jw" viewBox="0 0 24 24"><path d="M6 21 H18 M8 21 V11 L9.5 7.5 H14.5 L16 11 V21 M7 11 H17 M9.2 7.5 L12 4.5 L14.8 7.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="g-home" viewBox="0 0 24 24"><path d="M4 11.5 L12 4.5 L20 11.5 M6.5 9.8 V20 H17.5 V9.8 M10.2 20 V14.5 H13.8 V20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="g-travel" viewBox="0 0 24 24"><path d="M3 12 L21 4 L14 21 L11.3 13.4 Z M11.3 13.4 L21 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="g-tech" viewBox="0 0 24 24"><path d="M8 8 H16 V16 H8 Z M10 8 V5 M14 8 V5 M10 16 V19 M14 16 V19 M8 10 H5 M8 14 H5 M16 10 H19 M16 14 H19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="g-transit" viewBox="0 0 24 24"><path d="M7 6.5 H17 V15 H7 Z M7 10.5 H17 M9.5 15 V17.5 M14.5 15 V17.5 M5.5 19 H18.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="g-clock" viewBox="0 0 24 24"><path d="M12 4 A8 8 0 1 0 12.01 4 Z M12 8 V12 L15 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs></svg>
+
+  <!-- sign in -->
+  <div class="signin" id="signin" hidden>
+    <form id="signinForm" autocomplete="on">
+      <h1 class="head">Your brief is waiting.</h1>
+      <p id="signinMsg">Enter your email and a sign-in link will be sent to it.</p>
+      <label class="sr" for="email">Email</label>
+      <input class="field" id="email" name="email" type="email" inputmode="email" placeholder="you@example.com" required>
+      <button class="btn" type="submit">Send the link</button>
+    </form>
+  </div>
+
+  <!-- app -->
+  <div class="app" id="app" hidden>
+    <main class="panes" id="panes">
+      <section class="pane" data-pane="now" id="paneNow" aria-label="Now"></section>
+      <section class="pane" data-pane="today" id="paneToday" aria-label="Today"></section>
+      <section class="pane capture" data-pane="capture" id="paneCapture" aria-label="Capture"></section>
+      <aside class="aside" id="aside" aria-label="Editor"></aside>
+    </main>
+    <nav class="nav" id="nav">
+      <button data-go="now">Now</button>
+      <button data-go="today" aria-current="true">Today</button>
+      <button data-go="capture">Capture</button>
+    </nav>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
