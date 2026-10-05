@@ -205,7 +205,7 @@ async function createTask(text, localDate) {
       Status: { status: { name: "To Do" } },
       "Due Date": { date: { start: localDate } },
     },
-    children: [{ object: "block", type: "paragraph", paragraph: { rich_text: rich(`Captured in briefme on ${localDate}.`) } }],
+    children: [{ object: "block", type: "paragraph", paragraph: { rich_text: rich(`Captured in Oggi on ${localDate}.`) } }],
   }).catch(async (e) => {
     // Status may be a select rather than a status property; retry with select.
     if (e.status !== 400) throw e;
@@ -216,7 +216,7 @@ async function createTask(text, localDate) {
         Status: { select: { name: "To Do" } },
         "Due Date": { date: { start: localDate } },
       },
-      children: [{ object: "block", type: "paragraph", paragraph: { rich_text: rich(`Captured in briefme on ${localDate}.`) } }],
+      children: [{ object: "block", type: "paragraph", paragraph: { rich_text: rich(`Captured in Oggi on ${localDate}.`) } }],
     });
   });
   return { id: page.id, url: page.url };

@@ -1,18 +1,18 @@
-// briefme — Eric's daily brief on the web.
+// Oggi — Eric's daily brief on the web.
 // Notion is the store: Claude writes Brief Days / Brief Items, this app reads and edits them.
 
 const express = require("express");
 const crypto = require("crypto");
 const path = require("path");
 
-const DEMO = process.env.BRIEFME_DEMO === "1" || !process.env.NOTION_TOKEN;
+const DEMO = process.env.OGGI_DEMO === "1" || !process.env.NOTION_TOKEN;
 const store = DEMO ? require("./demo") : require("./notion");
 
 const PORT = process.env.PORT || 8080;
 const SECRET = process.env.SESSION_SECRET || (DEMO ? "demo-secret" : null);
 const ALLOWED = (process.env.ALLOWED_EMAIL || "").toLowerCase().split(",").map((s) => s.trim()).filter(Boolean);
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
-const MAIL_FROM = process.env.MAIL_FROM || "briefme <brief@princellama.com>";
+const MAIL_FROM = process.env.MAIL_FROM || "Oggi <oggi@princellama.com>";
 
 if (!SECRET) {
   console.error("SESSION_SECRET is not set. Refusing to start without it.");
@@ -60,7 +60,7 @@ function cookie(req, name) {
 
 function authed(req) {
   if (DEMO) return { e: "demo" };
-  return verify(cookie(req, "bm"));
+  return verify(cookie(req, "oggi"));
 }
 function requireAuth(req, res, next) {
   if (authed(req)) return next();
@@ -86,8 +86,8 @@ app.post("/auth/request", async (req, res) => {
       body: JSON.stringify({
         from: MAIL_FROM,
         to: [email],
-        subject: "Your briefme sign-in link",
-        text: `Open this link to sign in to briefme. It works once, for 15 minutes.\n\n${link}\n\nIf you did not ask for it, ignore this email.`,
+        subject: "Your Oggi sign-in link",
+        text: `Open this link to sign in to Oggi. It works once, for 15 minutes.\n\n${link}\n\nIf you did not ask for it, ignore this email.`,
       }),
     });
     if (!r.ok) console.error("Resend error", r.status, await r.text());
@@ -105,11 +105,11 @@ app.get("/auth/verify", (req, res) => {
   usedLinks.add(t);
   const session = sign({ e: p.e, k: "session", exp: Date.now() + 90 * 24 * 3600_000 });
   const secure = BASE_URL.startsWith("https") ? "; Secure" : "";
-  res.set("Set-Cookie", `bm=${encodeURIComponent(session)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${90 * 24 * 3600}${secure}`);
+  res.set("Set-Cookie", `oggi=${encodeURIComponent(session)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${90 * 24 * 3600}${secure}`);
   res.redirect("/");
 });
 app.post("/auth/signout", (req, res) => {
-  res.set("Set-Cookie", "bm=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
+  res.set("Set-Cookie", "oggi=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
   res.json({ ok: true });
 });
 app.get("/auth/me", (req, res) => res.json({ signedIn: !!authed(req), demo: DEMO }));
@@ -185,4 +185,4 @@ app.use(express.static(path.join(__dirname, "public"), {
 }));
 app.get("*", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
-app.listen(PORT, () => console.log(`briefme on ${PORT}${DEMO ? " (demo data)" : ""}`));
+app.listen(PORT, () => console.log(`oggi on ${PORT}${DEMO ? " (demo data)" : ""}`));

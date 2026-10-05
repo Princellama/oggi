@@ -1,4 +1,4 @@
-// In-memory stand-in for notion.js, used when BRIEFME_DEMO=1 or no NOTION_TOKEN.
+// In-memory stand-in for notion.js, used when OGGI_DEMO=1 or no NOTION_TOKEN.
 // Same interface, seeded with sample data, so the app can be run and checked anywhere.
 const sample = require("./data/sample.json");
 

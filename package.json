@@ -1,12 +1,12 @@
 {
-  "name": "briefme",
+  "name": "oggi",
   "version": "0.1.0",
   "private": true,
   "description": "Eric's daily brief, on the web. Notion is the store; Claude writes, the app reads and edits.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "BRIEFME_DEMO=1 node server.js"
+    "dev": "OGGI_DEMO=1 node server.js"
   },
   "engines": {
     "node": ">=20"

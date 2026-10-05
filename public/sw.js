@@ -1,6 +1,6 @@
 // Cache the app shell so the brief opens with a weak signal.
 // The brief data itself is cached by the page (last good copy), never here.
-const SHELL = "briefme-shell-v1";
+const SHELL = "oggi-shell-v1";
 const FILES = ["/", "/index.html", "/styles.css", "/app.js", "/fonts/fraunces-latin-600-normal.woff2", "/icons/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {

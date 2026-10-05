@@ -1,4 +1,4 @@
-/* briefme — client. Plain JS, no build step.
+/* Oggi — client. Plain JS, no build step.
    Every piece of gathered text is rendered with textContent, never as markup. */
 (function () {
   "use strict";
@@ -478,7 +478,7 @@
   function claudeLink() {
     const lines = (B.day.edits || "").split("\n").filter(Boolean);
     const prompt =
-`In briefme I made these changes since the ${String(B.day.pass || "morning").toLowerCase()} brief on ${B.day.date}. They are already saved in Notion (Brief Days → "Edits since brief" for ${B.day.date}, and the Brief Items rows).
+`In Oggi I made these changes since the ${String(B.day.pass || "morning").toLowerCase()} brief on ${B.day.date}. They are already saved in Notion (Brief Days → "Edits since brief" for ${B.day.date}, and the Brief Items rows).
 
 ${lines.map((l) => "- " + l.replace(/^\d\d:\d\dZ\s*/, "")).join("\n")}
 

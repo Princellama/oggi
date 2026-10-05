@@ -1,6 +1,6 @@
 {
-  "name": "Brief",
-  "short_name": "Brief",
+  "name": "Oggi",
+  "short_name": "Oggi",
   "description": "The shape of the day and the few things worth knowing.",
   "start_url": "/?view=now",
   "scope": "/",

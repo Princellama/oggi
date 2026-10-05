@@ -1,11 +1,11 @@
-# briefme
+# Oggi
 
-Eric's daily brief on the web — briefme.princellama.com.
+Eric's daily brief on the web — oggi.princellama.com.
 
 Notion is the store. The morning, afternoon and evening brief runs (Claude) write two Notion tables; this app reads them and writes back what Eric does: notes, intentions, the evening choices, captures. Every edit is also appended to the day's **Edits since brief**, which the next brief run reads and the **Send to Claude** button carries into a new chat.
 
 ```
-Claude (brief skill) ──writes──▶ Notion: Brief Days + Brief Items ◀──reads / edits── briefme (this app)
+Claude (brief skill) ──writes──▶ Notion: Brief Days + Brief Items ◀──reads / edits── Oggi (this app)
                                   Notion: #QuickActions          ◀──captures, due dates──┘
 ```
 
@@ -29,12 +29,12 @@ The app shows the latest Brief Days row on or before today, with the Brief Items
 
 | Name | Value |
 | --- | --- |
-| `NOTION_TOKEN` | The internal integration secret for "briefme". The three tables above must be shared with that integration. |
+| `NOTION_TOKEN` | The internal integration secret for "oggi". The three tables above must be shared with that integration. |
 | `SESSION_SECRET` | Any long random string. Changing it signs everyone out. |
 | `ALLOWED_EMAIL` | The address that may sign in (comma-separate more than one). |
 | `RESEND_API_KEY` | A Resend key for princellama.com (the domain is already verified). |
-| `MAIL_FROM` | `briefme <brief@princellama.com>` |
-| `BASE_URL` | `https://briefme.princellama.com` |
+| `MAIL_FROM` | `Oggi <oggi@princellama.com>` |
+| `BASE_URL` | `https://oggi.princellama.com` |
 
 No database. Sign-in is a one-time emailed link (15 minutes), then a 90-day signed cookie.
 
@@ -47,4 +47,4 @@ npm run dev        # demo data, no Notion, no sign-in, http://localhost:8080
 
 ## Deploy
 
-Same pattern as JIRO and Dolce: Railway web service from GitHub `Princellama/briefme`, custom domain `briefme.princellama.com` via a GoDaddy CNAME plus Railway's TXT verify record.
+Same pattern as JIRO and Dolce: Railway web service from GitHub `Princellama/oggi`, custom domain `oggi.princellama.com` via a GoDaddy CNAME plus Railway's TXT verify record.
