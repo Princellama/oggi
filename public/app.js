@@ -79,6 +79,23 @@
     return svg;
   }
 
+  // ---------------- areas ----------------
+  // The four main areas sit above the places: a place is where a thing lives on the drive,
+  // an area is which part of life it belongs to. Claude sets Area; older rows fall back to Place.
+  const AREAS = [
+    { name: "CPA", glyph: "g-tax", cls: "a-cpa" },
+    { name: "Medicare", glyph: "g-medicare", cls: "a-med" },
+    { name: "Personal", glyph: "g-person", cls: "a-per" },
+    { name: "Money", glyph: "g-money", cls: "a-mon" },
+  ];
+  const areaOf = (it) => it.area && AREAS.some((a) => a.name === it.area) ? it.area : (it.place === "Kahala" ? "CPA" : it.place === "Kakaako" ? "Medicare" : "Personal");
+  const areaDef = (name) => AREAS.find((a) => a.name === name) || AREAS[2];
+  function areaChip(name, withLabel = true) {
+    const a = areaDef(name);
+    return h("span", { class: "area " + a.cls, title: a.name }, glyphSvg(a.glyph), withLabel ? a.name : null);
+  }
+  let areaFilter = null;
+
   // ---------------- state ----------------
   let B = null;         // { day, items }
   let selKey = null;    // selected item id (desktop)
@@ -224,7 +241,7 @@
   function titleEl(it) {
     const url = safeUrl(it.link);
     const el = url ? ext(h("a", { class: "ttl", href: url })) : h("span", { class: "ttl" });
-    el.append(glyph(it.place), document.createTextNode(it.title || ""));
+    el.append(document.createTextNode(it.title || ""));
     return el;
   }
 
@@ -288,7 +305,13 @@
     else {
       const n = needs(), r = resolved();
       if (!n.length && !r.length) bot.append(h("p", { class: "calm", text: "Nothing needs you this morning." }));
-      if (n.length) bot.append(h("div", { class: "blk" }, h("h2", { class: "sec", text: "Needs attention" }), listOf(n, true)));
+      if (n.length) {
+        bot.append(areaStrip(n));
+        const shown = areaFilter ? n.filter((it) => areaOf(it) === areaFilter) : n;
+        shown.numbers = shown.map((it) => n.indexOf(it));
+        bot.append(h("div", { class: "blk" }, h("h2", { class: "sec", text: areaFilter ? `Needs attention · ${areaFilter}` : "Needs attention" }),
+          shown.length ? listOf(shown, true) : h("p", { class: "quiet", text: `Nothing open in ${areaFilter}.` })));
+      }
       if (r.length) bot.append(h("div", { class: "blk" }, h("h2", { class: "sec", text: "Resolved" }), listOf(r, false)));
       bot.append(renderIntentions(pass));
     }
@@ -296,13 +319,25 @@
     pane.append(h("div", null, bot));
   }
 
+  function areaStrip(items) {
+    const strip = h("div", { class: "areas", role: "group", "aria-label": "Filter by area" });
+    for (const a of AREAS) {
+      const open = items.filter((it) => it.status !== "Closed" && areaOf(it) === a.name).length;
+      const b = h("button", { class: "areatile " + a.cls + (open ? "" : " empty"), "aria-pressed": String(areaFilter === a.name) },
+        glyphSvg(a.glyph), h("span", { class: "an", text: a.name }), h("span", { class: "ac", text: String(open) }));
+      b.addEventListener("click", () => { areaFilter = areaFilter === a.name ? null : a.name; rerenderListOnly(); });
+      strip.append(b);
+    }
+    return strip;
+  }
+
   function listOf(items, live) {
     const ol = h("ol", { class: "items" });
     items.forEach((it, idx) => {
       const closed = it.status === "Closed" && live;
       const li = h("li", { "data-id": it.id, class: (closed ? "closed " : "") + (selKey === it.id ? "sel" : "") });
-      li.append(h("span", { class: "num", text: String(idx + 1) }));
-      const body = h("div", { class: "body" }, titleEl(it), sentence(it));
+      li.append(h("span", { class: "num", text: String((items.numbers ? items.numbers[idx] : idx) + 1) }));
+      const body = h("div", { class: "body" }, h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place })), titleEl(it), sentence(it));
       if (it.note) body.append(h("p", { class: "mynote", text: it.note }));
       if (live && !closed && !isDesk()) body.append(inlineTools(it, body));
       li.append(body);
@@ -353,7 +388,8 @@
       const li = h("li", { "data-id": it.id, class: selKey === it.id ? "sel" : "" });
       li.append(h("span", { class: "num", text: String(i + 1) }));
       const body = h("div", { class: "body" });
-      body.append(h("span", { class: "ttl" }, glyph(it.place), it.title));
+      body.append(h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place })));
+      body.append(h("span", { class: "ttl", text: it.title }));
       const carried = it.carries > 0 ? `Carried ${it.carries} day${it.carries === 1 ? "" : "s"}.` : "New today.";
       body.append(h("p", { class: "carry", text: `${carried} ${firstSentence(it.sentence)}` }));
       body.append(choiceRow(it));
@@ -408,6 +444,8 @@
     box.append(w);
     pane.append(box);
     if (!B || !B.day) { w.append(h("p", { class: "now-empty", text: "Nothing yet. The brief lands here in the morning." })); return; }
+    const rec = renderRecommendation();
+    if (rec) { box.classList.add("has-rec"); pane.append(rec); }
     const seq = nowSequence();
     if (!seq.length) { w.append(h("p", { class: "now-empty", text: "Nothing is waiting on you. The rest of today is yours." })); return; }
     nowIdx = Math.max(0, Math.min(nowIdx, seq.length - 1));
@@ -423,7 +461,7 @@
       if (nextItem) w.append(h("p", { class: "now-then" }, h("span", { class: "quiet", style: "margin-right:8px", text: running ? "After this" : "Before it" }), h("b", { text: nextItem.it.title })));
     } else {
       const it = cur.it;
-      w.append(h("p", { class: "now-kicker" }, glyph(it.place), it.place));
+      w.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: "· " + it.place })));
       w.append(h("h1", { class: "now-title", text: it.title }));
       w.append(sentence(it));
       if (it.carries > 1) w.append(h("p", { class: "now-carry", text: `Carried ${it.carries} days.` }));
@@ -443,6 +481,73 @@
     ctl.append(h("span", { class: "pos", text: `${nowIdx + 1} of ${seq.length}` }));
     if (isDesk()) ctl.append(h("button", { text: "Close", onclick: () => toggleFocus(false) }));
     w.append(ctl);
+  }
+
+  // ---------------- AI recommendation ----------------
+  // The brief run writes one recommendation into the day's JSON:
+  // { title, why, area, claude: "yes"|"partly"|"no", claudeDoes, youDo, prompt, mindmap: { center, branches: [{ label, items: [] }] } }
+  const CLAUDE_SAYS = { yes: "Claude can do this", partly: "Claude can do part of it", no: "This one needs you" };
+  function renderRecommendation() {
+    const r = B && B.day && B.day.recommendation;
+    if (!r || !r.title) return null;
+    const box = h("section", { class: "rec", "aria-label": "AI recommendation" });
+    const w = h("div", { class: "wrap" });
+    box.append(w);
+    w.append(h("h2", { class: "sec rec-sec" }, glyphSvg("g-spark"), "AI recommendation"));
+    const card = h("div", { class: "rec-card" });
+    if (r.area) card.append(h("p", { class: "itemmeta" }, areaChip(r.area)));
+    card.append(h("h3", { class: "rec-title", text: r.title }));
+    if (r.why) card.append(h("p", { class: "rec-why", text: r.why }));
+    const who = CLAUDE_SAYS[r.claude] ? r.claude : "no";
+    card.append(h("p", { class: "rec-badge rb-" + who, text: CLAUDE_SAYS[who] }));
+    const dl = h("dl", { class: "rec-split" });
+    if (r.claudeDoes && who !== "no") dl.append(h("dt", { text: "Claude" }), h("dd", { text: r.claudeDoes }));
+    if (r.youDo) dl.append(h("dt", { text: "You" }), h("dd", { text: r.youDo }));
+    if (dl.childNodes.length) card.append(dl);
+    if (who !== "no") {
+      const prompt = r.prompt || `Please take care of this for me: ${r.title}. ${r.claudeDoes || ""} Read the barayuga-notion skill first, and tell me what is left for me when you're done.`;
+      card.append(h("div", { class: "row" }, ext(h("a", { class: "btn", href: "https://claude.ai/new?q=" + encodeURIComponent(prompt), text: who === "yes" ? "Have Claude do it" : "Have Claude start it" }))));
+    }
+    w.append(card);
+    if (r.mindmap && r.mindmap.center && Array.isArray(r.mindmap.branches) && r.mindmap.branches.length) {
+      w.append(h("h2", { class: "sec rec-sec", text: "The plan" }));
+      w.append(mindmap(r.mindmap));
+    }
+    return box;
+  }
+
+  // A small left-to-right mind map: the goal, up to four branches, up to three steps each.
+  // Laid out with HTML so labels wrap naturally; the connectors are drawn after layout.
+  function mindmap(m) {
+    const root = h("div", { class: "mm" });
+    const svg = s("svg", { class: "mm-lines", "aria-hidden": "true" });
+    const center = h("div", { class: "mm-center", text: m.center });
+    const col = h("div", { class: "mm-branches" });
+    const nodes = [];
+    for (const b of m.branches.slice(0, 4)) {
+      const node = h("div", { class: "mm-node", text: b.label || "" });
+      const leaves = h("ul", { class: "mm-leaves" }, (b.items || []).slice(0, 3).map((t) => h("li", { text: t })));
+      col.append(h("div", { class: "mm-branch" }, node, leaves));
+      nodes.push(node);
+    }
+    root.append(svg, center, col);
+    root.setAttribute("role", "img");
+    root.setAttribute("aria-label", `Plan: ${m.center}. ` + m.branches.slice(0, 4).map((b) => `${b.label}: ${(b.items || []).join(", ")}`).join(". "));
+    const draw = () => {
+      if (!root.isConnected) return;
+      const R = root.getBoundingClientRect(), C = center.getBoundingClientRect();
+      svg.setAttribute("width", R.width); svg.setAttribute("height", R.height);
+      svg.replaceChildren();
+      const x1 = C.right - R.left, y1 = C.top - R.top + C.height / 2;
+      for (const n of nodes) {
+        const N = n.getBoundingClientRect();
+        const x2 = N.left - R.left, y2 = N.top - R.top + N.height / 2, mx = (x1 + x2) / 2;
+        svg.append(s("path", { d: `M${x1} ${y1} C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}`, fill: "none", stroke: "#B4B3A8", "stroke-width": 1.5 }));
+      }
+    };
+    requestAnimationFrame(draw);
+    if ("ResizeObserver" in window) new ResizeObserver(() => draw()).observe(root);
+    return root;
   }
   function glyphSvg(id) { const v = s("svg", { class: "gl", "aria-hidden": "true" }); v.append(s("use", { href: "#" + id })); return v; }
 
@@ -548,6 +653,13 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
         b.addEventListener("click", async () => { await patchItem(it, { place: p.name }); renderAll(); });
         places.append(b);
       }
+      const areas = h("div", { class: "places" });
+      for (const a of AREAS) {
+        const b = h("button", { "aria-pressed": String(areaOf(it) === a.name) }, glyphSvg(a.glyph), a.name);
+        b.addEventListener("click", async () => { await patchItem(it, { area: a.name }); renderAll(); });
+        areas.append(b);
+      }
+      inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Area" }), areas));
       inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Place" }), places));
       inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: it.carries ? `Where it goes · carried ${it.carries} day${it.carries === 1 ? "" : "s"}` : "Where it goes" }), choiceRow(it)));
 
@@ -560,6 +672,8 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
       inner.append(h("div", { class: "ed-row" }, links));
       inner.append(h("hr"));
     } else {
+      const rec = renderRecommendation();
+      if (rec) { rec.classList.add("in-aside"); inner.append(rec, h("hr")); }
       inner.append(h("p", { class: "quiet", style: "margin:0 0 24px", text: "Select an item to edit it, or press j." }));
     }
 

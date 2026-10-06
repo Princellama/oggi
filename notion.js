@@ -59,6 +59,7 @@ function toItem(page) {
     title: read(p["Title"]),
     mapLabel: read(p["Map label"]),
     place: read(p["Place"]) || "Skyline",
+    area: read(p["Area"]),
     list: read(p["List"]),
     status: read(p["Status"]) || "Open",
     order: read(p["Order"]) ?? 99,
@@ -137,6 +138,7 @@ async function updateItem(id, fields) {
   if ("title" in fields) props["Title"] = { title: rich(fields.title) };
   if ("note" in fields) props["Note"] = { rich_text: rich(fields.note) };
   if ("place" in fields) props["Place"] = { select: { name: fields.place } };
+  if ("area" in fields) props["Area"] = { select: { name: fields.area } };
   if ("order" in fields) props["Order"] = { number: fields.order };
   if ("status" in fields) props["Status"] = { select: { name: fields.status } };
   if ("decision" in fields) {

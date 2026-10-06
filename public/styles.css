@@ -219,3 +219,61 @@ ul.added li .quiet { margin-left: 8px; }
 @media (prefers-reduced-motion: no-preference) {
   .panes { scroll-behavior: smooth; }
 }
+
+/* ---------- areas ---------- */
+:root { --cpa: #B4552F; --med: #3E7A57; --per: #8C6A1F; --mon: #2F5F8C; }
+.a-cpa { --ac: var(--cpa); } .a-med { --ac: var(--med); } .a-per { --ac: var(--per); } .a-mon { --ac: var(--mon); }
+.itemmeta { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 12px; }
+.area { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ac); }
+.area .gl { width: 14px; height: 14px; margin: 0; color: var(--ac); }
+.now-kicker .area .gl { width: 16px; height: 16px; color: var(--ac); }
+.areas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 0 0 26px; }
+.areatile {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 10px 9px;
+  border: 1px solid var(--hair); border-radius: 10px; background: var(--bg); text-align: left; min-width: 0;
+}
+.areatile .gl { width: 18px; height: 18px; margin: 0 0 4px; color: var(--ac); }
+.areatile .an { font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.areatile .ac { font-size: 20px; line-height: 1.1; font-family: var(--serif); font-weight: 600; color: var(--ac); font-variant-numeric: tabular-nums; }
+.areatile.empty { opacity: .55; }
+.areatile.empty .ac { color: var(--grey); }
+.areatile[aria-pressed="true"] { border-color: var(--ac); box-shadow: inset 0 0 0 1px var(--ac); background: var(--wash); }
+
+/* ---------- AI recommendation ---------- */
+.rec { background: var(--bg); border-top: 1px solid var(--hair); padding: 30px 0 40px; }
+.rec .wrap { max-width: 640px; }
+.rec-sec { display: flex; align-items: center; gap: 8px; }
+.rec-sec .gl { width: 16px; height: 16px; margin: 0; color: var(--clay); }
+.rec-card { border: 1px solid var(--hair); border-radius: 12px; padding: 18px 18px 20px; margin: 0 0 30px; background: var(--wash); }
+.rec-title { font-family: var(--serif); font-weight: 600; font-size: 22px; line-height: 1.25; color: var(--ink); margin: 2px 0 8px; }
+.rec-why { margin: 0 0 14px; }
+.rec-badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; margin: 0 0 12px; }
+.rb-yes { background: #E3EFE7; color: #2F6A47; }
+.rb-partly { background: #F4E9DC; color: #8A5524; }
+.rb-no { background: #ECEBE6; color: var(--soft); }
+.rec-split { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0 0 16px; font-size: 14px; }
+.rec-split dt { font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); padding-top: 2px; }
+.rec-split dd { margin: 0; }
+.rec-card .row { display: flex; gap: 18px; align-items: center; }
+
+/* ---------- mind map ---------- */
+.mm { position: relative; display: grid; grid-template-columns: minmax(90px, 30%) 1fr; column-gap: 34px; align-items: center; }
+.mm-lines { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+.mm-center {
+  position: relative; background: var(--ink); color: var(--bg); border-radius: 12px; padding: 12px 12px;
+  font-family: var(--serif); font-weight: 600; font-size: 15px; line-height: 1.25; text-align: center;
+}
+.mm-branches { display: flex; flex-direction: column; gap: 14px; }
+.mm-branch { position: relative; }
+.mm-node {
+  display: inline-block; position: relative; border: 1.5px solid var(--ink); border-radius: 999px;
+  padding: 3px 12px; font-size: 13px; font-weight: 600; color: var(--ink); background: var(--bg);
+}
+.mm-leaves { list-style: none; margin: 6px 0 0 14px; padding: 0 0 0 12px; border-left: 1.5px solid var(--hair); font-size: 13px; line-height: 1.4; }
+.mm-leaves li { padding: 2px 0; }
+@media (max-width: 420px) { .mm { column-gap: 22px; grid-template-columns: minmax(80px, 32%) 1fr; } .mm-center { font-size: 14px; } }
+/* let the recommendation peek under the Now card so it is discoverable */
+.pane[data-pane="now"] .now.has-rec { min-height: calc(100% - 64px); }
+.rec.in-aside { border-top: 0; padding: 0; background: none; }
+.rec.in-aside .wrap { padding: 0; }
+.rec.in-aside .rec-title { font-size: 19px; }

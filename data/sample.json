@@ -62,7 +62,49 @@
         "at": "middle"
       }
     ],
-    "tomorrow": "Tuesday opens with nothing booked until noon; you chose to carry Sam's return and the Guam reply."
+    "tomorrow": "Tuesday opens with nothing booked until noon; you chose to carry Sam's return and the Guam reply.",
+    "recommendation": {
+      "title": "Send Sam the e-file authorization tonight",
+      "why": "His return is the only one with a hard deadline before you board, and the signature is the one step that can't happen from the ship.",
+      "area": "CPA",
+      "claude": "partly",
+      "claudeDoes": "Draft the 8879 email to Sam and set a reminder for the follow-up.",
+      "youDo": "Review the return totals and press send.",
+      "prompt": "Draft an email to Sam asking him to sign his e-file authorization (Form 8879) tonight, so his return can be filed before I board on Wednesday. Keep it short and warm, in my voice. Then add a QuickAction in Notion to follow up tomorrow morning if he hasn't signed.",
+      "mindmap": {
+        "center": "Sam filed before Wednesday",
+        "branches": [
+          {
+            "label": "Finish",
+            "items": [
+              "Check totals",
+              "Attach W-2s"
+            ]
+          },
+          {
+            "label": "Signature",
+            "items": [
+              "Email the 8879",
+              "Follow up 9 AM"
+            ]
+          },
+          {
+            "label": "File",
+            "items": [
+              "E-file in Axcess",
+              "Save the acknowledgement"
+            ]
+          },
+          {
+            "label": "If it slips",
+            "items": [
+              "File an extension",
+              "Tell Sam the plan"
+            ]
+          }
+        ]
+      }
+    }
   },
   "items": [
     {
@@ -80,7 +122,8 @@
       "carries": 1,
       "note": "",
       "decision": null,
-      "mapLabel": "Sam’s return"
+      "mapLabel": "Sam’s return",
+      "area": "CPA"
     },
     {
       "id": "d2",
@@ -97,7 +140,8 @@
       "carries": 0,
       "note": "",
       "decision": null,
-      "mapLabel": "Mia’s return"
+      "mapLabel": "Mia’s return",
+      "area": "CPA"
     },
     {
       "id": "d3",
@@ -114,7 +158,8 @@
       "carries": 0,
       "note": "",
       "decision": null,
-      "mapLabel": "Theo’s return"
+      "mapLabel": "Theo’s return",
+      "area": "CPA"
     },
     {
       "id": "d4",
@@ -131,7 +176,8 @@
       "carries": 11,
       "note": "",
       "decision": null,
-      "mapLabel": "Lea’s refund"
+      "mapLabel": "Lea’s refund",
+      "area": "CPA"
     },
     {
       "id": "d5",
@@ -148,7 +194,8 @@
       "carries": 7,
       "note": "Might be spam or phishing.",
       "decision": null,
-      "mapLabel": "Guam call time"
+      "mapLabel": "Guam call time",
+      "area": "CPA"
     },
     {
       "id": "d6",
@@ -165,7 +212,8 @@
       "carries": 1,
       "note": "",
       "decision": null,
-      "mapLabel": "Card declined"
+      "mapLabel": "Card declined",
+      "area": "Money"
     },
     {
       "id": "d7",
@@ -182,7 +230,8 @@
       "carries": 1,
       "note": "",
       "decision": null,
-      "mapLabel": "Enrolment opens"
+      "mapLabel": "Enrolment opens",
+      "area": "Medicare"
     },
     {
       "id": "d8",
@@ -199,7 +248,8 @@
       "carries": 1,
       "note": "",
       "decision": null,
-      "mapLabel": "Convention ranking"
+      "mapLabel": "Convention ranking",
+      "area": "Personal"
     },
     {
       "id": "r1",
@@ -213,7 +263,8 @@
       "sourcePhrase": "shared his device over Tailscale",
       "link": "https://mail.google.com/",
       "carries": 0,
-      "note": ""
+      "note": "",
+      "area": "Personal"
     },
     {
       "id": "r2",
@@ -227,7 +278,8 @@
       "sourcePhrase": "sent word this morning",
       "link": "https://mail.google.com/",
       "carries": 0,
-      "note": ""
+      "note": "",
+      "area": "Money"
     }
   ]
 }

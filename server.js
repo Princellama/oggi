@@ -136,10 +136,11 @@ app.get("/api/brief", requireAuth, wrap(async (req, res) => {
 }));
 
 app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
-  const allowed = ["title", "note", "place", "order", "decision", "status"];
+  const allowed = ["title", "note", "place", "area", "order", "decision", "status"];
   const fields = {};
   for (const k of allowed) if (k in req.body) fields[k] = req.body[k];
   if (fields.place && !["Skyline", "Airport", "Kalihi", "Kakaako", "Kahala", "Hawaii Kai", "Home"].includes(fields.place)) return res.status(400).json({ error: "place" });
+  if (fields.area && !["CPA", "Medicare", "Personal", "Money"].includes(fields.area)) return res.status(400).json({ error: "area" });
   if ("decision" in fields && fields.decision !== null && !["Tomorrow", "This week", "Let go"].includes(fields.decision)) return res.status(400).json({ error: "decision" });
   if ("status" in fields && !["Open", "Closed"].includes(fields.status)) return res.status(400).json({ error: "status" });
   const item = await store.updateItem(req.params.id, fields);
@@ -154,6 +155,7 @@ app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
   } else if ("status" in fields) line = `${t} → marked ${fields.status === "Closed" ? "done" : "open again"}`;
   else if ("title" in fields) line = `Renamed an item to “${t}”`;
   else if ("place" in fields) line = `${t} → moved to ${fields.place}`;
+  else if ("area" in fields) line = `${t} → area ${fields.area}`;
   else if ("note" in fields && fields.note) line = `Note on ${t}: ${fields.note}`;
   const mergeKey = "note" in fields ? `Note on ${t}:` : ("decision" in fields ? `${t} → ` : null);
   if (line && dayId) await store.logEdit(dayId, `${stamp()} ${line}`, mergeKey);
