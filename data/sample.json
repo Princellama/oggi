@@ -7,18 +7,18 @@
     "headline": "Meetings bookend the day, Eric — the middle is yours for the three returns.",
     "mapCaption": "Nearly all the weight is at Kahala — five tax matters, three of them returns to finish before Wednesday — with one item each at Kakaako, Kalihi and Hawaii Kai.",
     "intentions": "",
-    "previousIntentions": "Close Daryl's return before lunch.",
+    "previousIntentions": "Close Sam's return before lunch.",
     "log": "",
     "edits": "",
     "timezone": "Asia/Tokyo",
     "acts": [
       {
         "time": "8:30 – 11 AM",
-        "text": "A FLOWN session first, then the Galera follow-up call — the morning has a shape before you open the inbox."
+        "text": "A FLOWN session first, then the Reyes follow-up call — the morning has a shape before you open the inbox."
       },
       {
         "time": "11 AM – 3 PM",
-        "text": "Nothing booked. The returns fit here, Daryl's first because his deadline lands while you are at sea."
+        "text": "Nothing booked. The returns fit here, Sam's first because his deadline lands while you are at sea."
       },
       {
         "time": "3 PM onward",
@@ -36,7 +36,7 @@
       {
         "start": "2026-10-05T10:15:00+09:00",
         "end": "2026-10-05T10:45:00+09:00",
-        "title": "Call Cathy Galera — living benefits follow-up",
+        "title": "Call Ana Reyes — living benefits follow-up",
         "where": "Phone",
         "weight": 1
       },
@@ -62,13 +62,13 @@
         "at": "middle"
       }
     ],
-    "tomorrow": "Tuesday opens with nothing booked until noon; you chose to carry Daryl's return and the Guam reply."
+    "tomorrow": "Tuesday opens with nothing booked until noon; you chose to carry Sam's return and the Guam reply."
   },
   "items": [
     {
       "id": "d1",
       "key": "daryl-extension",
-      "title": "Daryl’s return, finished before you board Wednesday",
+      "title": "Sam’s return, finished before you board Wednesday",
       "place": "Kahala",
       "list": "Needs attention",
       "status": "Open",
@@ -80,12 +80,12 @@
       "carries": 1,
       "note": "",
       "decision": null,
-      "mapLabel": "Daryl’s return"
+      "mapLabel": "Sam’s return"
     },
     {
       "id": "d2",
       "key": "kikuyo-return",
-      "title": "Kikuyo Prothe’s return, moved up to as soon as possible",
+      "title": "Mia Lane’s return, moved up to as soon as possible",
       "place": "Kahala",
       "list": "Needs attention",
       "status": "Open",
@@ -97,12 +97,12 @@
       "carries": 0,
       "note": "",
       "decision": null,
-      "mapLabel": "Kikuyo’s return"
+      "mapLabel": "Mia’s return"
     },
     {
       "id": "d3",
       "key": "isaac-return",
-      "title": "Isaac’s return, with his documents already in",
+      "title": "Theo’s return, with his documents already in",
       "place": "Kahala",
       "list": "Needs attention",
       "status": "Closed",
@@ -114,12 +114,12 @@
       "carries": 0,
       "note": "",
       "decision": null,
-      "mapLabel": "Isaac’s return"
+      "mapLabel": "Theo’s return"
     },
     {
       "id": "d4",
       "key": "louis-adjustment",
-      "title": "Rona is still waiting to hear why her refund was short",
+      "title": "Lea is still waiting to hear why her refund was short",
       "place": "Kahala",
       "list": "Needs attention",
       "status": "Open",
@@ -131,7 +131,7 @@
       "carries": 11,
       "note": "",
       "decision": null,
-      "mapLabel": "Rona’s refund"
+      "mapLabel": "Lea’s refund"
     },
     {
       "id": "d5",
@@ -204,7 +204,7 @@
     {
       "id": "r1",
       "key": "r-tailscale",
-      "title": "Don’s exit node is shared with you",
+      "title": "Ken’s exit node is shared with you",
       "place": "Hawaii Kai",
       "list": "Resolved",
       "status": "Closed",

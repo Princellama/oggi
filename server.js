@@ -5,7 +5,14 @@ const express = require("express");
 const crypto = require("crypto");
 const path = require("path");
 
-const DEMO = process.env.OGGI_DEMO === "1" || !process.env.NOTION_TOKEN;
+// Demo mode skips sign-in and serves sample data, so it only ever runs when asked for
+// explicitly, and never on Railway.
+const ON_RAILWAY = !!process.env.RAILWAY_ENVIRONMENT_NAME || !!process.env.RAILWAY_PROJECT_ID;
+const DEMO = process.env.OGGI_DEMO === "1" && !ON_RAILWAY;
+if (!DEMO && !process.env.NOTION_TOKEN) {
+  console.error("NOTION_TOKEN is not set. Refusing to start without it (use npm run dev for demo data).");
+  process.exit(1);
+}
 const store = DEMO ? require("./demo") : require("./notion");
 
 const PORT = process.env.PORT || 8080;
