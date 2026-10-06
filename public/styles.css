@@ -98,7 +98,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .now-title { font-family: var(--serif); font-weight: 600; font-size: 36px; line-height: 1.18; color: var(--ink); margin: 0 0 14px; letter-spacing: -.01em; }
 .now-sub { margin: 0 0 22px; font-size: 15px; }
 .now-sub a { text-decoration: underline; text-decoration-color: #C9C8BF; text-underline-offset: 2px; }
-.now-carry { font-size: 13px; color: var(--grey); margin: -12px 0 22px; }
+.now-carry { font-size: 13px; color: var(--grey); margin: 10px 0 0; }
 .now-then { border-top: 1px solid var(--hair); margin-top: 34px; padding-top: 16px; font-size: 13.5px; }
 .now-then b { font-weight: 600; color: var(--ink); }
 .now-ctl { display: flex; gap: 28px; align-items: center; margin-top: 30px; font-size: 14px; }
