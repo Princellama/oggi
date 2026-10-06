@@ -161,7 +161,7 @@
     } else svg.append(s("path", { ...common, stroke: "#2E2C27", d: path(0, W) }));
 
     // motif: one clay sun where the day opens up
-    const sun = ((B.day.motifs || []).find((m) => m.kind === "sun"));
+    const sun = ((B.day.motifs || []).find((m) => m && (m.kind === "sun" || m === "sun")));
     if (sun) {
       const sx = sun.at === "evening" ? 700 : sun.at === "morning" ? 140 : 420;
       const g = s("g", { fill: "none", stroke: "#C6613F", "stroke-width": "1.5", "stroke-linecap": "round" });
@@ -289,7 +289,7 @@
     if (!evening) {
       top.append(drawTerrain());
       const acts = h("div", { class: "acts" });
-      for (const a of (B.day.acts || []).slice(0, 3)) acts.append(h("div", { class: "act" }, h("span", { class: "t", text: a.time }), h("p", { text: a.text })));
+      for (const a of (B.day.acts || []).slice(0, 3)) acts.append(h("div", { class: "act" }, h("span", { class: "t", text: a.time || a.range || "" }), h("p", { text: a.text })));
       top.append(acts);
     }
     pane.append(h("div", { class: "band-top" }, top));
@@ -408,7 +408,8 @@
     inp.addEventListener("input", () => save(inp.value));
     logBox.append(inp, saved);
     wrap.append(logBox);
-    if (B.day.tomorrow) wrap.append(h("p", { class: "opens", text: B.day.tomorrow }));
+    const tmr = typeof B.day.tomorrow === "string" ? B.day.tomorrow : (B.day.tomorrow && B.day.tomorrow.text);
+    if (tmr) wrap.append(h("p", { class: "opens", text: tmr }));
     return wrap;
   }
   const firstSentence = (t) => { const m = String(t || "").match(/^.*?[.!?](\s|$)/); return m ? m[0].trim() : String(t || ""); };
@@ -732,7 +733,8 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
     if (passOf() === "Evening") {
       parts.push(open.length ? `${open.length} thing${open.length === 1 ? "" : "s"} to decide on.` : "Nothing to carry.");
       open.forEach((it, i) => parts.push(`${i + 1}. ${it.title}. ${it.carries ? `Carried ${it.carries} days.` : ""}`));
-      if (B.day.tomorrow) parts.push(B.day.tomorrow);
+      const tmr = typeof B.day.tomorrow === "string" ? B.day.tomorrow : (B.day.tomorrow && B.day.tomorrow.text);
+      if (tmr) parts.push(tmr);
     } else {
       if (open.length) parts.push("Needs attention.");
       open.forEach((it, i) => parts.push(`${i + 1}. ${it.title}. ${it.sentence || ""}`));
