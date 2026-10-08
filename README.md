@@ -32,6 +32,8 @@ The app shows the latest Brief Days row on or before today, with the Brief Items
 | `NOTION_TOKEN` | The internal integration secret for "oggi". The three tables above must be shared with that integration. |
 | `SESSION_SECRET` | Any long random string. Changing it signs everyone out. |
 | `ALLOWED_EMAIL` | The address that may sign in (comma-separate more than one). |
+| `OGGI_USER` | Username for PIN sign-in (not case-sensitive). |
+| `OGGI_PIN` | The PIN. Five wrong tries lock a device out for 15 minutes; fifteen in an hour pause PIN sign-in for an hour. The email link always works as a fallback. |
 | `RESEND_API_KEY` | A Resend key for princellama.com (the domain is already verified). |
 | `MAIL_FROM` | `Oggi <oggi@princellama.com>` |
 | `BASE_URL` | `https://oggi.princellama.com` |

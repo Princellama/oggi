@@ -20,6 +20,9 @@ const SECRET = process.env.SESSION_SECRET || (DEMO ? "demo-secret" : null);
 const ALLOWED = (process.env.ALLOWED_EMAIL || "").toLowerCase().split(",").map((s) => s.trim()).filter(Boolean);
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const MAIL_FROM = process.env.MAIL_FROM || "Oggi <oggi@princellama.com>";
+// Username + PIN sign-in. Both live only in Railway → Variables, never in the code.
+const PIN_USER = (process.env.OGGI_USER || "").trim().toLowerCase();
+const PIN = (process.env.OGGI_PIN || "").trim();
 
 if (!SECRET) {
   console.error("SESSION_SECRET is not set. Refusing to start without it.");
@@ -27,6 +30,7 @@ if (!SECRET) {
 }
 
 const app = express();
+app.set("trust proxy", 1); // Railway sits in front; needed for per-device lockout
 app.disable("x-powered-by");
 app.use(express.json({ limit: "64kb" }));
 app.use((req, res, next) => {
@@ -104,15 +108,50 @@ app.post("/auth/request", async (req, res) => {
   reply();
 });
 
+// ---------- username + PIN ----------
+// A four-digit PIN is only 10,000 guesses, so wrong tries lock out hard:
+// 5 wrong from one connection → that connection waits 15 minutes;
+// 15 wrong from anywhere within an hour → PIN sign-in pauses for an hour (the email link still works).
+const pinFails = new Map(); // ip -> { n, until }
+let pinGlobal = { n: 0, since: Date.now(), until: 0 };
+const hashed = (s) => crypto.createHash("sha256").update(String(s)).digest();
+function setSession(res, who) {
+  const session = sign({ e: who, k: "session", exp: Date.now() + 90 * 24 * 3600_000 });
+  const secure = BASE_URL.startsWith("https") ? "; Secure" : "";
+  res.set("Set-Cookie", `oggi=${encodeURIComponent(session)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${90 * 24 * 3600}${secure}`);
+}
+app.get("/auth/methods", (req, res) => res.json({ pin: !!(PIN_USER && PIN), email: ALLOWED.length > 0 }));
+app.post("/auth/pin", (req, res) => {
+  if (!PIN_USER || !PIN) return res.status(503).json({ error: "PIN sign-in is not set up." });
+  const now = Date.now();
+  if (now - pinGlobal.since > 3600_000) pinGlobal = { n: 0, since: now, until: 0 };
+  if (pinGlobal.until > now) return res.status(429).json({ error: "Too many wrong PINs. PIN sign-in is paused for an hour — use the email link instead." });
+  const ip = req.ip || "?";
+  const f = pinFails.get(ip) || { n: 0, until: 0 };
+  if (f.until > now) return res.status(429).json({ error: `Too many wrong tries. Try again in ${Math.ceil((f.until - now) / 60000)} minutes.` });
+  const user = String(req.body.user || "").trim().toLowerCase();
+  const pin = String(req.body.pin || "").trim();
+  const ok = crypto.timingSafeEqual(hashed(user), hashed(PIN_USER)) & crypto.timingSafeEqual(hashed(pin), hashed(PIN));
+  if (!ok) {
+    f.n += 1;
+    if (f.n >= 5) { f.until = now + 15 * 60_000; f.n = 0; }
+    pinFails.set(ip, f);
+    pinGlobal.n += 1;
+    if (pinGlobal.n >= 15) { pinGlobal.until = now + 3600_000; console.error("PIN sign-in paused after repeated wrong PINs"); }
+    return res.status(401).json({ error: "That username and PIN don't match." });
+  }
+  pinFails.delete(ip);
+  setSession(res, ALLOWED[0] || PIN_USER);
+  res.json({ ok: true });
+});
+
 const usedLinks = new Set();
 app.get("/auth/verify", (req, res) => {
   const t = String(req.query.t || "");
   const p = verify(t);
   if (!p || p.k !== "link" || usedLinks.has(t)) return res.redirect("/?signin=expired");
   usedLinks.add(t);
-  const session = sign({ e: p.e, k: "session", exp: Date.now() + 90 * 24 * 3600_000 });
-  const secure = BASE_URL.startsWith("https") ? "; Secure" : "";
-  res.set("Set-Cookie", `oggi=${encodeURIComponent(session)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${90 * 24 * 3600}${secure}`);
+  setSession(res, p.e);
   res.redirect("/");
 });
 app.post("/auth/signout", (req, res) => {

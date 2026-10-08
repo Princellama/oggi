@@ -277,3 +277,4 @@ ul.added li .quiet { margin-left: 8px; }
 .rec.in-aside { border-top: 0; padding: 0; background: none; }
 .rec.in-aside .wrap { padding: 0; }
 .rec.in-aside .rec-title { font-size: 19px; }
+.signin-row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }

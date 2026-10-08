@@ -118,8 +118,23 @@
   function showSignin(msg) {
     $("#app").hidden = true;
     $("#signin").hidden = false;
-    if (msg) $("#signinMsg").textContent = msg;
+    if (msg) { $("#pinForm").hidden = true; $("#signinForm").hidden = false; $("#signinMsg").textContent = msg; }
   }
+  $("#pinForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const user = $("#user").value.trim(), pin = $("#pin").value.trim();
+    if (!user || !pin) return;
+    const msg = $("#pinMsg");
+    try {
+      const r = await fetch("/auth/pin", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ user, pin }) });
+      if (r.ok) { $("#pin").value = ""; location.replace("/"); return; }
+      msg.textContent = (await r.json().catch(() => ({}))).error || "Sign-in failed.";
+    } catch { msg.textContent = "No connection. Try again in a moment."; }
+    $("#pin").value = "";
+  });
+  $("#toEmail").addEventListener("click", () => { $("#pinForm").hidden = true; $("#signinForm").hidden = false; });
+  $("#toPin").addEventListener("click", () => { $("#signinForm").hidden = true; $("#pinForm").hidden = false; });
+
   $("#signinForm").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const email = $("#email").value.trim();

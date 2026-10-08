@@ -32,12 +32,27 @@
 
   <!-- sign in -->
   <div class="signin" id="signin" hidden>
-    <form id="signinForm" autocomplete="on">
+    <form id="pinForm" autocomplete="on">
+      <h1 class="head">Your brief is waiting.</h1>
+      <p id="pinMsg">Sign in with your username and PIN.</p>
+      <label class="sr" for="user">Username</label>
+      <input class="field" id="user" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Username" required>
+      <label class="sr" for="pin">PIN</label>
+      <input class="field" id="pin" name="password" type="password" inputmode="numeric" autocomplete="current-password" placeholder="PIN" required>
+      <div class="signin-row">
+        <button class="btn" type="submit">Sign in</button>
+        <button class="textlink" type="button" id="toEmail">Email me a link instead</button>
+      </div>
+    </form>
+    <form id="signinForm" autocomplete="on" hidden>
       <h1 class="head">Your brief is waiting.</h1>
       <p id="signinMsg">Enter your email and a sign-in link will be sent to it.</p>
       <label class="sr" for="email">Email</label>
       <input class="field" id="email" name="email" type="email" inputmode="email" placeholder="you@example.com" required>
-      <button class="btn" type="submit">Send the link</button>
+      <div class="signin-row">
+        <button class="btn" type="submit">Send the link</button>
+        <button class="textlink" type="button" id="toPin">Use username and PIN</button>
+      </div>
     </form>
   </div>
 
