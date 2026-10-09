@@ -279,11 +279,20 @@
   }
 
   // ---------------- TODAY ----------------
+  function staleBanner() {
+    const d = new Date(B.day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" });
+    return h("div", { class: "stale" },
+      h("p", { text: `No brief yet today — this is ${d}'s.` }),
+      h("div", { class: "row" },
+        ext(h("a", { class: "btn", href: runBriefLink(), text: "Run today's brief" })),
+        h("span", { class: "quiet", text: "Then come back and tap Refresh." })));
+  }
   function renderToday() {
     const pane = $("#paneToday");
     pane.replaceChildren();
     if (!B || !B.day) {
-      pane.append(h("div", { class: "band-top" }, h("div", { class: "wrap" }, h("h1", { class: "head", text: "No brief yet today." }), h("p", { text: "It appears here as soon as the morning run writes it." }))));
+      pane.append(h("div", { class: "band-top" }, h("div", { class: "wrap" }, h("h1", { class: "head", text: "No brief yet today." }), h("p", { text: "It appears here as soon as the morning run writes it." }),
+        h("div", { class: "row" }, ext(h("a", { class: "btn", href: runBriefLink(), text: "Run today's brief" })), h("button", { class: "textlink", onclick: (ev) => refreshNow(ev.currentTarget), text: "Refresh" })))));
       return;
     }
     const pass = passOf();
@@ -298,7 +307,11 @@
       h("span", null,
         isDesk() ? h("button", { class: "readaloud focusbar", onclick: () => toggleFocus(true), text: "Focus", title: "Focus (f)" }) : null,
         isDesk() ? " · " : null,
+        h("button", { class: "readaloud", onclick: (ev) => refreshNow(ev.currentTarget), text: "Refresh", title: "Refresh from Notion" }),
+        " · ",
         h("button", { class: "readaloud", onclick: readAloud, id: "readBtn", text: "Read aloud" }))));
+    if (refreshMsg) top.append(h("p", { class: "offline", text: refreshMsg }));
+    if (staleDay()) top.append(staleBanner());
     if (offlineAt) top.append(h("p", { class: "offline", text: `Offline — this is the brief as of ${fmtTime(new Date(offlineAt))}.` }));
     top.append(h("h1", { class: "head", text: B.day.headline || "" }));
     if (!evening) {
@@ -352,7 +365,7 @@
       const closed = it.status === "Closed" && live;
       const li = h("li", { "data-id": it.id, class: (closed ? "closed " : "") + (selKey === it.id ? "sel" : "") });
       li.append(h("span", { class: "num", text: String((items.numbers ? items.numbers[idx] : idx) + 1) }));
-      const body = h("div", { class: "body" }, h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place })), titleEl(it), sentence(it));
+      const body = h("div", { class: "body" }, h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), newBadge(it)), titleEl(it), sentence(it));
       if (it.note) body.append(h("p", { class: "mynote", text: it.note }));
       if (live && !closed && !isDesk()) body.append(inlineTools(it, body));
       li.append(body);
@@ -403,7 +416,7 @@
       const li = h("li", { "data-id": it.id, class: selKey === it.id ? "sel" : "" });
       li.append(h("span", { class: "num", text: String(i + 1) }));
       const body = h("div", { class: "body" });
-      body.append(h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place })));
+      body.append(h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), newBadge(it)));
       body.append(h("span", { class: "ttl", text: it.title }));
       const carried = it.carries > 0 ? `Carried ${it.carries} day${it.carries === 1 ? "" : "s"}.` : "New today.";
       body.append(h("p", { class: "carry", text: `${carried} ${firstSentence(it.sentence)}` }));
@@ -663,6 +676,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
   // ---------------- DESKTOP aside ----------------
   function select(id) {
     selKey = id;
+    { const it = B && B.items.find((i) => i.id === id); if (it && isFresh(it)) { unFresh(it); const b = document.querySelector(`ol.items li[data-id="${CSS.escape(id)}"] .newbadge`); if (b) b.remove(); } }
     document.querySelectorAll("ol.items li").forEach((li) => li.classList.toggle("sel", li.getAttribute("data-id") === id));
     renderAside();
   }
@@ -810,6 +824,52 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
     markNav(["now", "today", "capture"][i] || "today");
   }, 60));
 
+
+  // ---------------- refresh + "New" badges ----------------
+  // An item is new if it was not in the brief the last time this device loaded it.
+  // Badges last a day, or until the item is opened, so a quiet re-load does not wipe them.
+  const FRESH_MS = 24 * 3600 * 1000;
+  const itemKey = (it) => it.key || it.id;
+  function noteFresh() {
+    if (!B || !B.day) return 0;
+    const cur = B.items.map(itemKey);
+    const seen = store.get("seenKeys");
+    const fresh = store.get("freshKeys") || {};
+    const now = Date.now();
+    for (const k of Object.keys(fresh)) if (now - fresh[k] > FRESH_MS || !cur.includes(k)) delete fresh[k];
+    let added = 0;
+    if (Array.isArray(seen)) for (const k of cur) if (!seen.includes(k) && !fresh[k]) { fresh[k] = now; added++; }
+    store.set("seenKeys", Array.from(new Set([...(seen || []), ...cur])).slice(-600));
+    store.set("freshKeys", fresh);
+    return added;
+  }
+  const isFresh = (it) => !!(store.get("freshKeys") || {})[itemKey(it)];
+  function unFresh(it) { const f = store.get("freshKeys") || {}; if (f[itemKey(it)]) { delete f[itemKey(it)]; store.set("freshKeys", f); } }
+  const newBadge = (it) => (isFresh(it) ? h("span", { class: "newbadge", text: "New" }) : null);
+
+  function briefPassNow() { const hr = new Date().getHours(); return hr < 12 ? "morning" : hr < 17 ? "afternoon" : "evening"; }
+  function runBriefLink() {
+    const pass = briefPassNow();
+    const prompt =
+`Run my ${pass} brief for ${localISO()} with the brief-web skill, so it lands in Oggi. Read "Edits since brief" on the latest day first and carry anything still open.`;
+    return "https://claude.ai/new?q=" + encodeURIComponent(prompt);
+  }
+  const staleDay = () => !!(B && B.day && B.day.date !== localISO());
+  let refreshMsg = "";
+  async function refreshNow(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = "Refreshing…"; }
+    const beforeDate = B && B.day ? B.day.date : null;
+    let ok = false;
+    try { ok = await load(); } catch {}
+    const added = ok ? noteFresh() : 0;
+    const dayMoved = ok && B && B.day && beforeDate && B.day.date !== beforeDate;
+    refreshMsg = !ok ? "Couldn't reach Notion — showing the last copy."
+      : dayMoved ? `New brief for ${new Date(B.day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" })}${added ? ` · ${added} new` : ""}.`
+      : added ? `${added} new since you last looked.`
+      : `Up to date · ${fmtTime(new Date())}`;
+    renderAll();
+  }
+
   // ---------------- boot ----------------
   function cache() { if (B) store.set("brief", { at: Date.now(), B }); }
   function renderAll() { renderToday(); renderNow(); if (!isDesk()) renderCapture(); renderAside(); }
@@ -838,6 +898,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
     $("#app").hidden = false;
     const ok = await load().catch(() => false);
     if (ok === false && !B) return;
+    noteFresh();
     renderAll();
     if (!isDesk()) go(p.get("view") || "today", false);
     if (isDesk() && p.get("view") === "now") toggleFocus(true);
@@ -845,7 +906,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
     document.addEventListener("visibilitychange", async () => {
       if (document.visibilityState !== "visible") return;
       if (document.activeElement && document.activeElement.closest("input, textarea")) return;
-      if (await load().catch(() => false)) renderAll();
+      if (await load().catch(() => false)) { noteFresh(); renderAll(); }
     });
     window.matchMedia("(min-width: 980px)").addEventListener("change", renderAll);
     setInterval(() => { if (!document.activeElement || !document.activeElement.closest("input, textarea")) renderNow(); }, 60_000);

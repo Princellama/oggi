@@ -278,3 +278,9 @@ ul.added li .quiet { margin-left: 8px; }
 .rec.in-aside .wrap { padding: 0; }
 .rec.in-aside .rec-title { font-size: 19px; }
 .signin-row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+
+/* refresh: stale-day banner and New badges */
+.stale { border: 1px solid var(--hair); border-left: 3px solid var(--clay); border-radius: 8px; padding: 12px 14px; margin: 0 0 22px; background: var(--wash); }
+.stale p { margin: 0 0 10px; font-size: 14px; color: var(--ink); }
+.stale .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.newbadge { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: var(--clay); color: var(--bg); font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; vertical-align: 1px; }
