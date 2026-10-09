@@ -611,8 +611,19 @@
     });
     w.append(inp, list);
     if (!target) w.append(h("p", { class: "quiet", style: "margin-top:26px", text: "Each line becomes a QuickAction in Notion, due today." }));
+    w.append(h("div", { class: "row", style: "margin-top:22px" }, ext(h("a", { class: "btn", href: plaudLink(), text: "Retrieve Plaud (voice notes)" }))));
     host.append(w);
     draw();
+  }
+
+  // ---------------- Plaud → Claude ----------------
+  // Opens a new Claude chat that runs the process-captures skill on any new recordings.
+  function plaudLink() {
+    const prompt =
+`Check Plaud. It's ${localISO()} and I may have recorded new voice notes since the last run.
+
+Please read the process-captures skill, then route any new Plaud recordings into Notion: work from the transcripts, not Plaud's summaries; turn anything I asked for into QuickActions; stop and ask me on any near-match name. Tell me in a few lines what you created, what you skipped, and anything you need me to confirm.`;
+    return "https://claude.ai/new?q=" + encodeURIComponent(prompt);
   }
 
   // ---------------- changes → Send to Claude ----------------
