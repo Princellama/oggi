@@ -103,6 +103,107 @@
             ]
           }
         ]
+      },
+      "key": "daryl-extension"
+    },
+    "recs": {
+      "daryl-extension": {
+        "title": "Send Sam the e-file authorization tonight",
+        "why": "His return is the only one with a hard deadline before you board, and the signature is the one step that can't happen from the ship.",
+        "claude": "partly",
+        "claudeDoes": "Draft the 8879 email to Sam and set a reminder for the follow-up.",
+        "youDo": "Review the return totals and press send.",
+        "prompt": "Draft an email to Sam asking him to sign his e-file authorization (Form 8879) tonight, so his return can be filed before I board on Wednesday. Keep it short and warm, in my voice. Then add a QuickAction in Notion to follow up tomorrow morning if he hasn't signed.",
+        "mindmap": {
+          "center": "Sam filed before Wednesday",
+          "branches": [
+            {
+              "label": "Finish",
+              "items": [
+                "Check totals",
+                "Attach W-2s"
+              ]
+            },
+            {
+              "label": "Signature",
+              "items": [
+                "Email the 8879",
+                "Follow up 9 AM"
+              ]
+            },
+            {
+              "label": "File",
+              "items": [
+                "E-file in Axcess",
+                "Save the acknowledgement"
+              ]
+            },
+            {
+              "label": "If it slips",
+              "items": [
+                "File an extension",
+                "Tell Sam the plan"
+              ]
+            }
+          ]
+        }
+      },
+      "kikuyo-return": {
+        "title": "Ask Mia for her missing 1099-R",
+        "why": "Her return can't move until the pension form arrives, and she asked for it as soon as possible.",
+        "claude": "partly",
+        "claudeDoes": "Draft a short email asking for the 1099-R and add a follow-up task for Friday.",
+        "youDo": "Read it over and send it from the practice address.",
+        "prompt": "Draft a short, warm email from me to Mia Lane asking her to send her pension 1099-R so I can finish her return. Save it as a Gmail draft and add a QuickAction in Notion to follow up Friday.",
+        "mindmap": {
+          "center": "Mia's return moving",
+          "branches": [
+            {
+              "label": "Ask",
+              "items": [
+                "Email for 1099-R"
+              ]
+            },
+            {
+              "label": "Prepare",
+              "items": [
+                "Enter W-2",
+                "Check last year"
+              ]
+            },
+            {
+              "label": "Finish",
+              "items": [
+                "Review",
+                "Send 8879"
+              ]
+            }
+          ]
+        }
+      },
+      "fpb-guam": {
+        "title": "Call Guam back and set a time",
+        "why": "They have asked three times; a fourth ask risks the relationship.",
+        "claude": "no",
+        "youDo": "Call them and agree a time for the review.",
+        "mindmap": {
+          "center": "Guam call booked",
+          "branches": [
+            {
+              "label": "Call",
+              "items": [
+                "Pick two times",
+                "Call back"
+              ]
+            },
+            {
+              "label": "After",
+              "items": [
+                "Calendar invite"
+              ]
+            }
+          ]
+        }
       }
     }
   },

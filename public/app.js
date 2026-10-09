@@ -460,12 +460,18 @@
     box.append(w);
     pane.append(box);
     if (!B || !B.day) { w.append(h("p", { class: "now-empty", text: "Nothing yet. The brief lands here in the morning." })); return; }
-    const rec = renderRecommendation();
-    if (rec) { box.classList.add("has-rec"); pane.append(rec); }
     const seq = nowSequence();
-    if (!seq.length) { w.append(h("p", { class: "now-empty", text: "Nothing is waiting on you. The rest of today is yours." })); return; }
+    if (!seq.length) {
+      w.append(h("p", { class: "now-empty", text: "Nothing is waiting on you. The rest of today is yours." }));
+      const top = renderRecommendation(topRec());
+      if (top) { box.classList.add("has-rec"); pane.append(top); }
+      return;
+    }
     nowIdx = Math.max(0, Math.min(nowIdx, seq.length - 1));
     const cur = seq[nowIdx];
+    // The recommendation follows the card: each item shows its own.
+    const rec = renderRecommendation(recFor(cur));
+    if (rec) { box.classList.add("has-rec"); pane.append(rec); }
 
     if (cur.kind === "event") {
       const e = cur.ev, t = Date.now();
@@ -500,12 +506,26 @@
   }
 
   // ---------------- AI recommendation ----------------
-  // The brief run writes one recommendation into the day's JSON:
-  // { title, why, area, claude: "yes"|"partly"|"no", claudeDoes, youDo, prompt, mindmap: { center, branches: [{ label, items: [] }] } }
+  // The brief run writes one recommendation per item into the day's JSON, keyed by item Key:
+  //   recs: { "<itemKey>": { title, why, claude: "yes"|"partly"|"no", claudeDoes, youDo, prompt, mindmap } }
+  // plus `recommendation` (the day's top pick, with `key` naming its item) for the desktop overview.
+  // Days written before per-item recs existed only have `recommendation`; it then shows on every item as before.
   const CLAUDE_SAYS = { yes: "Claude can do this", partly: "Claude can do part of it", no: "This one needs you" };
-  function renderRecommendation() {
-    const r = B && B.day && B.day.recommendation;
-    if (!r || !r.title) return null;
+  const validRec = (r) => r && typeof r === "object" && r.title;
+  function topRec() { const r = B && B.day && B.day.recommendation; return validRec(r) ? r : null; }
+  function recForItem(it) {
+    const d = B && B.day;
+    if (!d || !it) return null;
+    const recs = d.recs && typeof d.recs === "object" ? d.recs : null;
+    const own = recs && it.key ? recs[it.key] : null;
+    if (validRec(own)) return { area: areaOf(it), ...own };
+    const top = topRec();
+    if (top && (top.key ? top.key === it.key : !recs)) return top;
+    return null;
+  }
+  function recFor(cur) { return cur && cur.kind === "item" ? recForItem(cur.it) : null; }
+  function renderRecommendation(r) {
+    if (!validRec(r)) return null;
     const box = h("section", { class: "rec", "aria-label": "AI recommendation" });
     const w = h("div", { class: "wrap" });
     box.append(w);
@@ -686,9 +706,11 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
       if (safeUrl(it.link)) links.append(ext(h("a", { class: "textlink", href: it.link, text: "Open the source" })));
       if (safeUrl(it.task)) links.append(ext(h("a", { class: "textlink", href: it.task, text: "Open the task" })));
       inner.append(h("div", { class: "ed-row" }, links));
+      const own = renderRecommendation(recForItem(it));
+      if (own) { own.classList.add("in-aside"); inner.append(h("hr"), own); }
       inner.append(h("hr"));
     } else {
-      const rec = renderRecommendation();
+      const rec = renderRecommendation(topRec());
       if (rec) { rec.classList.add("in-aside"); inner.append(rec, h("hr")); }
       inner.append(h("p", { class: "quiet", style: "margin:0 0 24px", text: "Select an item to edit it, or press j." }));
     }
