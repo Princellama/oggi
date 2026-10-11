@@ -456,18 +456,276 @@
     return row;
   }
 
-  // ---------------- NOW ----------------
+  // ---------------- NOW: the sky ----------------
+  // Every open thing is a star in the constellation of its place on the drive — west to east,
+  // Home floating above the corridor. Back / Next (or a swipe across the sky) fly the camera
+  // from star to star; tapping the bright one dives in to the full card.
+  const DRIVE = ["Skyline", "Airport", "Kalihi", "Kakaako", "Kahala", "Hawaii Kai", "Home"];
+  const SKY_AT = {
+    Skyline: [90, 340], Airport: [250, 372], Kalihi: [410, 330], Kakaako: [570, 366],
+    Kahala: [730, 328], "Hawaii Kai": [890, 360], Home: [490, 150],
+  };
+  const EVENT_AT = [170, 210];
+  const STAR_TINT = { CPA: "#E8997A", Medicare: "#8CC9A2", Personal: "#E4C06D", Money: "#93B8DE" };
+  const EVENT_TINT = "#F4EFE4";
+  const DIVE_W = 22;
+  const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let nowDrilled = false;
+  let cam = null;          // { x, y, w } in sky units
+  let camAnim = 0;
+  let surfacing = false;   // coming back out of a dive: start close, pull back
+  let sky = null;          // the live sky: { el, svg, seq, stars, card, ctl }
+
+  const placeRank = (p) => { const i = DRIVE.indexOf(p); return i < 0 ? 0 : i; };
   function nowSequence() {
     const seq = [];
     const t = Date.now();
     const evs = events().filter((e) => e.e.getTime() > t).sort((a, b) => a.s - b.s);
     if (evs[0]) seq.push({ kind: "event", ev: evs[0] });
-    for (const it of openNeeds()) seq.push({ kind: "item", it });
+    // the drive, west to east and Home last; the brief's own order inside a place
+    const items = openNeeds().slice().sort((a, b) => placeRank(a.place) - placeRank(b.place) || a.order - b.order);
+    for (const it of items) seq.push({ kind: "item", it });
     return seq;
   }
+
+  function hash(str) { let x = 2166136261; for (const c of String(str)) { x ^= c.charCodeAt(0); x = Math.imul(x, 16777619); } return (x >>> 0) / 4294967296; }
+  function rng(seed) { let a = Math.floor(seed * 4294967296) || 1; return () => { a ^= a << 13; a ^= a >>> 17; a ^= a << 5; return ((a >>> 0) % 100000) / 100000; }; }
+
+  // Positions depend only on the place and the brief's order, so a star stays put all day:
+  // closing one dims it where it stands instead of reshuffling the sky.
+  function skyStars(seq) {
+    const stars = [];
+    const bySeq = new Map();
+    seq.forEach((x, i) => bySeq.set(x.kind === "event" ? "event" : x.it.id, i));
+    const all = B.items.filter((i) => i.list === "Needs attention" || i.list === "Resolved");
+    const byPlace = {};
+    for (const it of all) (byPlace[SKY_AT[it.place] ? it.place : "Skyline"] ||= []).push(it);
+    const reach = {};
+    for (const [place, list] of Object.entries(byPlace)) {
+      const [cx, cy] = SKY_AT[place];
+      const rot = hash(place) * Math.PI * 2;
+      list.sort((a, b) => (a.list === b.list ? 0 : a.list === "Needs attention" ? -1 : 1) || a.order - b.order);
+      list.forEach((it, k) => {
+        const r = k === 0 ? 0 : 46 * Math.sqrt(k);
+        const a = rot + k * 2.39996;
+        const open = bySeq.has(it.id);
+        stars.push({ kind: "item", it, place, open, seqIdx: open ? bySeq.get(it.id) : -1, x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) * 0.9 });
+        reach[place] = Math.max(reach[place] || 0, cy + r * Math.sin(a) * 0.9 - cy);
+      });
+    }
+    if (bySeq.has("event")) stars.push({ kind: "event", ev: seq[0].ev, open: true, seqIdx: 0, x: EVENT_AT[0], y: EVENT_AT[1] });
+    return { stars, reach };
+  }
+  const tintOf = (st) => (st.kind === "event" ? EVENT_TINT : STAR_TINT[areaOf(st.it)] || STAR_TINT.Personal);
+
+  function buildSky(seq) {
+    const { stars, reach } = skyStars(seq);
+    const el = h("div", { class: "sky", role: "group", "aria-label": `Today's sky: ${seq.length} thing${seq.length === 1 ? "" : "s"}, west to east along the drive. Swipe or use Back and Next to move; open the bright star for the detail.` });
+    const svg = s("svg", { class: "sky-svg" });
+    el.append(svg);
+
+    // dust: a fixed field of faint stars, the same every day
+    const r = rng(0.4137);
+    const dust = s("g", { class: "dust", "aria-hidden": "true" });
+    for (let i = 0; i < 190; i++) {
+      const c = s("circle", { cx: (-260 + r() * 1520).toFixed(1), cy: (-200 + r() * 860).toFixed(1), r: (0.35 + r() * 0.9).toFixed(2), "fill-opacity": (0.12 + r() * 0.38).toFixed(2) });
+      if (i % 7 === 0) { c.setAttribute("class", "tw"); c.style.animationDelay = (r() * 4).toFixed(2) + "s"; }
+      dust.append(c);
+    }
+    svg.append(dust);
+
+    // the drive itself, faint, west to east
+    const pts = DRIVE.filter((p) => p !== "Home").map((p) => SKY_AT[p]);
+    let d = `M${pts[0][0] - 120} ${pts[0][1] + 10} L${pts[0][0]} ${pts[0][1]}`;
+    for (let i = 1; i < pts.length; i++) { const [x0, y0] = pts[i - 1], [x1, y1] = pts[i]; const mx = (x0 + x1) / 2; d += ` C${mx} ${y0} ${mx} ${y1} ${x1} ${y1}`; }
+    d += ` L${pts[pts.length - 1][0] + 120} ${pts[pts.length - 1][1] - 8}`;
+    svg.append(s("path", { class: "road", d, "aria-hidden": "true" }));
+    svg.append(s("path", { class: "road", d: `M${SKY_AT.Home[0] - 110} ${SKY_AT.Home[1] - 6} L${SKY_AT.Home[0] + 110} ${SKY_AT.Home[1] - 6}`, "aria-hidden": "true" }));
+
+    // constellation lines inside each place
+    const lines = s("g", { "aria-hidden": "true" });
+    for (const place of Object.keys(SKY_AT)) {
+      const ps = stars.filter((x) => x.kind === "item" && x.place === place);
+      for (let i = 1; i < ps.length; i++) lines.append(s("line", { class: "cline" + (ps[i].open && ps[i - 1].open ? "" : " faint"), x1: ps[i - 1].x.toFixed(1), y1: ps[i - 1].y.toFixed(1), x2: ps[i].x.toFixed(1), y2: ps[i].y.toFixed(1) }));
+    }
+    svg.append(lines);
+
+    // place names under their constellations
+    const labels = s("g", { "aria-hidden": "true" });
+    for (const [place, [cx, cy]] of Object.entries(SKY_AT)) {
+      const live = stars.some((x) => x.kind === "item" && x.place === place && x.open);
+      const g = s("g", { class: "pl" + (live ? " live" : ""), color: "#F4EFE4" });
+      const ly = cy + Math.max(0, reach[place] || 0) + 58;
+      g.append(s("use", { href: "#" + glyphOf(place), x: cx - 6, y: ly - 21, width: 12, height: 12 }));
+      g.append(s("text", { x: cx, y: ly }, place.toUpperCase()));
+      if (!reach[place] && reach[place] !== 0) g.append(s("circle", { cx, cy, r: 2.2, class: "ghost" }));
+      labels.append(g);
+    }
+    svg.append(labels);
+
+    const trails = s("g", { "aria-hidden": "true" });
+    svg.append(trails);
+
+    // the stars
+    const field = s("g");
+    for (const st of stars) {
+      const tint = tintOf(st);
+      const name = st.kind === "event" ? `${st.ev.title}, ${fmtTime(st.ev.s)}` : `${st.it.title}, ${st.place}`;
+      const g = s("g", { class: "star" + (st.open ? "" : " dim") + (st.kind === "event" ? " ev" : ""), transform: `translate(${st.x.toFixed(1)} ${st.y.toFixed(1)})` });
+      if (st.open) { g.setAttribute("tabindex", "0"); g.setAttribute("role", "button"); g.setAttribute("aria-label", name); }
+      const body = s("g", { class: "star-b" });
+      body.append(
+        s("circle", { class: "halo2", r: 30, fill: tint }),
+        s("circle", { class: "halo", r: 18, fill: tint }),
+        s("circle", { class: "core", r: 10, fill: tint }));
+      if (st.kind === "event") body.append(s("circle", { class: "orbit", r: 15, fill: "none", stroke: tint }));
+      g.append(body);
+      if (st.open) g.append(s("text", { class: "star-l", y: 17 }, st.kind === "event" ? fmtTime(st.ev.s) : shortLabel(st.it)));
+      st.el = g;
+      field.append(g);
+    }
+    svg.append(field);
+
+    // tap a dim neighbour to travel to it; tap the bright one to dive in
+    let swiped = false, sx = null, sy = null;
+    const pick = (ev) => {
+      const g = ev.target.closest(".star");
+      if (!g || swiped) return;
+      const st = stars.find((x) => x.el === g);
+      if (!st || !st.open) return;
+      if (st.seqIdx === nowIdx) dive(); else flyTo(st.seqIdx);
+    };
+    svg.addEventListener("click", pick);
+    svg.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter" && ev.key !== " ") return;
+      ev.preventDefault(); pick(ev);
+    });
+    el.addEventListener("pointerdown", (ev) => { swiped = false; sx = ev.clientX; sy = ev.clientY; });
+    el.addEventListener("pointerup", (ev) => {
+      if (sx == null) return;
+      const dx = ev.clientX - sx, dy = ev.clientY - sy;
+      sx = null;
+      if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
+      swiped = true;
+      if (dx < 0) { if (nowIdx < sky.seq.length - 1) flyTo(nowIdx + 1); else if (!isDesk()) go("today"); }
+      else if (nowIdx > 0) flyTo(nowIdx - 1);
+    });
+    el.addEventListener("pointercancel", () => { sx = null; });
+
+    if (!isDesk() && !store.get("skyHintSeen") && seq.length > 1) el.append(h("p", { class: "sky-hint", text: "Swipe to travel · tap the bright star to open it" }));
+    if ("ResizeObserver" in window) new ResizeObserver(() => { if (cam && sky && sky.el === el) { if (!camAnim) cam = { ...cam, w: restW(el) }; setView(); } }).observe(el);
+    return { el, svg, seq, stars, trails };
+  }
+
+  const starFor = (i) => sky && sky.stars.find((x) => x.seqIdx === i);
+  function restW(el) { const px = (el && el.clientWidth) || 360; return Math.max(380, Math.min(760, px * 1.05)); }
+  function restCam(st) { return { x: st.x, y: st.y + 6, w: restW(sky.el) }; }
+  function setView() {
+    if (!sky || !cam) return;
+    const el = sky.el;
+    const aspect = el.clientWidth && el.clientHeight ? el.clientHeight / el.clientWidth : 0.85;
+    const hh = cam.w * aspect;
+    sky.svg.setAttribute("viewBox", `${(cam.x - cam.w / 2).toFixed(2)} ${(cam.y - hh / 2).toFixed(2)} ${cam.w.toFixed(2)} ${hh.toFixed(2)}`);
+  }
+  // Fly the camera: position eases, the zoom moves on a log scale and pulls back a little
+  // mid-flight in proportion to the distance, so long hops feel like travel.
+  function animateCam(to, dur, onMid, onDone) {
+    cancelAnimationFrame(camAnim); camAnim = 0;
+    const from = cam || to;
+    if (reduceMotion() || !dur) { cam = to; setView(); if (onMid) onMid(); if (onDone) onDone(); return; }
+    const dist = Math.hypot(to.x - from.x, to.y - from.y);
+    const bump = Math.min(0.75, dist / 520);
+    const t0 = performance.now();
+    let mid = false;
+    const step = (now) => {
+      const t = Math.min(1, (now - t0) / dur);
+      const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      cam = { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e, w: from.w * Math.pow(to.w / from.w, e) * (1 + bump * Math.sin(Math.PI * t)) };
+      setView();
+      if (!mid && t >= 0.5) { mid = true; if (onMid) onMid(); }
+      if (t < 1) camAnim = requestAnimationFrame(step);
+      else { camAnim = 0; if (onDone) onDone(); }
+    };
+    camAnim = requestAnimationFrame(step);
+  }
+  function markStar(i) {
+    for (const st of sky.stars) {
+      const on = st.open && st.seqIdx === i;
+      st.el.classList.toggle("on", on);
+      if (st.open) st.el.setAttribute("aria-current", String(on));
+    }
+  }
+  function drawTrail(a, b) {
+    if (reduceMotion()) return;
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const ln = s("line", { class: "trail", x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: tintOf(b), "stroke-dasharray": len, "stroke-dashoffset": len });
+    sky.trails.append(ln);
+    requestAnimationFrame(() => requestAnimationFrame(() => ln.setAttribute("stroke-dashoffset", 0)));
+    setTimeout(() => ln.classList.add("gone"), 900);
+    setTimeout(() => ln.remove(), 1500);
+  }
+
+  function flyTo(i) {
+    if (!sky || i < 0 || i >= sky.seq.length || i === nowIdx) return;
+    const a = starFor(nowIdx), b = starFor(i);
+    nowIdx = i;
+    if (!a || !b) { renderNow(); return; }
+    if (!store.get("skyHintSeen")) { store.set("skyHintSeen", true); const hint = sky.el.querySelector(".sky-hint"); if (hint) hint.classList.add("gone"); }
+    markStar(i);
+    drawTrail(a, b);
+    sky.card.classList.add("swap");
+    fillCtl();
+    animateCam(restCam(b), 820, () => { fillCard(); sky.card.classList.remove("swap"); });
+  }
+  function dive() {
+    const st = starFor(nowIdx);
+    if (!st) return;
+    if (!store.get("skyHintSeen")) store.set("skyHintSeen", true);
+    sky.el.classList.add("diving");
+    sky.card.classList.add("swap");
+    animateCam({ x: st.x, y: st.y, w: DIVE_W }, 560, null, () => { nowDrilled = true; renderNow(); const p = $("#paneNow"); if (p) p.scrollTop = 0; });
+  }
+  function surface() { nowDrilled = false; surfacing = true; renderNow(); }
+
+  // The card under the sky: just enough to know what the bright star is.
+  function fillCard() {
+    const card = sky.card;
+    const cur = sky.seq[nowIdx];
+    card.replaceChildren();
+    if (!cur) return;
+    if (cur.kind === "event") {
+      const e = cur.ev, t = Date.now();
+      const running = e.s.getTime() <= t;
+      card.append(h("p", { class: "now-kicker" }, glyphSvg("g-clock"), running ? `Until ${fmtTime(e.e)}` : `${fmtTime(e.s)} · ${fmtIn(e.s.getTime() - t)}`));
+      card.append(h("h1", { class: "now-title", onclick: dive }, e.title));
+      if (e.where) card.append(h("p", { class: "now-gist", text: e.where }));
+    } else {
+      const it = cur.it;
+      card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: "· " + it.place })));
+      card.append(h("h1", { class: "now-title", onclick: dive }, it.title));
+      if (it.sentence) card.append(h("p", { class: "now-gist", text: firstSentence(it.sentence) }));
+      if (it.carries > 1) card.append(h("p", { class: "now-carry", text: `Carried ${it.carries} days.` }));
+    }
+    const rec = recFor(cur);
+    const open = h("div", { class: "now-open" }, h("button", { class: "btn", onclick: dive, text: "Open it" }));
+    if (rec && (rec.claude === "yes" || rec.claude === "partly")) open.append(h("span", { class: "now-claude" }, glyphSvg("g-spark"), CLAUDE_SAYS[rec.claude]));
+    card.append(open);
+  }
+  function fillCtl() {
+    const ctl = sky.ctl;
+    ctl.replaceChildren();
+    ctl.append(h("button", { text: "← Back", disabled: nowIdx === 0 ? true : null, onclick: () => flyTo(nowIdx - 1) }));
+    ctl.append(h("button", { text: "Next →", disabled: nowIdx >= sky.seq.length - 1 ? true : null, onclick: () => flyTo(nowIdx + 1) }));
+    const cur = sky.seq[nowIdx];
+    ctl.append(h("span", { class: "pos", text: `${nowIdx + 1} of ${sky.seq.length}${cur && cur.kind === "item" ? " · " + cur.it.place : ""}` }));
+    if (isDesk()) ctl.append(h("button", { text: "Close", onclick: () => toggleFocus(false) }));
+  }
+
   function renderNow() {
     const pane = $("#paneNow");
+    cancelAnimationFrame(camAnim); camAnim = 0;
     pane.replaceChildren();
+    sky = null;
     const box = h("div", { class: "now" });
     const w = h("div", { class: "wrap" });
     box.append(w);
@@ -475,6 +733,7 @@
     if (!B || !B.day) { w.append(h("p", { class: "now-empty", text: "Nothing yet. The brief lands here in the morning." })); return; }
     const seq = nowSequence();
     if (!seq.length) {
+      nowDrilled = false;
       w.append(h("p", { class: "now-empty", text: "Nothing is waiting on you. The rest of today is yours." }));
       const top = renderRecommendation(topRec());
       if (top) { box.classList.add("has-rec"); pane.append(top); }
@@ -482,9 +741,38 @@
     }
     nowIdx = Math.max(0, Math.min(nowIdx, seq.length - 1));
     const cur = seq[nowIdx];
-    // The recommendation follows the card: each item shows its own.
+    if (nowDrilled) { renderDrilled(pane, box, w, seq, cur); return; }
+
+    // the sky, then the card, then the controls
+    box.classList.add("skyview");
+    sky = buildSky(seq);
+    box.insertBefore(sky.el, w);
+    sky.card = h("div", { class: "now-card" });
+    sky.ctl = h("div", { class: "now-ctl" });
+    w.append(sky.card, sky.ctl);
+    markStar(nowIdx);
+    fillCard();
+    fillCtl();
+    const st = starFor(nowIdx);
+    if (!st) return;
+    if (surfacing) {
+      surfacing = false;
+      cam = { x: st.x, y: st.y, w: DIVE_W };
+      sky.el.classList.add("rising");
+      setView();
+      requestAnimationFrame(() => { sky.el.classList.remove("rising"); animateCam(restCam(st), 620); });
+    } else {
+      cam = restCam(st);
+      setView();
+    }
+  }
+
+  // Inside a star: everything the old Now card had, plus its recommendation and plan.
+  function renderDrilled(pane, box, w, seq, cur) {
+    box.classList.add("drilled");
+    w.append(h("button", { class: "now-up", onclick: surface }, "← Back to the sky", h("span", { class: "quiet", text: `${nowIdx + 1} of ${seq.length}` })));
     const rec = renderRecommendation(recFor(cur));
-    if (rec) { box.classList.add("has-rec"); pane.append(rec); }
+    if (rec) { box.classList.add("has-rec"); rec.classList.add("drilled"); pane.append(rec); }
 
     if (cur.kind === "event") {
       const e = cur.ev, t = Date.now();
@@ -507,13 +795,12 @@
       ta.addEventListener("input", () => { grow(ta); save(ta.value); });
       w.append(ta, saved);
       setTimeout(() => grow(ta), 0);
+      w.append(h("p", { class: "ed-label now-where", text: "Where it goes" }), choiceRow(it));
     }
 
     const ctl = h("div", { class: "now-ctl" });
-    if (cur.kind === "item") ctl.append(h("button", { text: "Done", onclick: async () => { await patchItem(cur.it, { status: "Closed" }); renderAll(); } }));
-    if (nowIdx > 0) ctl.append(h("button", { text: "← Back", onclick: () => { nowIdx--; renderNow(); } }));
-    if (nowIdx < seq.length - 1) ctl.append(h("button", { text: "Next →", onclick: () => { nowIdx++; renderNow(); } }));
-    ctl.append(h("span", { class: "pos", text: `${nowIdx + 1} of ${seq.length}` }));
+    if (cur.kind === "item") ctl.append(h("button", { class: "btn", text: "Done", onclick: async () => { await patchItem(cur.it, { status: "Closed" }); nowDrilled = false; surfacing = true; renderAll(); } }));
+    ctl.append(h("button", { text: "Back to the sky", onclick: surface }));
     if (isDesk()) ctl.append(h("button", { text: "Close", onclick: () => toggleFocus(false) }));
     w.append(ctl);
   }
@@ -756,6 +1043,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
   function toggleFocus(on) {
     document.body.classList.toggle("focus", on);
     if (isDesk()) markNav(on ? "now" : "today");
+    nowDrilled = false;
     if (on) { nowIdx = 0; const seq = nowSequence(); if (selKey) { const i = seq.findIndex((x) => x.kind === "item" && x.it.id === selKey); if (i >= 0) nowIdx = i; } renderNow(); }
   }
 
@@ -763,8 +1051,14 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
   document.addEventListener("keydown", (ev) => {
     if (!isDesk() || !B || !B.day) return;
     const typing = ev.target.closest("input, textarea");
-    if (ev.key === "Escape") { if (typing) ev.target.blur(); else if (document.body.classList.contains("focus")) toggleFocus(false); else { selKey = null; renderAll(); } return; }
+    if (ev.key === "Escape") { if (typing) ev.target.blur(); else if (document.body.classList.contains("focus") && nowDrilled) surface(); else if (document.body.classList.contains("focus")) toggleFocus(false); else { selKey = null; renderAll(); } return; }
     if (typing || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    // in focus, the arrows travel the sky and Enter dives into the bright star
+    if (document.body.classList.contains("focus") && sky) {
+      if (ev.key === "ArrowRight" || ev.key === "l") { ev.preventDefault(); flyTo(nowIdx + 1); return; }
+      if (ev.key === "ArrowLeft" || ev.key === "h") { ev.preventDefault(); flyTo(nowIdx - 1); return; }
+      if (ev.key === "Enter" && !ev.target.closest("button, a, .star")) { ev.preventDefault(); dive(); return; }
+    }
     const list = passOf() === "Evening" ? openNeeds() : needs();
     const i = list.findIndex((x) => x.id === selKey);
     const it = list[i];
@@ -919,7 +1213,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
       if (await load().catch(() => false)) { noteFresh(); renderAll(); }
     });
     window.matchMedia("(min-width: 980px)").addEventListener("change", renderAll);
-    setInterval(() => { if (!document.activeElement || !document.activeElement.closest("input, textarea")) renderNow(); }, 60_000);
+    setInterval(() => { if (camAnim) return; if (!document.activeElement || !document.activeElement.closest("input, textarea")) renderNow(); }, 60_000);
   }
 
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
