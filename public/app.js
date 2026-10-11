@@ -755,6 +755,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
 
   function toggleFocus(on) {
     document.body.classList.toggle("focus", on);
+    if (isDesk()) markNav(on ? "now" : "today");
     if (on) { nowIdx = 0; const seq = nowSequence(); if (selKey) { const i = seq.findIndex((x) => x.kind === "item" && x.it.id === selKey); if (i >= 0) nowIdx = i; } renderNow(); }
   }
 
@@ -817,7 +818,16 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
     markNav(name);
   }
   function markNav(name) { document.querySelectorAll(".nav button").forEach((b) => b.setAttribute("aria-current", String(b.dataset.go === name))); }
-  $("#nav").addEventListener("click", (ev) => { const b = ev.target.closest("button[data-go]"); if (b) go(b.dataset.go); });
+  $("#nav").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-go]");
+    if (!b) return;
+    if (!isDesk()) { go(b.dataset.go); return; }
+    // desktop: Now = focus view, Today = the brief + editor, Capture = jump to the capture box
+    const name = b.dataset.go;
+    toggleFocus(name === "now");
+    markNav(name);
+    if (name === "capture") { const c = $("#deskCapture"); if (c) { c.scrollIntoView({ block: "center" }); c.focus(); } }
+  });
   panes.addEventListener("scroll", debounce(() => {
     if (isDesk()) return;
     const i = Math.round(panes.scrollLeft / panes.clientWidth);

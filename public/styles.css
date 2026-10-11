@@ -186,14 +186,17 @@ ul.added li .quiet { margin-left: 8px; }
 .focusbar { display: none; }
 
 @media (min-width: 980px) {
-  .nav { display: none; }
+  /* desktop: the menu becomes a top bar instead of disappearing */
+  .nav { position: static; order: -1; height: 48px; padding: 0; justify-content: flex-start; gap: 32px; padding-left: 28px;
+         border-top: 0; border-bottom: 1px solid var(--hair); z-index: 30; flex: 0 0 auto; }
+  .panes { min-height: 0; }
   .panes { display: grid; grid-template-columns: minmax(0, 1fr) 380px; overflow: hidden; scroll-snap-type: none; }
   .pane { height: 100%; padding-bottom: 0; }
   .pane[data-pane="now"], .pane[data-pane="capture"] { display: none; }
   .aside { display: block; height: 100%; overflow-y: auto; border-left: 1px solid var(--edge); background: var(--bg); }
   .aside .inner { padding: 36px 28px 40px; }
   .focusbar { display: inline; }
-  body.focus .pane[data-pane="now"] { display: block; position: fixed; inset: 0; z-index: 20; }
+  body.focus .pane[data-pane="now"] { display: block; position: fixed; inset: 48px 0 0 0; z-index: 20; }
   .ed-title { width: 100%; border: 0; border-bottom: 1px solid var(--hair); font: 700 17px/1.35 var(--sans); color: var(--ink); padding: 4px 0 8px; background: transparent; resize: none; }
   .ed-row { margin: 22px 0 0; }
   .ed-label { font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--grey); margin: 0 0 8px; }
