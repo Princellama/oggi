@@ -250,6 +250,8 @@ ul.added li .quiet { margin-left: 8px; }
 .rec-card { border: 1px solid var(--hair); border-radius: 12px; padding: 18px 18px 20px; margin: 0 0 30px; background: var(--wash); }
 .rec-title { font-family: var(--serif); font-weight: 600; font-size: 22px; line-height: 1.25; color: var(--ink); margin: 2px 0 8px; }
 .rec-why { margin: 0 0 14px; }
+.rec-generic { background: transparent; border-style: dashed; }
+
 .rec-badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; margin: 0 0 12px; }
 .rb-yes { background: #E3EFE7; color: #2F6A47; }
 .rb-partly { background: #F4E9DC; color: #8A5524; }

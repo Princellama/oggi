@@ -809,10 +809,31 @@
   // The brief run writes one recommendation per item into the day's JSON, keyed by item Key:
   //   recs: { "<itemKey>": { title, why, claude: "yes"|"partly"|"no", claudeDoes, youDo, prompt, mindmap } }
   // plus `recommendation` (the day's top pick, with `key` naming its item) for the desktop overview.
-  // Days written before per-item recs existed only have `recommendation`; it then shows on every item as before.
+  // A recommendation is only ever shown on the item it is about. When the top pick has no `key`,
+  // it is matched to the one item whose title shares the most names with it; anything without
+  // its own recommendation gets an "Ask Claude" card built from that item instead.
   const CLAUDE_SAYS = { yes: "Claude can do this", partly: "Claude can do part of it", no: "This one needs you" };
   const validRec = (r) => r && typeof r === "object" && r.title;
   function topRec() { const r = B && B.day && B.day.recommendation; return validRec(r) ? r : null; }
+  const names = (t, skipFirst) => {
+    const words = String(t || "").replace(/[’']s\b/g, "").split(/[^A-Za-z0-9-]+/).filter(Boolean);
+    return new Set(words.filter((w, i) => (!skipFirst || i > 0) && w.length > 1 && /^[A-Z]/.test(w)).map((w) => w.toLowerCase()));
+  };
+  function topKey() {
+    const top = topRec();
+    if (!top) return null;
+    if (top.key) return top.key;
+    const want = names(top.title, true);
+    if (!want.size || !B || !B.items) return null;
+    let best = null, bestN = 0, tie = false;
+    for (const it of B.items) {
+      if (!it.key || it.status === "Closed") continue;
+      let n = 0;
+      for (const w of names(it.title, false)) if (want.has(w)) n++;
+      if (n > bestN) { best = it.key; bestN = n; tie = false; } else if (n && n === bestN) tie = true;
+    }
+    return bestN && !tie ? best : null;
+  }
   function recForItem(it) {
     const d = B && B.day;
     if (!d || !it) return null;
@@ -820,8 +841,18 @@
     const own = recs && it.key ? recs[it.key] : null;
     if (validRec(own)) return { area: areaOf(it), ...own };
     const top = topRec();
-    if (top && (top.key ? top.key === it.key : !recs)) return top;
-    return null;
+    if (top && it.key && topKey() === it.key) return top;
+    return askRec(it);
+  }
+  // No plan was written for this item: offer to have Claude work one out for it, honestly labelled.
+  function askRec(it) {
+    if (!it || it.status === "Closed") return null;
+    const bits = [`This is an open item from my daily brief (${areaOf(it)}): "${it.title}".`];
+    if (it.sentence) bits.push(it.sentence);
+    if (it.note) bits.push(`My note on it: ${it.note}`);
+    if (safeUrl(it.task)) bits.push(`The task behind it is ${it.task}.`);
+    bits.push("Read the barayuga-notion skill and anything linked, then tell me the one next step that changes the outcome, what you can do and what is left for me. Do your part as drafts only: send, pay or submit nothing. Put no SSNs, Medicare numbers or tax figures in anything you write.");
+    return { generic: true, title: "No plan written for this one yet", why: "The brief didn't write a recommendation for this item. Claude can read it and its task and work one out.", area: areaOf(it), prompt: bits.join(" ") };
   }
   function recFor(cur) { return cur && cur.kind === "item" ? recForItem(cur.it) : null; }
   function renderRecommendation(r) {
@@ -834,6 +865,12 @@
     if (r.area) card.append(h("p", { class: "itemmeta" }, areaChip(r.area)));
     card.append(h("h3", { class: "rec-title", text: r.title }));
     if (r.why) card.append(h("p", { class: "rec-why", text: r.why }));
+    if (r.generic) {
+      card.classList.add("rec-generic");
+      card.append(h("div", { class: "row" }, ext(h("a", { class: "btn", href: "https://claude.ai/new?q=" + encodeURIComponent(r.prompt), text: "Ask Claude for a plan" }))));
+      w.append(card);
+      return box;
+    }
     const who = CLAUDE_SAYS[r.claude] ? r.claude : "no";
     card.append(h("p", { class: "rec-badge rb-" + who, text: CLAUDE_SAYS[who] }));
     const dl = h("dl", { class: "rec-split" });
