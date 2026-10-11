@@ -287,3 +287,86 @@ ul.added li .quiet { margin-left: 8px; }
 .stale p { margin: 0 0 10px; font-size: 14px; color: var(--ink); }
 .stale .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .newbadge { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: var(--clay); color: var(--bg); font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; vertical-align: 1px; }
+
+/* ---------- NOW: the sky ---------- */
+/* A night window over the drive: each place is a constellation, each open thing a star. */
+:root { --night: #1C1B18; --night-2: #2B2924; --starlight: #F4EFE4; }
+.now.skyview .wrap { justify-content: flex-start; padding-top: 22px; }
+.sky {
+  position: relative; margin: 16px 16px 0; height: clamp(240px, 42vh, 470px); border-radius: 18px; overflow: hidden;
+  background: radial-gradient(120% 95% at 50% 38%, var(--night-2) 0%, var(--night) 62%, #141310 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .04), 0 1px 2px rgba(46, 44, 39, .08);
+  touch-action: pan-y; user-select: none; -webkit-user-select: none; flex: none;
+}
+.sky-svg { display: block; width: 100%; height: 100%; }
+.sky .dust circle { fill: var(--starlight); }
+.sky .road { fill: none; stroke: var(--starlight); stroke-opacity: .1; stroke-width: 1.1; stroke-dasharray: 2 6; stroke-linecap: round; }
+.sky .cline { stroke: var(--starlight); stroke-opacity: .2; stroke-width: .8; }
+.sky .cline.faint { stroke-opacity: .07; }
+.sky .pl { color: var(--starlight); opacity: .3; }
+.sky .pl.live { opacity: .62; }
+.sky .pl text { font: 600 8.5px var(--sans); letter-spacing: 1.7px; fill: var(--starlight); text-anchor: middle; }
+.sky .pl .ghost { fill: var(--starlight); }
+.sky .star { cursor: pointer; outline: none; }
+.sky .star-b { transform-box: fill-box; transform-origin: center; transform: scale(.42); transition: transform .7s cubic-bezier(.2, .75, .2, 1); }
+.sky .star .halo, .sky .star .halo2 { opacity: 0; transition: opacity .6s; }
+.sky .star .orbit { stroke-width: 1; stroke-opacity: .55; }
+.sky .star:hover .halo { opacity: .14; }
+.sky .star.on .star-b { transform: scale(1); }
+.sky .star.on .halo { opacity: .2; }
+.sky .star.on .halo2 { opacity: .08; animation: sky-breathe 3.4s ease-in-out infinite; }
+.sky .star-l { font: 500 8.5px var(--sans); fill: var(--starlight); fill-opacity: .66; text-anchor: middle; transition: opacity .45s; pointer-events: none; }
+.sky .star.on .star-l { opacity: 0; }
+.sky .star.dim { pointer-events: none; }
+.sky .star.dim .star-b { transform: scale(.24); }
+.sky .star.dim .core { opacity: .32; }
+.sky .star:focus-visible .core { stroke: #fff; stroke-width: 2.5; }
+.sky .trail { fill: none; stroke-width: 1.3; stroke-linecap: round; stroke-opacity: .7;
+  transition: stroke-dashoffset .8s cubic-bezier(.65, 0, .35, 1), stroke-opacity .55s; }
+.sky .trail.gone { stroke-opacity: 0; }
+.sky .tw { animation: sky-twinkle 4.5s ease-in-out infinite alternate; }
+.sky-hint {
+  position: absolute; left: 0; right: 0; bottom: 12px; margin: 0; text-align: center; pointer-events: none;
+  font-size: 12px; letter-spacing: .02em; color: rgba(244, 239, 228, .55); transition: opacity .6s;
+}
+.sky-hint.gone { opacity: 0; }
+/* diving in: the bright star fills the window, then the window gives way to the card */
+.sky.diving { transition: opacity .32s .26s; opacity: 0; }
+.sky.rising { opacity: 0; }
+.sky { transition: opacity .35s; }
+@keyframes sky-breathe { 0%, 100% { opacity: .07; } 50% { opacity: .17; } }
+@keyframes sky-twinkle { from { opacity: .25; } to { opacity: 1; } }
+
+.now-card { transition: opacity .26s, transform .26s; }
+.now-card.swap { opacity: 0; transform: translateY(6px); }
+.now.skyview .now-title { font-size: 28px; margin-bottom: 10px; cursor: pointer; }
+.now-gist { margin: 0 0 4px; font-size: 15px; }
+.now-open { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
+.now-claude { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--soft); }
+.now-claude .gl { margin: 0; color: var(--clay); width: 14px; height: 14px; }
+.now-ctl button[disabled] { color: var(--hair); cursor: default; }
+.now.skyview .now-ctl { margin-top: 26px; }
+
+.now.drilled .wrap { justify-content: flex-start; padding-top: 26px; }
+.now-up { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--soft); margin: 0 0 30px; padding: 6px 0; }
+.now-up:hover { color: var(--ink); }
+.now-where { font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--grey); margin: 22px 0 8px; }
+.now.drilled .now-ctl .btn { color: var(--bg); }
+.now.drilled .now-ctl .btn:hover { color: var(--bg); }
+
+@media (min-width: 980px) {
+  .sky { height: 56vh; margin: 20px 28px 0; }
+  .now.skyview .now-title { font-size: 32px; }
+}
+@media (max-width: 640px) {
+  .now.skyview .now-title { font-size: 24px; }
+  .now.skyview .wrap { padding-top: 18px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .now.drilled .wrap, .rec.drilled .wrap { animation: now-surface .45s ease-out both; }
+  @keyframes now-surface { from { opacity: 0; transform: scale(.985); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sky .star-b, .sky .trail, .sky .star .halo, .now-card, .sky, .sky.diving { transition: none; }
+  .sky .tw, .sky .star.on .halo2 { animation: none; }
+}
