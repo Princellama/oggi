@@ -458,8 +458,8 @@
 
   // ---------------- NOW: the sky ----------------
   // Every open thing is a star in the constellation of its place on the drive — west to east,
-  // Home floating above the corridor. Back / Next (or a swipe across the sky) fly the camera
-  // from star to star; tapping the bright one dives in to the full card.
+  // Home floating above the corridor. Drag to look around, pinch to zoom; Back / Next (or a tap
+  // on a star) fly the camera from star to star; tapping the bright one dives in to the full card.
   const DRIVE = ["Skyline", "Airport", "Kalihi", "Kakaako", "Kahala", "Hawaii Kai", "Home"];
   const SKY_AT = {
     Skyline: [90, 340], Airport: [250, 372], Kalihi: [410, 330], Kakaako: [570, 366],
@@ -469,6 +469,9 @@
   const STAR_TINT = { CPA: "#E8997A", Medicare: "#8CC9A2", Personal: "#E4C06D", Money: "#93B8DE" };
   const EVENT_TINT = "#F4EFE4";
   const DIVE_W = 22;
+  const SKY_MIN_W = 160, SKY_MAX_W = 1500;              // how close and how far you can zoom
+  const SKY_BOX = { x0: -40, x1: 1020, y0: 60, y1: 520 }; // where the camera may wander
+  let glide = 0;
   const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let nowDrilled = false;
   let cam = null;          // { x, y, w } in sky units
@@ -520,7 +523,7 @@
 
   function buildSky(seq) {
     const { stars, reach } = skyStars(seq);
-    const el = h("div", { class: "sky", role: "group", "aria-label": `Today's sky: ${seq.length} thing${seq.length === 1 ? "" : "s"}, west to east along the drive. Swipe or use Back and Next to move; open the bright star for the detail.` });
+    const el = h("div", { class: "sky", role: "group", "aria-label": `Today's sky: ${seq.length} thing${seq.length === 1 ? "" : "s"}, west to east along the drive. Drag to look around, pinch to zoom, or use Back and Next to move; open the bright star for the detail.` });
     const svg = s("svg", { class: "sky-svg" });
     el.append(svg);
 
@@ -600,24 +603,106 @@
       if (ev.key !== "Enter" && ev.key !== " ") return;
       ev.preventDefault(); pick(ev);
     });
-    el.addEventListener("pointerdown", (ev) => { swiped = false; sx = ev.clientX; sy = ev.clientY; });
-    el.addEventListener("pointerup", (ev) => {
-      if (sx == null) return;
-      const dx = ev.clientX - sx, dy = ev.clientY - sy;
-      sx = null;
-      if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
-      swiped = true;
-      if (dx < 0) { if (nowIdx < sky.seq.length - 1) flyTo(nowIdx + 1); else if (!isDesk()) go("today"); }
-      else if (nowIdx > 0) flyTo(nowIdx - 1);
+    // Look around: drag with one finger to pan (with a little glide when you let go),
+    // pinch with two to zoom; the wheel or trackpad does the same on a computer.
+    const ptrs = new Map();
+    let last = null, vel = { x: 0, y: 0, t: 0 }, pinch = null;
+    const unit = () => (cam ? cam.w / (el.clientWidth || 360) : 1);
+    const toSky = (px, py) => {
+      const rc = el.getBoundingClientRect();
+      return { x: cam.x + (px - rc.left - rc.width / 2) * unit(), y: cam.y + (py - rc.top - rc.height / 2) * unit() };
+    };
+    const zoomAt = (factor, px, py) => {
+      if (!cam) return;
+      const p = toSky(px, py);
+      const w = Math.max(SKY_MIN_W, Math.min(SKY_MAX_W, cam.w * factor));
+      const f = w / cam.w;
+      cam = { x: p.x + (cam.x - p.x) * f, y: p.y + (cam.y - p.y) * f, w };
+    };
+    const startLook = () => { cancelAnimationFrame(camAnim); camAnim = 0; cancelAnimationFrame(glide); glide = 0; };
+    el.addEventListener("pointerdown", (ev) => {
+      if (ev.button > 0) return;
+      startLook();
+      ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (ptrs.size === 1) { swiped = false; sx = ev.clientX; sy = ev.clientY; last = { x: ev.clientX, y: ev.clientY, t: performance.now() }; vel = { x: 0, y: 0, t: last.t }; }
+      if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); swiped = true; }
     });
-    el.addEventListener("pointercancel", () => { sx = null; });
+    el.addEventListener("pointermove", (ev) => {
+      if (!ptrs.has(ev.pointerId) || !cam) return;
+      ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (ptrs.size >= 2) {
+        const [a, b] = [...ptrs.values()];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        if (pinch) zoomAt(pinch / dist, (a.x + b.x) / 2, (a.y + b.y) / 2);
+        pinch = dist;
+        clampCam(); setView(); lookedAway();
+        return;
+      }
+      if (!swiped && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 6) return;
+      if (!swiped) { swiped = true; try { el.setPointerCapture(ev.pointerId); } catch (e) { /* fine */ } }
+      const now = performance.now();
+      const dx = ev.clientX - last.x, dy = ev.clientY - last.y, dt = Math.max(1, now - last.t);
+      cam = { ...cam, x: cam.x - dx * unit(), y: cam.y - dy * unit() };
+      vel = { x: (dx / dt) * 0.6 + vel.x * 0.4, y: (dy / dt) * 0.6 + vel.y * 0.4, t: now };
+      last = { x: ev.clientX, y: ev.clientY, t: now };
+      clampCam(); setView(); lookedAway();
+    });
+    const endLook = (ev) => {
+      if (!ptrs.has(ev.pointerId)) return;
+      ptrs.delete(ev.pointerId);
+      if (ptrs.size === 1) { const [p] = [...ptrs.values()]; last = { x: p.x, y: p.y, t: performance.now() }; vel = { x: 0, y: 0, t: last.t }; pinch = null; return; }
+      if (ptrs.size) return;
+      pinch = null; sx = null;
+      if (!swiped || reduceMotion() || performance.now() - vel.t > 80) return;
+      // glide to a stop
+      let vx = vel.x, vy = vel.y, t0 = performance.now();
+      const step = (now) => {
+        const dt = now - t0; t0 = now;
+        cam = { ...cam, x: cam.x - vx * dt * unit(), y: cam.y - vy * dt * unit() };
+        const k = Math.pow(0.994, dt); vx *= k; vy *= k;
+        clampCam(); setView();
+        glide = Math.hypot(vx, vy) > 0.02 ? requestAnimationFrame(step) : 0;
+      };
+      glide = requestAnimationFrame(step);
+    };
+    el.addEventListener("pointerup", endLook);
+    el.addEventListener("pointercancel", endLook);
+    el.addEventListener("wheel", (ev) => {
+      if (!cam) return;
+      ev.preventDefault();
+      startLook();
+      if (ev.ctrlKey || !ev.deltaX && Math.abs(ev.deltaY) >= 50) zoomAt(Math.exp(ev.deltaY * (ev.ctrlKey ? 0.01 : 0.002)), ev.clientX, ev.clientY);
+      else cam = { ...cam, x: cam.x + ev.deltaX * unit(), y: cam.y + ev.deltaY * unit() };
+      clampCam(); setView(); lookedAway();
+    }, { passive: false });
 
-    if (!isDesk() && !store.get("skyHintSeen") && seq.length > 1) el.append(h("p", { class: "sky-hint", text: "Swipe to travel · tap the bright star to open it" }));
-    if ("ResizeObserver" in window) new ResizeObserver(() => { if (cam && sky && sky.el === el) { if (!camAnim) cam = { ...cam, w: restW(el) }; setView(); } }).observe(el);
+    // back to the bright star after looking around
+    const home = h("button", { class: "sky-home", type: "button", "aria-label": "Back to the bright star", onclick: () => { const st = starFor(nowIdx); if (st) { el.classList.remove("away"); animateCam(restCam(st), 560); } } }, "◎");
+    el.append(home);
+
+    if (!isDesk() && !store.get("skyHintSeen") && seq.length > 1) el.append(h("p", { class: "sky-hint", text: "Drag to look around · pinch to zoom · tap a star to go there" }));
+    let seenW = 0;
+    if ("ResizeObserver" in window) new ResizeObserver(() => {
+      if (!(cam && sky && sky.el === el)) return;
+      if (!camAnim && el.clientWidth !== seenW && !el.classList.contains("away")) cam = { ...cam, w: restW(el) };
+      seenW = el.clientWidth;
+      setView();
+    }).observe(el);
     return { el, svg, seq, stars, trails };
   }
 
   const starFor = (i) => sky && sky.stars.find((x) => x.seqIdx === i);
+  function clampCam() {
+    if (!cam) return;
+    cam.x = Math.max(SKY_BOX.x0, Math.min(SKY_BOX.x1, cam.x));
+    cam.y = Math.max(SKY_BOX.y0, Math.min(SKY_BOX.y1, cam.y));
+  }
+  // the camera has left the bright star: offer the way back, retire the hint
+  function lookedAway() {
+    if (!sky) return;
+    sky.el.classList.add("away");
+    if (!store.get("skyHintSeen")) { store.set("skyHintSeen", true); const hint = sky.el.querySelector(".sky-hint"); if (hint) hint.classList.add("gone"); }
+  }
   function restW(el) { const px = (el && el.clientWidth) || 360; return Math.max(380, Math.min(760, px * 1.05)); }
   function restCam(st) { return { x: st.x, y: st.y + 6, w: restW(sky.el) }; }
   function setView() {
@@ -672,6 +757,8 @@
     if (!a || !b) { renderNow(); return; }
     if (!store.get("skyHintSeen")) { store.set("skyHintSeen", true); const hint = sky.el.querySelector(".sky-hint"); if (hint) hint.classList.add("gone"); }
     markStar(i);
+    cancelAnimationFrame(glide); glide = 0;
+    sky.el.classList.remove("away");
     drawTrail(a, b);
     sky.card.classList.add("swap");
     fillCtl();
@@ -724,6 +811,7 @@
   function renderNow() {
     const pane = $("#paneNow");
     cancelAnimationFrame(camAnim); camAnim = 0;
+    cancelAnimationFrame(glide); glide = 0;
     pane.replaceChildren();
     sky = null;
     const box = h("div", { class: "now" });
