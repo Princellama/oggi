@@ -382,5 +382,58 @@
       "note": "",
       "area": "Money"
     }
+  ],
+  "outbox": [
+    {
+      "id": "demo-ob-1",
+      "url": "https://www.notion.so/demo-ob-1",
+      "table": "people",
+      "name": "Sample Client A",
+      "pushTo": [
+        "Axcess",
+        "TaxDome"
+      ],
+      "what": "Example only. Create in Axcess with the phone and email on the People row."
+    },
+    {
+      "id": "demo-ob-2",
+      "url": "https://www.notion.so/demo-ob-2",
+      "table": "people",
+      "name": "Sample Prospect B",
+      "pushTo": [
+        "GHL"
+      ],
+      "what": "Example only. Update the existing GHL contact: add the second phone, labelled as the daughter's number."
+    },
+    {
+      "id": "demo-ob-3",
+      "url": "https://www.notion.so/demo-ob-3",
+      "table": "people",
+      "name": "Sample Prospect C",
+      "pushTo": [
+        "GHL"
+      ],
+      "what": "Example only. New prospect, not in GHL. No phone or email yet, so GHL can't create the contact."
+    },
+    {
+      "id": "demo-ob-4",
+      "url": "https://www.notion.so/demo-ob-4",
+      "table": "partners",
+      "name": "Sample Referral Partner",
+      "pushTo": [
+        "GHL"
+      ],
+      "what": "Example only. Standardise the lead-source spelling in GHL."
+    },
+    {
+      "id": "demo-ob-5",
+      "url": "https://www.notion.so/demo-ob-5",
+      "table": "people",
+      "name": "Sample Member D",
+      "pushTo": [
+        "GHL"
+      ],
+      "what": "No email on file. Example only. Get it at next contact and add to GHL."
+    }
   ]
 }

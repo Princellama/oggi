@@ -39,4 +39,13 @@ async function getPage(id) {
 }
 function toItem(p) { return p.demo; }
 
-module.exports = { getBrief, updateItem, updateDay, logEdit, applyDecisionToTask, createTask, getPage, toItem };
+const outbox = (sample.outbox || []).map((r) => ({ pushed: null, ...r }));
+async function getOutbox() { return outbox.filter((r) => !r.pushed).map((r) => ({ ...r })); }
+async function setPushed(id, date) {
+  const r = outbox.find((x) => x.id === id);
+  if (!r) throw Object.assign(new Error("not found"), { status: 404 });
+  r.pushed = date || null;
+  return { ...r };
+}
+
+module.exports = { getOutbox, setPushed, getBrief, updateItem, updateDay, logEdit, applyDecisionToTask, createTask, getPage, toItem };

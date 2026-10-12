@@ -1167,7 +1167,8 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
 
   function toggleFocus(on) {
     document.body.classList.toggle("focus", on);
-    if (isDesk()) markNav(on ? "now" : "today");
+    if (on) document.body.classList.remove("outboxview");
+    if (isDesk()) markNav(on ? "now" : document.body.classList.contains("outboxview") ? "outbox" : "today");
     nowDrilled = false;
     if (on) { nowIdx = 0; const seq = nowSequence(); if (selKey) { const i = seq.findIndex((x) => x.kind === "item" && x.it.id === selKey); if (i >= 0) nowIdx = i; } renderNow(); }
   }
@@ -1176,8 +1177,10 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
   document.addEventListener("keydown", (ev) => {
     if (!isDesk() || !B || !B.day) return;
     const typing = ev.target.closest("input, textarea");
+    if (ev.key === "Escape" && !typing && document.body.classList.contains("outboxview")) { document.body.classList.remove("outboxview"); markNav("today"); return; }
     if (ev.key === "Escape") { if (typing) ev.target.blur(); else if (document.body.classList.contains("focus") && nowDrilled) surface(); else if (document.body.classList.contains("focus")) toggleFocus(false); else { selKey = null; renderAll(); } return; }
     if (typing || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (document.body.classList.contains("outboxview")) return;
     // in focus, the arrows travel the sky and Enter dives into the bright star
     if (document.body.classList.contains("focus") && sky) {
       if (ev.key === "ArrowRight" || ev.key === "l") { ev.preventDefault(); flyTo(nowIdx + 1); return; }
@@ -1228,6 +1231,162 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
     if (btn) btn.textContent = "Stop reading";
   }
 
+  // ---------------- OUTBOX ----------------
+  // People and Partners rows whose "Push to" is set and "Pushed" is empty: what GHL, TaxDome
+  // and Axcess are still owed. Mark pushed writes today's date into Pushed; Undo clears it.
+  const OB_CATS = [
+    { id: "tax", title: "TaxDome and Axcess", blurb: "Client records the tax side still needs." },
+    { id: "ghl", title: "GHL — ready to enter", blurb: "Contacts and notes with everything needed to type them in." },
+    { id: "partners", title: "Partners → GHL", blurb: "Lead-source names to standardise in GHL." },
+    { id: "waiting", title: "Waiting on information", blurb: "Blocked until a phone, email or detail comes in." },
+    { id: "gaps", title: "Email gaps", blurb: "No email on file. Ask at the next contact; nothing to enter until then." },
+  ];
+  const OB_BLOCKED = /blocked|no phone or email|no phone, email|not pushed|can.t create|cannot create|street number was not|before entering anything|confirm whether (she|he|they) (is|are) still/i;
+  const OB = { rows: null, at: null, err: null, loading: false, done: {}, sel: {}, confirm: null, gapsOpen: false, msg: "" };
+  function obCat(r) {
+    if (r.table === "partners") return "partners";
+    if (/^\s*no email on file/i.test(r.what || "")) return "gaps";
+    if (OB_BLOCKED.test(r.what || "")) return "waiting";
+    if ((r.pushTo || []).some((x) => /taxdome|axcess/i.test(x))) return "tax";
+    return "ghl";
+  }
+  async function loadOutbox() {
+    if (OB.loading) return;
+    OB.loading = true; OB.err = null; renderOutbox();
+    try {
+      const r = await api("GET", "/api/outbox");
+      const rows = r.rows || [];
+      // keep what was checked off on this device visible, even though Notion no longer lists it
+      for (const id of Object.keys(OB.done)) if (!rows.some((x) => x.id === id)) rows.push(OB.done[id].row);
+      OB.rows = rows; OB.at = Date.now();
+      store.set("outbox", { at: OB.at, rows: r.rows || [] });
+    } catch (e) {
+      if (e.message === "signin") { OB.loading = false; return; }
+      OB.err = e.message === "share"
+        ? "Oggi can't see People and Partners yet. In Notion, open each of those two tables, choose ••• → Connections, and add the oggi connection. Then refresh."
+        : "Couldn't reach Notion" + (OB.rows ? " — showing the last copy." : ".");
+      if (!OB.rows) { const c = store.get("outbox"); if (c) { OB.rows = c.rows; OB.at = c.at; } }
+    }
+    OB.loading = false;
+    renderOutbox();
+  }
+  function obLine(r) { return `${r.name} → ${(r.pushTo || []).join(", ")}\n${r.what || ""}`; }
+  function obClaudeLink(rows) {
+    const sys = Array.from(new Set(rows.flatMap((r) => r.pushTo || [])));
+    const prompt =
+`Work through this batch of my Notion outbox. Read the barayuga-notion skill first.
+
+For each Notion row below, open it with the Notion connector and read its Push to and What changed fields; What changed says exactly what to enter. Enter it into the named system (${sys.join(", ")}): use the HighLevel (IFG) connector for GHL where it can make the change, otherwise use my browser (GHL at app.teamifg.com, TaxDome, CCH Axcess). I sign in myself; never enter a password for me. Before saving each one, show me exactly what you are about to enter and wait for my OK. Never overwrite GHL tags with the tags field. Stop and ask on any near-match name rather than creating a duplicate. After I confirm a row is saved, set that row's Pushed date to today in Notion.
+
+Rows:
+${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
+    return "https://claude.ai/new?q=" + encodeURIComponent(prompt);
+  }
+  function obCopy(text, btn) {
+    const done = () => { const o = btn.textContent; btn.textContent = "Copied"; setTimeout(() => { btn.textContent = o; }, 1400); };
+    const fallback = () => {
+      let box = btn.parentElement.nextElementSibling;
+      if (!box || !box.classList.contains("ob-fallback")) { box = h("textarea", { class: "ob-fallback", readonly: true, rows: 5 }); btn.parentElement.after(box); }
+      box.value = text; box.focus(); box.select();
+    };
+    try { navigator.clipboard.writeText(text).then(done, fallback); } catch { fallback(); }
+  }
+  async function obSet(r, on) {
+    await api("PATCH", `/api/outbox/${r.id}`, { pushed: on, name: r.name, pushTo: r.pushTo, dayId: B && B.day ? B.day.id : null });
+    if (on) { OB.done[r.id] = { date: localISO(), row: r }; delete OB.sel[r.id]; }
+    else delete OB.done[r.id];
+  }
+  function renderOutbox() {
+    const host = $("#paneOutbox");
+    if (!host) return;
+    const y = host.scrollTop;
+    host.replaceChildren();
+    const w = h("div", { class: "wrap" });
+    host.append(w);
+    const rows = OB.rows || [];
+    const open = (c) => rows.filter((r) => obCat(r) === c && !OB.done[r.id]);
+    const ready = open("tax").length + open("ghl").length + open("partners").length;
+    const refresh = h("button", { class: "readaloud", text: OB.loading ? "Refreshing…" : "Refresh", disabled: OB.loading });
+    refresh.addEventListener("click", () => loadOutbox());
+    w.append(h("div", { class: "toprow" }, h("p", { class: "daydate", text: "Outbox" + (OB.at ? ` · ${fmtTime(new Date(OB.at))}` : "") }), refresh));
+    w.append(h("h1", { class: "head" }, OB.rows ? (ready ? `${ready} ready to enter, Eric.` : "Nothing is ready to enter.") : "Loading your outbox."));
+    if (OB.rows) w.append(h("p", { class: "ob-tally" },
+      h("span", null, h("b", { text: String(ready) }), " ready"),
+      h("span", null, h("b", { text: String(open("waiting").length) }), " waiting"),
+      h("span", null, h("b", { text: String(open("gaps").length) }), " email gaps"),
+      Object.keys(OB.done).length ? h("span", null, h("b", { text: String(Object.keys(OB.done).length) }), " pushed here") : null));
+    if (OB.err) w.append(h("p", { class: "ob-err", text: OB.err }));
+    if (OB.msg) w.append(h("p", { class: "ob-msg", role: "status", text: OB.msg }));
+    if (!OB.rows) { host.scrollTop = y; return; }
+
+    for (const c of OB_CATS) {
+      const items = rows.filter((r) => obCat(r) === c.id);
+      const openRows = items.filter((r) => !OB.done[r.id]);
+      const sec = h("section", { class: "ob-sec" + (c.id === "gaps" ? " ob-gaps" : "") });
+      const head = h("div", { class: "ob-head" }, h("h2", { class: "sec", text: c.title }), h("span", { class: "ob-count", text: String(openRows.length) }));
+      const blurb = h("p", { class: "quiet ob-blurb", text: c.blurb });
+      const list = h("ul", { class: "ob-list" });
+      for (const r of items) {
+        const d = OB.done[r.id];
+        const cb = h("input", { type: "checkbox", id: "ob-" + r.id, "aria-label": "Select " + r.name, disabled: !!d });
+        cb.checked = !!OB.sel[r.id];
+        cb.addEventListener("change", () => { if (cb.checked) OB.sel[r.id] = 1; else delete OB.sel[r.id]; OB.confirm = null; renderOutbox(); });
+        const nm = safeUrl(r.url) ? ext(h("a", { href: r.url, text: r.name })) : h("span", { text: r.name });
+        const tools = h("div", { class: "itemtools" });
+        if (d) {
+          const undo = h("button", { text: "Undo" });
+          undo.addEventListener("click", async () => { undo.disabled = true; try { await obSet(r, false); OB.msg = `${r.name} is back in the outbox.`; } catch (e) { if (e.message !== "signin") OB.msg = "Couldn't save that to Notion. Try again."; } renderOutbox(); });
+          tools.append(h("span", { class: "ob-done", text: `Pushed ${d.date}` }), undo);
+        } else {
+          const cp = h("button", { text: "Copy" });
+          cp.addEventListener("click", () => obCopy(obLine(r), cp));
+          const pu = h("button", { text: "Mark pushed" });
+          pu.addEventListener("click", async () => { pu.disabled = true; pu.textContent = "Saving…"; try { await obSet(r, true); OB.msg = `${r.name} marked pushed.`; } catch (e) { if (e.message !== "signin") OB.msg = "Couldn't save that to Notion. Try again."; } renderOutbox(); });
+          tools.append(cp, pu);
+        }
+        list.append(h("li", { class: d ? "closed" : null }, cb, h("div", { class: "body" },
+          h("div", { class: "ttl ob-name" }, nm, ...(r.pushTo || []).map((x) => h("span", { class: "ob-chip", text: x }))),
+          h("p", { class: "sen ob-what", text: r.what || "No detail written yet." }),
+          tools)));
+      }
+      if (!items.length) list.append(h("li", { class: "ob-empty quiet", text: "Nothing here right now." }));
+
+      let bar = null;
+      if (c.id !== "gaps" && openRows.length) {
+        const sel = openRows.filter((r) => OB.sel[r.id]);
+        const all = h("button", { class: "textlink", text: sel.length === openRows.length ? "Clear" : "Select all" });
+        all.addEventListener("click", () => { const on = sel.length !== openRows.length; openRows.forEach((r) => { if (on) OB.sel[r.id] = 1; else delete OB.sel[r.id]; }); OB.confirm = null; renderOutbox(); });
+        const copyB = h("button", { class: "textlink", text: "Copy batch", disabled: !sel.length });
+        copyB.addEventListener("click", () => obCopy(sel.map(obLine).join("\n\n"), copyB));
+        const confirming = OB.confirm === c.id;
+        const pushB = h("button", { class: "textlink" + (confirming ? " ob-confirm" : ""), text: confirming ? `Confirm: mark ${sel.length} pushed` : "Mark pushed", disabled: !sel.length });
+        pushB.addEventListener("click", async () => {
+          if (!confirming) { OB.confirm = c.id; renderOutbox(); return; }
+          OB.confirm = null; pushB.disabled = true; pushB.textContent = "Saving…";
+          let failed = 0;
+          for (const r of sel) { try { await obSet(r, true); } catch { failed++; } }
+          OB.msg = failed ? `${sel.length - failed} marked pushed; ${failed} didn't save. Try those again.` : `${sel.length} marked pushed.`;
+          renderOutbox();
+        });
+        const claude = sel.length ? ext(h("a", { class: "btn", href: obClaudeLink(sel), text: "Have Claude enter these" })) : h("span", { class: "btn ob-off", "aria-disabled": "true", text: "Have Claude enter these" });
+        bar = sel.length
+          ? h("div", { class: "ob-bar" }, h("span", { class: "quiet", text: `${sel.length} selected` }), all, copyB, pushB, claude)
+          : h("div", { class: "ob-bar ob-bar-idle" }, h("span", { class: "quiet", text: "Tick items to copy them, mark them pushed, or hand them to Claude as a batch." }), all);
+      }
+
+      if (c.id === "gaps") {
+        const det = h("details", { open: OB.gapsOpen });
+        det.addEventListener("toggle", () => { OB.gapsOpen = det.open; });
+        det.append(h("summary", null, head, blurb), list);
+        sec.append(det);
+      } else sec.append(...[head, blurb, list, bar].filter(Boolean));
+      w.append(sec);
+    }
+    w.append(h("p", { class: "quiet", style: "margin-top:8px", text: "Mark pushed writes today's date into Pushed in Notion, which takes the row out of the outbox. Have Claude enter these opens a new chat that reads the selected rows from Notion and fills them in, asking before each save." }));
+    host.scrollTop = y;
+  }
+  function showOutbox() { if (!OB.rows || Date.now() - (OB.at || 0) > 5 * 60_000) loadOutbox(); else renderOutbox(); }
+
   // ---------------- nav (phone) ----------------
   const panes = $("#panes");
   function go(name, smooth = true) {
@@ -1235,22 +1394,27 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
     if (!el) return;
     panes.scrollTo({ left: el.offsetLeft, behavior: smooth ? "smooth" : "auto" });
     markNav(name);
+    if (name === "outbox") showOutbox();
   }
   function markNav(name) { document.querySelectorAll(".nav button").forEach((b) => b.setAttribute("aria-current", String(b.dataset.go === name))); }
   $("#nav").addEventListener("click", (ev) => {
     const b = ev.target.closest("button[data-go]");
     if (!b) return;
     if (!isDesk()) { go(b.dataset.go); return; }
-    // desktop: Now = focus view, Today = the brief + editor, Capture = jump to the capture box
+    // desktop: Now = focus view, Today = the brief + editor, Capture = jump to the capture box, Outbox = its own page
     const name = b.dataset.go;
+    document.body.classList.toggle("outboxview", name === "outbox");
     toggleFocus(name === "now");
     markNav(name);
+    if (name === "outbox") showOutbox();
     if (name === "capture") { const c = $("#deskCapture"); if (c) { c.scrollIntoView({ block: "center" }); c.focus(); } }
   });
   panes.addEventListener("scroll", debounce(() => {
     if (isDesk()) return;
     const i = Math.round(panes.scrollLeft / panes.clientWidth);
-    markNav(["now", "today", "capture"][i] || "today");
+    const name = ["now", "today", "capture", "outbox"][i] || "today";
+    markNav(name);
+    if (name === "outbox" && !OB.rows && !OB.loading) loadOutbox();
   }, 60));
 
 
@@ -1331,6 +1495,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
     renderAll();
     if (!isDesk()) go(p.get("view") || "today", false);
     if (isDesk() && p.get("view") === "now") toggleFocus(true);
+    if (isDesk() && p.get("view") === "outbox") { document.body.classList.add("outboxview"); markNav("outbox"); showOutbox(); }
     // refresh quietly when the app comes back to the foreground
     document.addEventListener("visibilitychange", async () => {
       if (document.visibilityState !== "visible") return;

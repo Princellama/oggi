@@ -8,6 +8,8 @@ const DS = {
   days: process.env.NOTION_DAYS_DS || "292f1929-9158-4c3f-8e80-80ad70cd4b13",
   items: process.env.NOTION_ITEMS_DS || "56605421-1249-4338-9a43-4ac9edc3bddc",
   tasks: process.env.NOTION_TASKS_DS || "15f8f469-b674-81ae-bbef-000bb207a508",
+  people: process.env.NOTION_PEOPLE_DS || "47d42794-febb-4efb-9173-14a22ce848cb",
+  partners: process.env.NOTION_PARTNERS_DS || "fe50f233-8c9a-4d3c-bce1-ceab5dd05653",
 };
 
 async function call(method, path, body) {
@@ -40,6 +42,7 @@ function read(p) {
     case "number": return p.number;
     case "url": return p.url;
     case "date": return p.date ? p.date.start : null;
+    case "multi_select": return (p.multi_select || []).map((o) => o.name);
     default: return null;
   }
 }
@@ -224,4 +227,46 @@ async function createTask(text, localDate) {
   return { id: page.id, url: page.url };
 }
 
-module.exports = { getBrief, updateItem, updateDay, logEdit, applyDecisionToTask, createTask, getPage, toItem };
+// ---- the outbox: People and Partners rows with "Push to" set and "Pushed" empty ----
+// "Pushed" is Eric's claim that he typed the change into GHL / TaxDome / Axcess; nothing reads those back.
+function toOutbox(page, table) {
+  const p = page.properties;
+  const title = Object.values(p).find((x) => x.type === "title");
+  return {
+    id: page.id,
+    url: page.url,
+    table,
+    name: title ? plain(title.title) : "",
+    pushTo: read(p["Push to"]) || [],
+    what: read(p["What changed"]) || "",
+    pushed: read(p["Pushed"]),
+  };
+}
+async function queryAll(ds, body) {
+  const out = [];
+  let cursor;
+  do {
+    const r = await queryDS(ds, { ...body, page_size: 100, start_cursor: cursor });
+    out.push(...r.results);
+    cursor = r.has_more ? r.next_cursor : undefined;
+  } while (cursor && out.length < 1000);
+  return out;
+}
+async function getOutbox() {
+  const body = {
+    filter: { and: [
+      { property: "Push to", multi_select: { is_not_empty: true } },
+      { property: "Pushed", date: { is_empty: true } },
+    ] },
+  };
+  const [people, partners] = await Promise.all([queryAll(DS.people, body), queryAll(DS.partners, body)]);
+  const rows = people.map((pg) => toOutbox(pg, "people")).concat(partners.map((pg) => toOutbox(pg, "partners")));
+  rows.sort((a, b) => a.name.localeCompare(b.name));
+  return rows;
+}
+async function setPushed(id, date) {
+  const page = await call("PATCH", `/pages/${id}`, { properties: { Pushed: { date: date ? { start: date } : null } } });
+  return toOutbox(page, null);
+}
+
+module.exports = { getOutbox, setPushed, getBrief, updateItem, updateDay, logEdit, applyDecisionToTask, createTask, getPage, toItem };

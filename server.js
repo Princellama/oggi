@@ -219,6 +219,28 @@ app.post("/api/capture", requireAuth, wrap(async (req, res) => {
   res.json(task);
 }));
 
+// ---------- outbox ----------
+app.get("/api/outbox", requireAuth, wrap(async (req, res) => {
+  try {
+    res.json({ rows: await store.getOutbox() });
+  } catch (e) {
+    // The oggi integration has to be added to People and Partners in Notion before this works.
+    if (e.status === 404 || /could not find|not shared|object_not_found/i.test(e.message || "")) {
+      return res.status(409).json({ error: "share" });
+    }
+    throw e;
+  }
+}));
+
+app.patch("/api/outbox/:id", requireAuth, wrap(async (req, res) => {
+  const on = !!req.body.pushed;
+  const row = await store.setPushed(req.params.id, on ? localDate(req) : null);
+  const name = String(req.body.name || row.name || "").slice(0, 120);
+  const to = Array.isArray(req.body.pushTo) ? req.body.pushTo.join(", ").slice(0, 60) : "";
+  if (req.body.dayId && name) await store.logEdit(req.body.dayId, `${stamp()} Outbox: ${name} → ${on ? `pushed${to ? ` to ${to}` : ""}` : "back in the outbox"}`).catch(() => {});
+  res.json(row);
+}));
+
 app.post("/api/edits/clear", requireAuth, wrap(async (req, res) => {
   if (!req.body.dayId) return res.status(400).json({ error: "dayId" });
   await store.updateDay(req.body.dayId, { edits: "" });
