@@ -41,6 +41,32 @@
     h = h % 12 || 12;
     return m ? `${h}:${String(m).padStart(2, "0")} ${ap}` : `${h} ${ap}`;
   }
+  // A time in another zone, e.g. Hawaii while Eric works remote.
+  function fmtTimeIn(d, tz) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }).formatToParts(d);
+      const g = (t) => (parts.find((x) => x.type === t) || {}).value;
+      const m = g("minute"), ap = (g("dayPeriod") || "").toUpperCase();
+      return m && m !== "00" ? `${g("hour")}:${m} ${ap}` : `${g("hour")} ${ap}`;
+    } catch { return fmtTime(d); }
+  }
+  // A short name for a zone: HST, PDT… where the browser knows one, otherwise the city.
+  function tzLabel(tz, d = new Date()) {
+    try {
+      const n = (new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "short" }).formatToParts(d).find((x) => x.type === "timeZoneName") || {}).value || "";
+      if (/^[A-Z]{2,5}$/.test(n)) return n;
+    } catch {}
+    return (tz.split("/").pop() || tz).replace(/_/g, " ");
+  }
+  const hereTz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch { return ""; } };
+  // Minutes a zone is ahead of UTC at a moment, to tell whether two zones differ right now.
+  function tzOffset(tz, d = new Date()) {
+    try {
+      const p = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(d);
+      const g = (t) => Number((p.find((x) => x.type === t) || {}).value);
+      return Math.round((Date.UTC(g("year"), g("month") - 1, g("day"), g("hour"), g("minute")) - Math.floor(d.getTime() / 60000) * 60000) / 60000);
+    } catch { return -d.getTimezoneOffset(); }
+  }
   function fmtIn(ms) {
     const m = Math.round(ms / 60000);
     if (m < 1) return "now";
@@ -494,7 +520,14 @@
     shortest: ["Shortest to longest", "By the time each one takes."],
   };
   const AREA_ORDER = ["CPA", "Medicare", "Money", "Personal"];
-  const DEF_PREFS = { mode: "drive", order: "priority", start: "", gap: 5, pomo: 25, pomoBreak: 5, est: {}, diff: {} };
+  const DEF_PREFS = { mode: "drive", order: "priority", start: "", gap: 5, pomo: 25, pomoBreak: 5, est: {}, diff: {}, remote: false, home: "Pacific/Honolulu" };
+  // Remote Work mode: the day runs on the time where this device is; home base is shown under it.
+  const HOMES = [["Pacific/Honolulu", "Hawaii"], ["America/Los_Angeles", "Los Angeles"], ["America/Denver", "Denver"], ["America/Chicago", "Chicago"], ["America/New_York", "New York"], ["Asia/Tokyo", "Tokyo"], ["Asia/Manila", "Manila"], ["Europe/London", "London"]];
+  function homeZone(p = prefs()) {
+    if (!p.remote) return null;
+    const home = p.home || "Pacific/Honolulu";
+    return tzOffset(home) === -new Date().getTimezoneOffset() ? null : home;   // same time here as at home: nothing to add
+  }
   function prefs() { const p = store.get("skyPrefs") || {}; return { ...DEF_PREFS, ...p, est: { ...(p.est || {}) }, diff: { ...(p.diff || {}) } }; }
   function setPrefs(patch) { store.set("skyPrefs", { ...prefs(), ...patch }); }
   // Rough minutes per item, from its title. Anything here can be changed in settings.
@@ -833,6 +866,7 @@
         px = x;
       }
       for (const st of stars) if (!pos.has(st)) pos.set(st, { x: st.dx, y: st.dy, show: false });
+      const home = homeZone();
       draw.push((g) => {
         const x0 = X(t0), x1 = X(tEnd);
         g.append(s("line", { class: "tl-axis", x1: x0, y1: TL_AXIS, x2: x1, y2: TL_AXIS }));
@@ -842,12 +876,18 @@
           const x = X(t);
           g.append(s("line", { class: "tl-tick", x1: x, y1: TL_AXIS - 5, x2: x, y2: TL_AXIS + 5 }));
           g.append(s("text", { class: "tl-hour", x, y: TL_AXIS + 22 }, fmtTime(new Date(t))));
+          if (home) g.append(s("text", { class: "tl-hour tl-home", x, y: TL_AXIS + 38 }, fmtTimeIn(new Date(t), home)));
+        }
+        // in Remote Work mode, name the two rows: where you are, and home base
+        if (home) {
+          g.append(s("text", { class: "tl-zone", x: x0 - 8, y: TL_AXIS + 22 }, tzLabel(hereTz()) || "here"));
+          g.append(s("text", { class: "tl-zone tl-home", x: x0 - 8, y: TL_AXIS + 38 }, tzLabel(home) + " · home"));
         }
         // now
         const nx = X(Date.now());
         if (nx >= x0 && nx <= x1) {
           g.append(s("line", { class: "tl-now", x1: nx, y1: TL_AXIS - 18, x2: nx, y2: TL_AXIS + 8 }));
-          g.append(s("text", { class: "tl-nowl", x: nx, y: TL_AXIS - 24 }, "now"));
+          g.append(s("text", { class: "tl-nowl", x: nx, y: TL_AXIS - 24 }, home ? `now · ${fmtTimeIn(new Date(), home)} ${tzLabel(home)}` : "now"));
         }
         // each block of time, and a thread up to its planet
         for (const st of live) {
@@ -856,7 +896,7 @@
           g.append(s("rect", { class: "tl-block", x: X(st.slot.at), y: TL_AXIS - 3, width: Math.max(4, X(st.slot.end) - X(st.slot.at)), height: 6, rx: 3, fill: tint }));
         }
       });
-      const pts = [...live.map((st) => pos.get(st)), { x: X(t0), y: TL_AXIS + 30 }, { x: X(tEnd), y: TL_AXIS + 30 }];
+      const pts = [...live.map((st) => pos.get(st)), { x: X(t0) - (home ? 70 : 0), y: TL_AXIS + (home ? 46 : 30) }, { x: X(tEnd), y: TL_AXIS + (home ? 46 : 30) }];
       return { pos, draw, box: boxOf(pts, 140) };
     }
     if (mode === "area") {
@@ -1049,6 +1089,15 @@
     brk.addEventListener("change", () => setPrefs({ pomoBreak: Number(brk.value) }));
     w.append(h("div", { class: "set-row" }, h("label", { for: "setPomo", text: "Focus timer" }), pomo));
     w.append(h("div", { class: "set-row" }, h("label", { for: "setBreak", text: "Then a break of" }), brk));
+
+    w.append(h("h2", { class: "sec", text: "Where you are" }));
+    const remote = h("input", { type: "checkbox", id: "setRemote", checked: !!p.remote });
+    const homeSel = h("select", { id: "setHome", class: "set-in", disabled: !p.remote }, HOMES.map(([z, l]) => { const o = h("option", { value: z, text: `${l} (${tzLabel(z)})` }); o.selected = (p.home || "Pacific/Honolulu") === z; return o; }));
+    remote.addEventListener("change", () => { setPrefs({ remote: remote.checked }); homeSel.disabled = !remote.checked; });
+    homeSel.addEventListener("change", () => setPrefs({ home: homeSel.value }));
+    w.append(h("label", { class: "opt", for: "setRemote" }, remote, h("span", null, h("b", { text: "Remote Work mode" }),
+      h("span", { class: "opt-sub", text: `The day runs on the time where you are (${tzLabel(hereTz()) || "this device"}, ${fmtTime(new Date())}). The timeline also shows your home base under each hour.` }))));
+    w.append(h("div", { class: "set-row" }, h("label", { for: "setHome", text: "Home base" }), homeSel));
 
     w.append(h("h2", { class: "sec", text: "Time and effort" }));
     w.append(h("p", { class: "quiet set-note", text: "Guessed from each title until you set them. A tax return starts at two hours; a call at fifteen minutes." }));

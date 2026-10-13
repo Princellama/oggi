@@ -441,6 +441,9 @@ textarea.ob-fallback { display: block; width: 100%; margin-top: 10px; font: 13px
 .sky .tl-tick { stroke: var(--starlight); stroke-opacity: .3; stroke-width: 1; }
 .sky .tl-hour { font: 600 8px var(--sans); letter-spacing: .6px; fill: var(--starlight); fill-opacity: .42; text-anchor: middle; }
 .sky .tl-now { stroke: #E8997A; stroke-width: 1.4; stroke-opacity: .8; }
+.sky .tl-hour.tl-home { fill: #7FC8C2; fill-opacity: .55; font-weight: 500; }
+.sky .tl-zone { font: 600 7px var(--sans); letter-spacing: .8px; fill: var(--starlight); fill-opacity: .42; text-anchor: end; text-transform: uppercase; }
+.sky .tl-zone.tl-home { fill: #7FC8C2; fill-opacity: .6; }
 .sky .tl-nowl { font: 600 7.5px var(--sans); letter-spacing: 1px; fill: #E8997A; fill-opacity: .85; text-anchor: middle; text-transform: uppercase; }
 .sky .tl-thread { stroke-width: .8; stroke-opacity: .22; stroke-dasharray: 1.5 3.5; }
 .sky .tl-block { opacity: .55; }
