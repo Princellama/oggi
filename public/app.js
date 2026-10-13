@@ -525,7 +525,7 @@
   }
   function dayStart(p = prefs()) {
     const now = new Date();
-    let t = new Date(Math.ceil(now.getTime() / 900000) * 900000);
+    let t = new Date(Math.ceil(now.getTime() / 300000) * 300000);   // the next five minutes
     if (/^\d\d:\d\d$/.test(p.start || "")) {
       const [hh, mm] = p.start.split(":").map(Number);
       const s0 = new Date(now); s0.setHours(hh, mm, 0, 0);
@@ -552,8 +552,9 @@
     const evs = events().filter((e) => e.e.getTime() > t).sort((a, b) => a.s - b.s);
     const open = openNeeds();
     if (p.mode === "timeline") {
-      const slots = schedule(orderItems(open, p.order, p), evs, p).map((x) => ({ kind: "item", ...x }));
-      const evSlots = evs.map((ev) => ({ kind: "event", ev, at: ev.s.getTime(), end: ev.e.getTime() }));
+      const fixed = evs.filter(blocksTime);
+      const slots = schedule(orderItems(open, p.order, p), fixed, p).map((x) => ({ kind: "item", ...x }));
+      const evSlots = fixed.map((ev) => ({ kind: "event", ev, at: ev.s.getTime(), end: ev.e.getTime() }));
       return evSlots.concat(slots).sort((a, b) => a.at - b.at);
     }
     const seq = [];
@@ -567,6 +568,9 @@
     for (const it of items) seq.push({ kind: "item", it });
     return seq;
   }
+  // A calendar entry holds time on the timeline only if it is a real appointment:
+  // optional entries and long blocks (a whole port day, an all-day hold) never push the work later.
+  const blocksTime = (ev) => !ev.optional && ev.e - ev.s < 4 * 3600000;
   const evKey = (ev) => "ev:" + ev.s.getTime() + ":" + ev.title;
   const seqKey = (x) => (x.kind === "event" ? evKey(x.ev) : x.it.id);
 
@@ -690,9 +694,11 @@
     let swiped = false, sx = null, sy = null;
     const pick = (ev) => {
       const g = ev.target.closest(".star");
+      if (!g && skyFull && !swiped && ev.type === "click") { closeModal(); return; }
       if (!g || swiped) return;
       const st = stars.find((x) => x.el === g);
       if (!st || !st.open || st.gone) return;
+      if (skyFull) { if (st.seqIdx === nowIdx) openModal(); else flyTo(st.seqIdx, true); return; }
       if (st.seqIdx === nowIdx) dive(); else flyTo(st.seqIdx);
     };
     svg.addEventListener("click", pick);
@@ -966,7 +972,7 @@
     sky.seq = seq;
     remapStars(sky.stars, seq);
     const i = curKey ? seq.findIndex((x) => seqKey(x) === curKey) : -1;
-    nowIdx = i >= 0 ? i : 0;
+    nowIdx = mode === "timeline" ? 0 : i >= 0 ? i : 0;
     markStar(nowIdx);
     fillCtl(); fillCard();
     sky.el.classList.add("away");
@@ -996,7 +1002,7 @@
     document.addEventListener("click", (ev) => { if (!box.contains(ev.target)) close(); });
     // keep the sky from treating taps on the control as drags
     box.addEventListener("pointerdown", (ev) => ev.stopPropagation());
-    box.append(btn, menu);
+    box.append(btn, fullBtn(), menu);
     return box;
   }
 
@@ -1147,6 +1153,77 @@
     return box;
   }
 
+  // ---- full screen: the sky fills the screen; tapping a planet floats its card over it ----
+  let skyFull = false;
+  function fullBtn() {
+    const b = h("button", { class: "sky-sort-b sky-full-b", type: "button" });
+    const set = () => { b.textContent = skyFull ? "Exit full screen" : "⤢"; b.setAttribute("aria-label", skyFull ? "Exit full screen" : "Full screen"); b.title = skyFull ? "Exit full screen (Esc)" : "Full screen"; };
+    set();
+    b.addEventListener("click", (ev) => { ev.stopPropagation(); if (skyFull) exitFull(); else enterFull(); });
+    b._sync = set;
+    return b;
+  }
+  function syncFullBtn() { const b = sky && sky.el.querySelector(".sky-full-b"); if (b && b._sync) b._sync(); }
+  function enterFull() {
+    if (!sky) return;
+    skyFull = true;
+    document.body.append(sky.el);
+    sky.el.classList.add("full");
+    document.body.classList.add("skyfull");
+    syncFullBtn();
+    requestAnimationFrame(() => { if (!sky) return; if (!sky.el.classList.contains("away")) { const st = starFor(nowIdx); if (st) cam = restCam(st); } setView(); });
+  }
+  function exitFull() {
+    skyFull = false;
+    document.body.classList.remove("skyfull");
+    if (!sky) return;
+    closeModal();
+    sky.el.classList.remove("full");
+    const box = document.querySelector("#paneNow .now");
+    const w = box && box.querySelector(".wrap");
+    if (box && w) box.insertBefore(sky.el, w); else sky.el.remove();
+    syncFullBtn();
+    requestAnimationFrame(() => { if (!sky) return; if (!sky.el.classList.contains("away")) { const st = starFor(nowIdx); if (st) cam = restCam(st); } setView(); fillCard(); fillCtl(); });
+  }
+  const modalEl = () => sky && sky.el.querySelector(".sky-modal");
+  function closeModal() { const m = modalEl(); if (m) { m.classList.remove("in"); m.hidden = true; } }
+  function openModal() {
+    if (!sky) return;
+    let m = modalEl();
+    if (!m) {
+      m = h("div", { class: "sky-modal", role: "dialog", "aria-modal": "false", hidden: true });
+      for (const t of ["pointerdown", "wheel", "click"]) m.addEventListener(t, (ev) => ev.stopPropagation());
+      sky.el.append(m);
+    }
+    fillModal(m);
+    const wasHidden = m.hidden;
+    m.hidden = false;
+    const st = starFor(nowIdx);
+    if (wasHidden && st && !camAnim) animateCam(cardCam(st), 520);
+    requestAnimationFrame(() => { m.classList.remove("swap"); m.classList.add("in"); });
+    const f = m.querySelector(".btn"); if (f) f.focus({ preventScroll: true });
+  }
+  function fillModal(m) {
+    m.replaceChildren();
+    const cur = sky.seq[nowIdx];
+    if (!cur) return;
+    m.setAttribute("aria-label", cur.kind === "event" ? cur.ev.title : cur.it.title);
+    m.append(h("button", { class: "sky-modal-x", type: "button", "aria-label": "Close", onclick: closeModal, text: "×" }));
+    m.append(...cardBits(cur, () => { exitFull(); dive(); }));
+    const nav = h("div", { class: "now-ctl sky-modal-nav" });
+    nav.append(h("button", { type: "button", text: "← Back", disabled: nowIdx === 0 ? true : null, onclick: () => flyTo(nowIdx - 1) }));
+    nav.append(h("button", { type: "button", text: "Next →", disabled: nowIdx >= sky.seq.length - 1 ? true : null, onclick: () => flyTo(nowIdx + 1) }));
+    nav.append(h("span", { class: "pos", text: `${nowIdx + 1} of ${sky.seq.length}` }));
+    m.append(nav);
+  }
+  document.addEventListener("keydown", (ev) => {
+    if (!skyFull || sheetOpen) return;
+    if (ev.target.closest && ev.target.closest("input, textarea, select")) return;
+    if (ev.key === "Escape") { ev.stopImmediatePropagation(); const m = modalEl(); if (m && !m.hidden) closeModal(); else exitFull(); return; }
+    if (ev.key === "ArrowRight" || ev.key === "ArrowLeft") { ev.stopImmediatePropagation(); ev.preventDefault(); flyTo(nowIdx + (ev.key === "ArrowRight" ? 1 : -1)); }
+    if (ev.key === "Enter" && !ev.target.closest("button, a")) { ev.stopImmediatePropagation(); openModal(); }
+  }, true);
+
   const starFor = (i) => sky && sky.stars.find((x) => x.seqIdx === i);
   function clampCam() {
     if (!cam) return;
@@ -1162,6 +1239,13 @@
   }
   function restW(el) { const px = (el && el.clientWidth) || 360; return Math.max(380, Math.min(760, px * 1.05)); }
   function restCam(st) { return { x: st.x, y: st.y + (prefs().mode === "timeline" ? 30 : 6), w: restW(sky.el) * (prefs().mode === "drive" ? 1 : 1.35) }; }
+  function cardCam(st) {
+    const c = restCam(st);
+    if (!(skyFull && sky)) return c;
+    const px = sky.el.clientWidth || 1200;
+    // wide screens: the card sits on the right, so the planet moves left; phones: the card sits low, so it moves up
+    return isDesk() ? { ...c, x: c.x + (c.w / px) * 230 } : { ...c, y: c.y + (c.w / px) * 150 };
+  }
   const skyMaxW = () => Math.max(SKY_MAX_W, sky && sky.box ? (sky.box.x1 - sky.box.x0) + 500 : 0);
   function setView() {
     if (!sky || !cam) return;
@@ -1208,8 +1292,11 @@
     setTimeout(() => ln.remove(), 1500);
   }
 
-  function flyTo(i) {
+  function flyTo(i, showCard) {
     if (!sky || i < 0 || i >= sky.seq.length || i === nowIdx) return;
+    const m = skyFull ? modalEl() : null;
+    const withCard = skyFull && (showCard || (m && !m.hidden));
+    if (m && !m.hidden) m.classList.add("swap");
     const a = starFor(nowIdx), b = starFor(i);
     nowIdx = i;
     if (!a || !b) { renderNow(); return; }
@@ -1220,9 +1307,10 @@
     drawTrail(a, b);
     sky.card.classList.add("swap");
     fillCtl();
-    animateCam(restCam(b), 820, () => { fillCard(); sky.card.classList.remove("swap"); });
+    animateCam(withCard ? cardCam(b) : restCam(b), 820, () => { fillCard(); sky.card.classList.remove("swap"); if (withCard) openModal(); });
   }
   function dive() {
+    if (skyFull) exitFull();
     const st = starFor(nowIdx);
     if (!st) return;
     if (!store.get("skyHintSeen")) store.set("skyHintSeen", true);
@@ -1238,24 +1326,29 @@
     const cur = sky.seq[nowIdx];
     card.replaceChildren();
     if (!cur) return;
+    card.append(...cardBits(cur, dive));
+  }
+  function cardBits(cur, onOpen) {
+    const card = h("div");
     if (cur.kind === "event") {
       const e = cur.ev, t = Date.now();
       const running = e.s.getTime() <= t;
       card.append(h("p", { class: "now-kicker" }, glyphSvg("g-clock"), running ? `Until ${fmtTime(e.e)}` : `${fmtTime(e.s)} · ${fmtIn(e.s.getTime() - t)}`));
-      card.append(h("h1", { class: "now-title", onclick: dive }, e.title));
+      card.append(h("h1", { class: "now-title", onclick: onOpen }, e.title));
       if (e.where) card.append(h("p", { class: "now-gist", text: e.where }));
     } else {
       const it = cur.it;
       const when = cur.at ? `· ${fmtTime(new Date(cur.at))}, about ${fmtDur(Math.round((cur.end - cur.at) / 60000))}` : "· " + it.place;
       card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: when })));
-      card.append(h("h1", { class: "now-title", onclick: dive }, it.title));
+      card.append(h("h1", { class: "now-title", onclick: onOpen }, it.title));
       if (it.sentence) card.append(h("p", { class: "now-gist", text: firstSentence(it.sentence) }));
       if (it.carries > 1) card.append(h("p", { class: "now-carry", text: `Carried ${it.carries} days.` }));
     }
     const rec = recFor(cur);
-    const open = h("div", { class: "now-open" }, h("button", { class: "btn", onclick: dive, text: "Open it" }));
+    const open = h("div", { class: "now-open" }, h("button", { class: "btn", onclick: onOpen, text: "Open it" }));
     if (rec && (rec.claude === "yes" || rec.claude === "partly")) open.append(h("span", { class: "now-claude" }, glyphSvg("g-spark"), CLAUDE_SAYS[rec.claude]));
     card.append(open);
+    return Array.from(card.childNodes);
   }
   function fillCtl() {
     const ctl = sky.ctl;
@@ -1271,6 +1364,10 @@
 
   function renderNow() {
     const pane = $("#paneNow");
+    const keepFull = skyFull;
+    if (sky && sky.el.classList.contains("full")) sky.el.remove();
+    skyFull = false;
+    document.body.classList.remove("skyfull");
     cancelAnimationFrame(camAnim); camAnim = 0;
     cancelAnimationFrame(glide); glide = 0;
     pane.replaceChildren();
@@ -1303,6 +1400,7 @@
     markStar(nowIdx);
     fillCard();
     fillCtl();
+    if (keepFull && !surfacing) enterFull();
     const st = starFor(nowIdx);
     if (!st) return;
     if (surfacing) {
@@ -1965,7 +2063,7 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
       if (await load().catch(() => false)) { noteFresh(); renderAll(); }
     });
     window.matchMedia("(min-width: 980px)").addEventListener("change", renderAll);
-    setInterval(() => { if (camAnim || starAnim || sheetOpen) return; if (sky && (sky.el.classList.contains("away") || !sky.el.querySelector(".sky-menu[hidden]"))) return; if (!document.activeElement || !document.activeElement.closest("input, textarea")) renderNow(); }, 60_000);
+    setInterval(() => { if (camAnim || starAnim || sheetOpen || skyFull) return; if (sky && (sky.el.classList.contains("away") || !sky.el.querySelector(".sky-menu[hidden]"))) return; if (!document.activeElement || !document.activeElement.closest("input, textarea")) renderNow(); }, 60_000);
   }
 
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
