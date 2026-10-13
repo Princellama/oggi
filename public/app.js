@@ -1178,14 +1178,17 @@
     if (!veil) return;
     for (const t of veil.timers) clearTimeout(t);
     cancelAnimationFrame(veil.raf);
-    const el = veil.el;
+    const el = veil.el, madeFull = veil.madeFull;
     veil = null;
+    if (madeFull && skyFull) exitFull();
     el.classList.remove("in");
     setTimeout(() => el.remove(), reduceMotion() ? 0 : 420);
   }
   function openVeil(kind, label) {
     if (!sky) return null;
     closeVeil();
+    const madeFull = !skyFull;
+    if (madeFull) enterFull();
     const el = h("div", { class: "veil veil-" + kind, role: "dialog", "aria-modal": "true", "aria-label": label });
     for (const t of ["pointerdown", "wheel", "click"]) el.addEventListener(t, (ev) => ev.stopPropagation());
     // a slow field of drifting motes, the galaxy seen through frosted glass
@@ -1202,7 +1205,7 @@
     const body = h("div", { class: "veil-body" });
     el.append(motes, x, body);
     sky.el.append(el);
-    veil = { el, body, timers: [], raf: 0 };
+    veil = { el, body, timers: [], raf: 0, madeFull };
     requestAnimationFrame(() => el.classList.add("in"));
     return veil;
   }
@@ -1294,6 +1297,7 @@
     let mins = Number(store.get("breathMins")) || 3;
     const choose = () => {
       v.body.replaceChildren();
+      v.body.classList.add("scroll");
       v.body.append(h("p", { class: "veil-kicker", text: "Breathe" }), h("h2", { class: "veil-title", text: "A minute to reset." }));
       const cards = h("div", { class: "breath-cards", role: "radiogroup", "aria-label": "Pattern" });
       for (const [k, b] of Object.entries(BREATHS)) {
@@ -1320,6 +1324,7 @@
       const cycle = b.steps.reduce((a, x) => a + x[1], 0);
       const rounds = Math.max(2, Math.round((m * 60) / cycle));
       v.body.replaceChildren();
+      v.body.classList.remove("scroll");
       v.el.style.setProperty("--tint", b.tint);
       const orb = h("div", { class: "breath-orb", "aria-hidden": "true" }, h("span", { class: "orb-glow" }), h("span", { class: "orb-core" }));
       const ring = h("div", { class: "breath-ring", "aria-hidden": "true" });
