@@ -783,7 +783,7 @@
     const home = h("button", { class: "sky-home", type: "button", "aria-label": "Back to the bright star", onclick: () => { const st = starFor(nowIdx); if (st) { el.classList.remove("away"); animateCam(restCam(st), 560); } } }, "◎");
     el.append(home);
 
-    el.append(sortControl(), pomoWidget());
+    el.append(sortControl(), cornerTools());
 
     if (!isDesk() && !store.get("skyHintSeen") && seq.length > 1) el.append(h("p", { class: "sky-hint", text: "Drag to look around · pinch to zoom · tap a star to go there" }));
     let seenW = 0;
@@ -1153,6 +1153,208 @@
     return box;
   }
 
+  // ---- Breathe and Break: two quiet resets beside the focus timer ----
+  // Each opens a heavily blurred veil over the sky, so the stars still glow through it.
+  // × or Esc closes either one.
+  let veil = null;   // { el, timers: [], raf }
+  const veilOpen = () => !!(veil && veil.el.isConnected);
+  function cornerTools() {
+    const box = h("div", { class: "sky-tools" });
+    const tool = (cls, label, icon, onClick) => {
+      const b = h("button", { type: "button", class: "sky-tool " + cls, "aria-label": label },
+        h("span", { class: "sky-tool-i", "aria-hidden": "true" }, icon), h("span", { class: "pomo-lab", text: label }));
+      b.addEventListener("click", (ev) => { ev.stopPropagation(); onClick(); });
+      return b;
+    };
+    const breathIcon = s("svg", { viewBox: "0 0 24 24", width: 18, height: 18 });
+    breathIcon.append(s("circle", { cx: 12, cy: 12, r: 3.2, fill: "none", stroke: "currentColor", "stroke-width": 1.5 }), s("circle", { cx: 12, cy: 12, r: 7.5, fill: "none", stroke: "currentColor", "stroke-width": 1, "stroke-opacity": 0.55 }));
+    const cupIcon = s("svg", { viewBox: "0 0 24 24", width: 18, height: 18 });
+    cupIcon.append(s("path", { d: "M6 9 H16 V14 A5 5 0 0 1 6 14 Z M16 10.5 H17.5 A2 2 0 0 1 17.5 14.5 H15.8 M9 4.5 C8.4 5.5 9.6 6 9 7 M12 4.5 C11.4 5.5 12.6 6 12 7", fill: "none", stroke: "currentColor", "stroke-width": 1.4, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+    box.append(tool("tool-breathe", "Breathe", breathIcon, () => openBreathe()), tool("tool-break", "Break", cupIcon, () => openBreak()), pomoWidget());
+    box.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    return box;
+  }
+  function closeVeil() {
+    if (!veil) return;
+    for (const t of veil.timers) clearTimeout(t);
+    cancelAnimationFrame(veil.raf);
+    const el = veil.el;
+    veil = null;
+    el.classList.remove("in");
+    setTimeout(() => el.remove(), reduceMotion() ? 0 : 420);
+  }
+  function openVeil(kind, label) {
+    if (!sky) return null;
+    closeVeil();
+    const el = h("div", { class: "veil veil-" + kind, role: "dialog", "aria-modal": "true", "aria-label": label });
+    for (const t of ["pointerdown", "wheel", "click"]) el.addEventListener(t, (ev) => ev.stopPropagation());
+    // a slow field of drifting motes, the galaxy seen through frosted glass
+    const motes = s("svg", { class: "veil-motes", viewBox: "0 0 400 300", preserveAspectRatio: "xMidYMid slice", "aria-hidden": "true" });
+    const r = rng(hash(kind));
+    for (let i = 0; i < 26; i++) {
+      const c = s("circle", { cx: (r() * 400).toFixed(1), cy: (r() * 300).toFixed(1), r: (0.6 + r() * 1.4).toFixed(2) });
+      c.style.animationDelay = (-r() * 18).toFixed(1) + "s";
+      c.style.animationDuration = (14 + r() * 14).toFixed(1) + "s";
+      motes.append(c);
+    }
+    const x = h("button", { type: "button", class: "veil-x", "aria-label": "Close", text: "×" });
+    x.addEventListener("click", closeVeil);
+    const body = h("div", { class: "veil-body" });
+    el.append(motes, x, body);
+    sky.el.append(el);
+    veil = { el, body, timers: [], raf: 0 };
+    requestAnimationFrame(() => el.classList.add("in"));
+    return veil;
+  }
+  const later = (fn, ms) => { if (veil) veil.timers.push(setTimeout(fn, ms)); };
+  document.addEventListener("keydown", (ev) => {
+    if (!veilOpen() || ev.key !== "Escape") return;
+    ev.stopImmediatePropagation(); ev.preventDefault();
+    closeVeil();
+  }, true);
+  function veilDone(title, sub, extra) {
+    const v = veil; if (!v) return;
+    v.body.replaceChildren();
+    const start = h("button", { type: "button", class: "veil-btn", text: `Start a ${prefs().pomo}-minute focus` });
+    start.addEventListener("click", () => {
+      const p = prefs(), st = pomoState();
+      store.set(POMO_KEY, { phase: "focus", end: Date.now() + p.pomo * 60000, len: p.pomo * 60000, done: st.done || 0 });
+      closeVeil();
+    });
+    const close = h("button", { type: "button", class: "veil-btn ghost", text: "Back to the sky", onclick: closeVeil });
+    v.body.append(h("p", { class: "veil-kicker", text: "Done" }), h("h2", { class: "veil-title", text: title }), sub ? h("p", { class: "veil-sub", text: sub }) : null,
+      h("div", { class: "veil-row" }, start, extra || null, close));
+    start.focus({ preventScroll: true });
+  }
+
+  // Break: a few minutes away from the screen, with a nudge every so often.
+  const BREAK_NUDGES = [
+    "Fill a glass of water and drink it.",
+    "Stand up. Reach both arms overhead, then fold forward and let your head hang.",
+    "Roll your shoulders back five times. Unclench your jaw.",
+    "Look at the farthest thing you can see for twenty seconds.",
+    "Take a short walk. Leave the phone where it is.",
+    "Stretch your neck: ear toward one shoulder, then the other.",
+    "Open a window or step outside for some air.",
+  ];
+  function openBreak() {
+    const mins = Number(prefs().pomoBreak) || 5;
+    const v = openVeil("break", `${mins}-minute break`);
+    if (!v) return;
+    const total = mins * 60000, end = Date.now() + total;
+    const R = 92, C = 2 * Math.PI * R;
+    const dial = s("svg", { class: "break-dial", viewBox: "0 0 220 220", "aria-hidden": "true" });
+    const arc = s("circle", { cx: 110, cy: 110, r: R, class: "break-arc", "stroke-dasharray": C.toFixed(1), transform: "rotate(-90 110 110)" });
+    const moon = s("circle", { r: 5, class: "break-moon" });
+    dial.append(s("circle", { cx: 110, cy: 110, r: R, class: "break-track" }), arc, moon);
+    const time = h("p", { class: "veil-time", "aria-live": "off" });
+    const nudge = h("p", { class: "veil-nudge", "aria-live": "polite" });
+    v.body.append(h("p", { class: "veil-kicker", text: "Break" }), h("div", { class: "break-wrap" }, dial, time), nudge,
+      h("p", { class: "veil-foot", text: "Esc or × to come back early." }));
+    let n = Math.floor(Math.random() * BREAK_NUDGES.length);
+    const showNudge = () => {
+      nudge.classList.remove("show");
+      later(() => { nudge.textContent = BREAK_NUDGES[n++ % BREAK_NUDGES.length]; nudge.classList.add("show"); }, 380);
+      later(showNudge, 25000);
+    };
+    showNudge();
+    const tick = () => {
+      if (!veil || veil.body !== v.body) return;
+      const left = Math.max(0, end - Date.now());
+      const m = Math.floor(left / 60000), sec = Math.floor((left % 60000) / 1000);
+      time.textContent = `${m}:${String(sec).padStart(2, "0")}`;
+      const f = 1 - left / total;
+      arc.setAttribute("stroke-dashoffset", (C * f).toFixed(1));
+      const a = -Math.PI / 2 + f * 2 * Math.PI;
+      moon.setAttribute("cx", (110 + R * Math.cos(a)).toFixed(1)); moon.setAttribute("cy", (110 + R * Math.sin(a)).toFixed(1));
+      if (left <= 0) { chime(2); veilDone("Break's over.", "Water, a stretch, some air. Ready for the next one?"); return; }
+      later(tick, 250);
+    };
+    tick();
+  }
+
+  // Breathe: three guided patterns, the orb swelling on the in-breath and settling on the out-breath.
+  const BREATHS = {
+    energy: { name: "Energize", hint: "When the afternoon sags", tint: "#E8997A",
+      about: "In through the nose, a little longer than out. Lifts alertness without caffeine.",
+      steps: [["in", 4], ["hold", 2], ["out", 2]] },
+    clarity: { name: "Clear", hint: "Before something that needs focus", tint: "#93B8DE",
+      about: "Box breathing: in, hold, out, hold, four counts each. Steadies attention.",
+      steps: [["in", 4], ["hold", 4], ["out", 4], ["rest", 4]] },
+    calm: { name: "Calm", hint: "To settle and reset", tint: "#8CC9A2",
+      about: "4-7-8: a long, slow out-breath that tells the body to stand down.",
+      steps: [["in", 4], ["hold", 7], ["out", 8]] },
+  };
+  const BREATH_WORDS = { in: "Breathe in", hold: "Hold", out: "Breathe out", rest: "Hold, empty" };
+  const BREATH_LENGTHS = [[1, "1 min"], [3, "3 min"], [5, "5 min"]];
+  function openBreathe() {
+    const v = openVeil("breathe", "Breathe");
+    if (!v) return;
+    let pick = store.get("breathPick") || "calm";
+    let mins = Number(store.get("breathMins")) || 3;
+    const choose = () => {
+      v.body.replaceChildren();
+      v.body.append(h("p", { class: "veil-kicker", text: "Breathe" }), h("h2", { class: "veil-title", text: "A minute to reset." }));
+      const cards = h("div", { class: "breath-cards", role: "radiogroup", "aria-label": "Pattern" });
+      for (const [k, b] of Object.entries(BREATHS)) {
+        const c = h("button", { type: "button", class: "breath-card", role: "radio", "aria-checked": String(pick === k), style: `--tint:${b.tint}` },
+          h("span", { class: "breath-dot", "aria-hidden": "true" }),
+          h("b", { text: b.name }), h("span", { class: "breath-hint", text: b.hint }),
+          h("span", { class: "breath-pat", text: b.steps.map((x) => x[1]).join(" · ") }));
+        c.addEventListener("click", () => { pick = k; store.set("breathPick", k); choose(); });
+        cards.append(c);
+      }
+      const lens = h("div", { class: "breath-lens", role: "radiogroup", "aria-label": "Length" });
+      for (const [m, lab] of BREATH_LENGTHS) {
+        const b = h("button", { type: "button", role: "radio", "aria-checked": String(mins === m), text: lab });
+        b.addEventListener("click", () => { mins = m; store.set("breathMins", m); choose(); });
+        lens.append(b);
+      }
+      const go = h("button", { type: "button", class: "veil-btn", text: "Begin", onclick: () => run(pick, mins) });
+      v.body.append(cards, h("p", { class: "veil-sub breath-about", text: BREATHS[pick].about }), lens, h("div", { class: "veil-row" }, go),
+        h("p", { class: "veil-foot", text: "Breathe gently. If you feel light-headed, stop and breathe normally." }));
+      go.focus({ preventScroll: true });
+    };
+    const run = (k, m) => {
+      const b = BREATHS[k];
+      const cycle = b.steps.reduce((a, x) => a + x[1], 0);
+      const rounds = Math.max(2, Math.round((m * 60) / cycle));
+      v.body.replaceChildren();
+      v.el.style.setProperty("--tint", b.tint);
+      const orb = h("div", { class: "breath-orb", "aria-hidden": "true" }, h("span", { class: "orb-glow" }), h("span", { class: "orb-core" }));
+      const ring = h("div", { class: "breath-ring", "aria-hidden": "true" });
+      const word = h("p", { class: "breath-word", "aria-live": "polite" });
+      const count = h("p", { class: "breath-count", "aria-hidden": "true" });
+      const prog = h("p", { class: "veil-foot" });
+      v.body.append(h("p", { class: "veil-kicker", text: b.name }), h("div", { class: "breath-stage" }, ring, orb, h("div", { class: "breath-say" }, word, count)), prog);
+      let round = 0, step = 0;
+      const sizeFor = (phase) => (phase === "in" ? 1 : phase === "out" ? 0.42 : null);
+      let size = 0.42;
+      orb.style.setProperty("--s", size);
+      const next = () => {
+        if (!veil || veil.body !== v.body) return;
+        if (step >= b.steps.length) { step = 0; round++; }
+        if (round >= rounds) { chime(1); veilDone("Well done.", `${rounds} rounds of ${b.name.toLowerCase()} breathing.`, h("button", { type: "button", class: "veil-btn ghost", text: "Again", onclick: () => run(k, m) })); return; }
+        const [phase, secs] = b.steps[step++];
+        const target = sizeFor(phase);
+        if (target != null) size = target;
+        orb.style.transitionDuration = secs + "s";
+        orb.style.setProperty("--s", size);
+        orb.dataset.phase = phase;
+        word.textContent = BREATH_WORDS[phase];
+        prog.textContent = `Round ${round + 1} of ${rounds}`;
+        for (let i = 0; i < secs; i++) later(() => { count.textContent = String(secs - i); }, i * 1000);
+        later(next, secs * 1000);
+      };
+      // a three-count settle before the first breath
+      word.textContent = "Get comfortable";
+      count.textContent = "";
+      prog.textContent = `${rounds} rounds · about ${Math.round((rounds * cycle) / 60) || 1} min`;
+      later(next, 2400);
+    };
+    choose();
+  }
+
   // ---- full screen: the sky fills the screen; tapping a planet floats its card over it ----
   let skyFull = false;
   function fullBtn() {
@@ -1217,7 +1419,7 @@
     m.append(nav);
   }
   document.addEventListener("keydown", (ev) => {
-    if (!skyFull || sheetOpen) return;
+    if (!skyFull || sheetOpen || veilOpen()) return;
     if (ev.target.closest && ev.target.closest("input, textarea, select")) return;
     if (ev.key === "Escape") { ev.stopImmediatePropagation(); const m = modalEl(); if (m && !m.hidden) closeModal(); else exitFull(); return; }
     if (ev.key === "ArrowRight" || ev.key === "ArrowLeft") { ev.stopImmediatePropagation(); ev.preventDefault(); flyTo(nowIdx + (ev.key === "ArrowRight" ? 1 : -1)); }
@@ -1365,6 +1567,7 @@
   function renderNow() {
     const pane = $("#paneNow");
     const keepFull = skyFull;
+    if (veil) { for (const t of veil.timers) clearTimeout(t); veil = null; }
     if (sky && sky.el.classList.contains("full")) sky.el.remove();
     skyFull = false;
     document.body.classList.remove("skyfull");
@@ -1735,7 +1938,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
 
   // ---------------- keyboard (desktop) ----------------
   document.addEventListener("keydown", (ev) => {
-    if (!isDesk() || !B || !B.day || sheetOpen) return;
+    if (!isDesk() || !B || !B.day || sheetOpen || veilOpen()) return;
     const typing = ev.target.closest("input, textarea");
     if (ev.key === "Escape" && !typing && document.body.classList.contains("outboxview")) { document.body.classList.remove("outboxview"); markNav("today"); return; }
     if (ev.key === "Escape") { if (typing) ev.target.blur(); else if (document.body.classList.contains("focus") && nowDrilled) surface(); else if (document.body.classList.contains("focus")) toggleFocus(false); else { selKey = null; renderAll(); } return; }
@@ -2063,7 +2266,7 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
       if (await load().catch(() => false)) { noteFresh(); renderAll(); }
     });
     window.matchMedia("(min-width: 980px)").addEventListener("change", renderAll);
-    setInterval(() => { if (camAnim || starAnim || sheetOpen || skyFull) return; if (sky && (sky.el.classList.contains("away") || !sky.el.querySelector(".sky-menu[hidden]"))) return; if (!document.activeElement || !document.activeElement.closest("input, textarea")) renderNow(); }, 60_000);
+    setInterval(() => { if (camAnim || starAnim || sheetOpen || skyFull || veilOpen()) return; if (sky && (sky.el.classList.contains("away") || !sky.el.querySelector(".sky-menu[hidden]"))) return; if (!document.activeElement || !document.activeElement.closest("input, textarea")) renderNow(); }, 60_000);
   }
 
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
