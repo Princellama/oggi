@@ -480,26 +480,104 @@
   let sky = null;          // the live sky: { el, svg, seq, stars, card, ctl }
 
   const placeRank = (p) => { const i = DRIVE.indexOf(p); return i < 0 ? 0 : i; };
+
+  // ---------------- NOW: sorting the sky ----------------
+  // Three ways to lay the sky out. Drive: the memory-palace map. Timeline: the open items in a
+  // line across the day, each at the time it would start, in the order chosen in settings.
+  // By area: CPA, Medicare, Money and Personal become suns with their items orbiting them.
+  // Preferences, time estimates and effort live on this device only.
+  const SKY_MODES = { drive: "Drive", timeline: "Timeline", area: "By area" };
+  const ORDERS = {
+    priority: ["By priority", "The brief's own order: what it put first, first."],
+    easiest: ["Easiest first", "Quick, light things first to get moving."],
+    frog: ["Eat that frog", "The hardest, most put-off thing first."],
+    shortest: ["Shortest to longest", "By the time each one takes."],
+  };
+  const AREA_ORDER = ["CPA", "Medicare", "Money", "Personal"];
+  const DEF_PREFS = { mode: "drive", order: "priority", start: "", gap: 5, pomo: 25, pomoBreak: 5, est: {}, diff: {} };
+  function prefs() { const p = store.get("skyPrefs") || {}; return { ...DEF_PREFS, ...p, est: { ...(p.est || {}) }, diff: { ...(p.diff || {}) } }; }
+  function setPrefs(patch) { store.set("skyPrefs", { ...prefs(), ...patch }); }
+  // Rough minutes per item, from its title. Anything here can be changed in settings.
+  const EST_RULES = [
+    [/\bis done\b|waiting on|may not be e-?filed|e-?file status/i, 20],
+    [/\breturns?\b|1040|file (his|her|their)? ?taxes|needs to file/i, 120],
+    [/season|board|outreach|\baep\b/i, 90],
+    [/crash|deploy|\bbug\b|\boggi\b|\bmilo\b/i, 60],
+    [/\bplan\b|compar|doctors|network|coverage/i, 45],
+    [/refund|adjust|notice|\bname\b/i, 30],
+    [/\bcall\b|reply|email|\btext\b|\bask\b|follow up|nudge/i, 15],
+    [/password|renew|w-?9|\bsign|card|\bpay|autopay|balance|declined/i, 15],
+  ];
+  const keyOf = (it) => it.key || it.id;
+  function guessEst(it) { for (const [re, m] of EST_RULES) if (re.test(it.title || "")) return m; for (const [re, m] of EST_RULES) if (re.test(it.sentence || "")) return m; return 30; }
+  function estOf(it, p = prefs()) { return Number(p.est[keyOf(it)]) || guessEst(it); }
+  function guessDiff(it, p) { const m = estOf(it, p); return Math.min(3, (m >= 90 ? 3 : m >= 30 ? 2 : 1) + ((it.carries || 0) >= 7 ? 1 : 0)); }
+  function diffOf(it, p = prefs()) { return Number(p.diff[keyOf(it)]) || guessDiff(it, p); }
+  function fmtDur(m) { if (m < 60) return `${m} min`; const h = Math.floor(m / 60), r = m % 60; return r ? `${h} hr ${r}` : `${h} hr`; }
+  function orderItems(list, order, p = prefs()) {
+    const a = list.slice();
+    const tie = (x, y) => x.order - y.order;
+    if (order === "easiest") a.sort((x, y) => diffOf(x, p) - diffOf(y, p) || estOf(x, p) - estOf(y, p) || tie(x, y));
+    else if (order === "frog") a.sort((x, y) => diffOf(y, p) - diffOf(x, p) || (y.carries || 0) - (x.carries || 0) || estOf(y, p) - estOf(x, p) || tie(x, y));
+    else if (order === "shortest") a.sort((x, y) => estOf(x, p) - estOf(y, p) || tie(x, y));
+    else a.sort(tie);
+    return a;
+  }
+  function dayStart(p = prefs()) {
+    const now = new Date();
+    let t = new Date(Math.ceil(now.getTime() / 900000) * 900000);
+    if (/^\d\d:\d\d$/.test(p.start || "")) {
+      const [hh, mm] = p.start.split(":").map(Number);
+      const s0 = new Date(now); s0.setHours(hh, mm, 0, 0);
+      if (s0 > t) t = s0;
+    }
+    return t.getTime();
+  }
+  // Lay the items end to end from the start time, stepping round anything on the calendar.
+  function schedule(items, evs, p = prefs()) {
+    const gap = (Number(p.gap) || 0) * 60000;
+    const busy = evs.map((e) => [e.s.getTime(), e.e.getTime()]);
+    let cur = dayStart(p);
+    return items.map((it) => {
+      const dur = estOf(it, p) * 60000;
+      for (let moved = true; moved;) { moved = false; for (const [a, b] of busy) if (a < cur + dur && b > cur) { cur = b; moved = true; } }
+      const slot = { it, at: cur, end: cur + dur };
+      cur += dur + gap;
+      return slot;
+    });
+  }
   function nowSequence() {
-    const seq = [];
+    const p = prefs();
     const t = Date.now();
     const evs = events().filter((e) => e.e.getTime() > t).sort((a, b) => a.s - b.s);
+    const open = openNeeds();
+    if (p.mode === "timeline") {
+      const slots = schedule(orderItems(open, p.order, p), evs, p).map((x) => ({ kind: "item", ...x }));
+      const evSlots = evs.map((ev) => ({ kind: "event", ev, at: ev.s.getTime(), end: ev.e.getTime() }));
+      return evSlots.concat(slots).sort((a, b) => a.at - b.at);
+    }
+    const seq = [];
     if (evs[0]) seq.push({ kind: "event", ev: evs[0] });
+    if (p.mode === "area") {
+      for (const a of AREA_ORDER) for (const it of orderItems(open.filter((i) => areaOf(i) === a), p.order, p)) seq.push({ kind: "item", it });
+      return seq;
+    }
     // the drive, west to east and Home last; the brief's own order inside a place
-    const items = openNeeds().slice().sort((a, b) => placeRank(a.place) - placeRank(b.place) || a.order - b.order);
+    const items = open.slice().sort((a, b) => placeRank(a.place) - placeRank(b.place) || a.order - b.order);
     for (const it of items) seq.push({ kind: "item", it });
     return seq;
   }
+  const evKey = (ev) => "ev:" + ev.s.getTime() + ":" + ev.title;
+  const seqKey = (x) => (x.kind === "event" ? evKey(x.ev) : x.it.id);
 
   function hash(str) { let x = 2166136261; for (const c of String(str)) { x ^= c.charCodeAt(0); x = Math.imul(x, 16777619); } return (x >>> 0) / 4294967296; }
   function rng(seed) { let a = Math.floor(seed * 4294967296) || 1; return () => { a ^= a << 13; a ^= a >>> 17; a ^= a << 5; return ((a >>> 0) % 100000) / 100000; }; }
 
-  // Positions depend only on the place and the brief's order, so a star stays put all day:
-  // closing one dims it where it stands instead of reshuffling the sky.
+  // Drive positions depend only on the place and the brief's order, so a star stays put all day:
+  // closing one dims it where it stands instead of reshuffling the sky. Every upcoming event gets
+  // a star too; the drive shows only the next one, the timeline shows them all.
   function skyStars(seq) {
     const stars = [];
-    const bySeq = new Map();
-    seq.forEach((x, i) => bySeq.set(x.kind === "event" ? "event" : x.it.id, i));
     const all = B.items.filter((i) => i.list === "Needs attention" || i.list === "Resolved");
     const byPlace = {};
     for (const it of all) (byPlace[SKY_AT[it.place] ? it.place : "Skyline"] ||= []).push(it);
@@ -511,13 +589,28 @@
       list.forEach((it, k) => {
         const r = k === 0 ? 0 : 46 * Math.sqrt(k);
         const a = rot + k * 2.39996;
-        const open = bySeq.has(it.id);
-        stars.push({ kind: "item", it, place, open, seqIdx: open ? bySeq.get(it.id) : -1, x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) * 0.9 });
-        reach[place] = Math.max(reach[place] || 0, cy + r * Math.sin(a) * 0.9 - cy);
+        const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a) * 0.9;
+        stars.push({ kind: "item", it, place, key: it.id, open: false, seqIdx: -1, dx: x, dy: y, x, y });
+        reach[place] = Math.max(reach[place] || 0, y - cy);
       });
     }
-    if (bySeq.has("event")) stars.push({ kind: "event", ev: seq[0].ev, open: true, seqIdx: 0, x: EVENT_AT[0], y: EVENT_AT[1] });
+    const t = Date.now();
+    events().filter((e) => e.e.getTime() > t).sort((a, b) => a.s - b.s).forEach((ev, j) => {
+      const x = EVENT_AT[0] + j * 64, y = EVENT_AT[1] - j * 18;
+      stars.push({ kind: "event", ev, key: evKey(ev), open: false, seqIdx: -1, dx: x, dy: y, x, y });
+    });
+    remapStars(stars, seq);
     return { stars, reach };
+  }
+  // Point each star at its place in the sequence (or at nothing, for this layout).
+  function remapStars(stars, seq) {
+    const idx = new Map();
+    seq.forEach((x, i) => idx.set(seqKey(x), i));
+    for (const st of stars) {
+      st.seqIdx = idx.has(st.key) ? idx.get(st.key) : -1;
+      st.open = st.seqIdx >= 0;
+      st.slot = st.open ? seq[st.seqIdx] : null;
+    }
   }
   const tintOf = (st) => (st.kind === "event" ? EVENT_TINT : STAR_TINT[areaOf(st.it)] || STAR_TINT.Personal);
 
@@ -542,19 +635,20 @@
     let d = `M${pts[0][0] - 120} ${pts[0][1] + 10} L${pts[0][0]} ${pts[0][1]}`;
     for (let i = 1; i < pts.length; i++) { const [x0, y0] = pts[i - 1], [x1, y1] = pts[i]; const mx = (x0 + x1) / 2; d += ` C${mx} ${y0} ${mx} ${y1} ${x1} ${y1}`; }
     d += ` L${pts[pts.length - 1][0] + 120} ${pts[pts.length - 1][1] - 8}`;
-    svg.append(s("path", { class: "road", d, "aria-hidden": "true" }));
-    svg.append(s("path", { class: "road", d: `M${SKY_AT.Home[0] - 110} ${SKY_AT.Home[1] - 6} L${SKY_AT.Home[0] + 110} ${SKY_AT.Home[1] - 6}`, "aria-hidden": "true" }));
+    svg.append(s("path", { class: "road lay-drive", d, "aria-hidden": "true" }));
+    svg.append(s("path", { class: "road lay-drive", d: `M${SKY_AT.Home[0] - 110} ${SKY_AT.Home[1] - 6} L${SKY_AT.Home[0] + 110} ${SKY_AT.Home[1] - 6}`, "aria-hidden": "true" }));
 
     // constellation lines inside each place
-    const lines = s("g", { "aria-hidden": "true" });
+    const lines = s("g", { "aria-hidden": "true", class: "lay-drive" });
     for (const place of Object.keys(SKY_AT)) {
       const ps = stars.filter((x) => x.kind === "item" && x.place === place);
+      for (const x of ps) { x.dx = x.x; x.dy = x.y; }
       for (let i = 1; i < ps.length; i++) lines.append(s("line", { class: "cline" + (ps[i].open && ps[i - 1].open ? "" : " faint"), x1: ps[i - 1].x.toFixed(1), y1: ps[i - 1].y.toFixed(1), x2: ps[i].x.toFixed(1), y2: ps[i].y.toFixed(1) }));
     }
     svg.append(lines);
 
     // place names under their constellations
-    const labels = s("g", { "aria-hidden": "true" });
+    const labels = s("g", { "aria-hidden": "true", class: "lay-drive" });
     for (const [place, [cx, cy]] of Object.entries(SKY_AT)) {
       const live = stars.some((x) => x.kind === "item" && x.place === place && x.open);
       const g = s("g", { class: "pl" + (live ? " live" : ""), color: "#F4EFE4" });
@@ -566,6 +660,9 @@
     }
     svg.append(labels);
 
+    // the timeline axis or the suns, redrawn whenever the sky is sorted
+    const layer = s("g", { class: "lay-mode", "aria-hidden": "true" });
+    svg.append(layer);
     const trails = s("g", { "aria-hidden": "true" });
     svg.append(trails);
 
@@ -573,9 +670,7 @@
     const field = s("g");
     for (const st of stars) {
       const tint = tintOf(st);
-      const name = st.kind === "event" ? `${st.ev.title}, ${fmtTime(st.ev.s)}` : `${st.it.title}, ${st.place}`;
-      const g = s("g", { class: "star" + (st.open ? "" : " dim") + (st.kind === "event" ? " ev" : ""), transform: `translate(${st.x.toFixed(1)} ${st.y.toFixed(1)})` });
-      if (st.open) { g.setAttribute("tabindex", "0"); g.setAttribute("role", "button"); g.setAttribute("aria-label", name); }
+      const g = s("g", { class: "star" + (st.kind === "event" ? " ev" : ""), transform: `translate(${st.x.toFixed(1)} ${st.y.toFixed(1)})` });
       const body = s("g", { class: "star-b" });
       body.append(
         s("circle", { class: "halo2", r: 30, fill: tint }),
@@ -583,8 +678,10 @@
         s("circle", { class: "core", r: 10, fill: tint }));
       if (st.kind === "event") body.append(s("circle", { class: "orbit", r: 15, fill: "none", stroke: tint }));
       g.append(body);
-      if (st.open) g.append(s("text", { class: "star-l", y: 17 }, st.kind === "event" ? fmtTime(st.ev.s) : shortLabel(st.it)));
+      g.append(s("text", { class: "star-l", y: 17 }, st.kind === "event" ? fmtTime(st.ev.s) : shortLabel(st.it)));
+      g.append(s("text", { class: "star-t", y: 28 }));
       st.el = g;
+      starState(st);
       field.append(g);
     }
     svg.append(field);
@@ -595,7 +692,7 @@
       const g = ev.target.closest(".star");
       if (!g || swiped) return;
       const st = stars.find((x) => x.el === g);
-      if (!st || !st.open) return;
+      if (!st || !st.open || st.gone) return;
       if (st.seqIdx === nowIdx) dive(); else flyTo(st.seqIdx);
     };
     svg.addEventListener("click", pick);
@@ -615,7 +712,7 @@
     const zoomAt = (factor, px, py) => {
       if (!cam) return;
       const p = toSky(px, py);
-      const w = Math.max(SKY_MIN_W, Math.min(SKY_MAX_W, cam.w * factor));
+      const w = Math.max(SKY_MIN_W, Math.min(skyMaxW(), cam.w * factor));
       const f = w / cam.w;
       cam = { x: p.x + (cam.x - p.x) * f, y: p.y + (cam.y - p.y) * f, w };
     };
@@ -680,6 +777,8 @@
     const home = h("button", { class: "sky-home", type: "button", "aria-label": "Back to the bright star", onclick: () => { const st = starFor(nowIdx); if (st) { el.classList.remove("away"); animateCam(restCam(st), 560); } } }, "◎");
     el.append(home);
 
+    el.append(sortControl(), pomoWidget());
+
     if (!isDesk() && !store.get("skyHintSeen") && seq.length > 1) el.append(h("p", { class: "sky-hint", text: "Drag to look around · pinch to zoom · tap a star to go there" }));
     let seenW = 0;
     if ("ResizeObserver" in window) new ResizeObserver(() => {
@@ -688,14 +787,372 @@
       seenW = el.clientWidth;
       setView();
     }).observe(el);
-    return { el, svg, seq, stars, trails };
+    return { el, svg, seq, stars, trails, layer };
+  }
+
+  // ---- sky layouts ----
+  function starState(st) {
+    const g = st.el;
+    g.classList.toggle("dim", !st.open);
+    if (st.open) {
+      g.setAttribute("tabindex", "0"); g.setAttribute("role", "button");
+      g.setAttribute("aria-label", st.kind === "event" ? `${st.ev.title}, ${fmtTime(st.ev.s)}` : `${st.it.title}, ${st.place}`);
+    } else { g.removeAttribute("tabindex"); g.removeAttribute("role"); g.removeAttribute("aria-label"); }
+    const tl = g.querySelector(".star-t");
+    if (tl) tl.textContent = st.open && st.slot && st.slot.at ? `${fmtTime(new Date(st.slot.at))} · ${fmtDur(Math.round((st.slot.end - st.slot.at) / 60000))}` : "";
+  }
+  const TL_K = 2.6;     // sky units per minute on the timeline: an hour is 132 units
+  const TL_Y = 300;     // where the planets sit; the day's line runs under them
+  const TL_AXIS = 372;
+  function boxOf(pts, pad) {
+    if (!pts.length) return { ...SKY_BOX };
+    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+    return { x0: Math.min(...xs) - pad, x1: Math.max(...xs) + pad, y0: Math.min(...ys) - pad * 0.6, y1: Math.max(...ys) + pad * 0.6 };
+  }
+  // Where every star goes in a layout, plus what to draw behind them.
+  function layoutFor(mode, stars) {
+    const pos = new Map();
+    const draw = [];
+    if (mode === "timeline") {
+      const live = stars.filter((st) => st.open && st.slot && st.slot.at).sort((a, b) => a.slot.at - b.slot.at);
+      if (!live.length) return layoutFor("drive", stars);
+      const t0 = live[0].slot.at - 30 * 60000;
+      const tEnd = Math.max(...live.map((st) => st.slot.end)) + 30 * 60000;
+      const X = (t) => 80 + ((t - t0) / 60000) * TL_K;
+      let px = -1e9, up = false;
+      for (const st of live) {
+        const x = X(st.slot.at);
+        up = x - px < 92 ? !up : false;   // close neighbours step up and down so labels don't collide
+        pos.set(st, { x, y: up ? TL_Y - 64 : TL_Y, show: true });
+        px = x;
+      }
+      for (const st of stars) if (!pos.has(st)) pos.set(st, { x: st.dx, y: st.dy, show: false });
+      draw.push((g) => {
+        const x0 = X(t0), x1 = X(tEnd);
+        g.append(s("line", { class: "tl-axis", x1: x0, y1: TL_AXIS, x2: x1, y2: TL_AXIS }));
+        // hour ticks
+        const h0 = new Date(t0); h0.setMinutes(0, 0, 0);
+        for (let t = h0.getTime() + 3600000; t < tEnd; t += 3600000) {
+          const x = X(t);
+          g.append(s("line", { class: "tl-tick", x1: x, y1: TL_AXIS - 5, x2: x, y2: TL_AXIS + 5 }));
+          g.append(s("text", { class: "tl-hour", x, y: TL_AXIS + 22 }, fmtTime(new Date(t))));
+        }
+        // now
+        const nx = X(Date.now());
+        if (nx >= x0 && nx <= x1) {
+          g.append(s("line", { class: "tl-now", x1: nx, y1: TL_AXIS - 18, x2: nx, y2: TL_AXIS + 8 }));
+          g.append(s("text", { class: "tl-nowl", x: nx, y: TL_AXIS - 24 }, "now"));
+        }
+        // each block of time, and a thread up to its planet
+        for (const st of live) {
+          const p = pos.get(st), tint = tintOf(st);
+          g.append(s("line", { class: "tl-thread", x1: p.x, y1: p.y + 10, x2: p.x, y2: TL_AXIS, stroke: tint }));
+          g.append(s("rect", { class: "tl-block", x: X(st.slot.at), y: TL_AXIS - 3, width: Math.max(4, X(st.slot.end) - X(st.slot.at)), height: 6, rx: 3, fill: tint }));
+        }
+      });
+      const pts = [...live.map((st) => pos.get(st)), { x: X(t0), y: TL_AXIS + 30 }, { x: X(tEnd), y: TL_AXIS + 30 }];
+      return { pos, draw, box: boxOf(pts, 140) };
+    }
+    if (mode === "area") {
+      const areas = AREA_ORDER.filter((a) => stars.some((st) => st.open && st.kind === "item" && areaOf(st.it) === a));
+      const suns = {}, rings = {};
+      areas.forEach((a, i) => { suns[a] = { x: 220 + i * 440, y: 320 }; });
+      for (const a of areas) {
+        const list = stars.filter((st) => st.open && st.kind === "item" && areaOf(st.it) === a).sort((x, y) => x.seqIdx - y.seqIdx);
+        const per = 7;
+        list.forEach((st, k) => {
+          const ring = Math.floor(k / per), n = Math.min(per, list.length - ring * per);
+          const r = 104 + ring * 62;
+          const a0 = -Math.PI / 2 + ring * 0.45 + (k % per) * (Math.PI * 2 / n);
+          pos.set(st, { x: suns[a].x + r * Math.cos(a0), y: suns[a].y + r * Math.sin(a0) * 0.86, show: true });
+          (rings[a] ||= new Set()).add(r);
+        });
+      }
+      let j = 0;
+      for (const st of stars) {
+        if (pos.has(st)) continue;
+        if (st.kind === "event" && st.open) { pos.set(st, { x: 120 + j * 70, y: 120, show: true }); j++; continue; }
+        pos.set(st, { x: st.dx, y: st.dy, show: false });
+      }
+      draw.push((g) => {
+        for (const a of areas) {
+          const c = suns[a], tint = STAR_TINT[a] || STAR_TINT.Personal;
+          for (const r of rings[a] || []) g.append(s("ellipse", { class: "orb-ring", cx: c.x, cy: c.y, rx: r, ry: r * 0.86, stroke: tint }));
+          const n = stars.filter((st) => st.open && st.kind === "item" && areaOf(st.it) === a).length;
+          const sun = s("g", { class: "sun", transform: `translate(${c.x} ${c.y})` });
+          sun.append(s("circle", { class: "sun-glow", r: 74, fill: tint }), s("circle", { class: "sun-halo", r: 44, fill: tint }), s("circle", { class: "sun-core", r: 33, fill: tint }));
+          sun.append(s("text", { class: "sun-l", y: 4 }, a.toUpperCase()));
+          sun.append(s("text", { class: "sun-n", y: 56 }, `${n} open`));
+          g.append(sun);
+        }
+      });
+      return { pos, draw, suns, box: boxOf([...pos.values()].filter((p) => p.show), 160) };
+    }
+    for (const st of stars) pos.set(st, { x: st.dx, y: st.dy, show: st.kind === "item" || st.open });
+    return { pos, draw, box: { ...SKY_BOX } };
+  }
+  function placeStar(st) { st.el.setAttribute("transform", `translate(${st.x.toFixed(1)} ${st.y.toFixed(1)})`); }
+  let starAnim = 0;
+  // Lay the sky out for a mode; with `animate`, every star travels to its new place.
+  function applyLayout(mode, animate, onDone) {
+    if (!sky) return;
+    const L = layoutFor(mode, sky.stars);
+    sky.el.classList.remove("m-drive", "m-timeline", "m-area");
+    sky.el.classList.add("m-" + mode);
+    sky.layer.replaceChildren();
+    for (const d of L.draw) d(sky.layer);
+    sky.layer.classList.remove("fresh"); sky.layer.getBoundingClientRect(); sky.layer.classList.add("fresh");
+    sky.box = L.box;
+    sky.suns = L.suns || null;
+    for (const st of sky.stars) {
+      const p = L.pos.get(st);
+      st.gone = !p.show;
+      st.el.classList.toggle("gone", st.gone);
+      st.tx = p.x; st.ty = p.y;
+      starState(st);
+    }
+    cancelAnimationFrame(starAnim); starAnim = 0;
+    if (!animate || reduceMotion()) { for (const st of sky.stars) { st.x = st.tx; st.y = st.ty; placeStar(st); } if (onDone) onDone(); return; }
+    const from = sky.stars.map((st) => ({ x: st.x, y: st.y }));
+    const order = sky.stars.map((st, i) => i).sort((a, b) => (sky.stars[a].seqIdx < 0) - (sky.stars[b].seqIdx < 0) || sky.stars[a].seqIdx - sky.stars[b].seqIdx);
+    const delay = new Map(order.map((i, k) => [i, Math.min(k, 16) * 38]));
+    const dur = 1050, t0 = performance.now();
+    const step = (now) => {
+      let done = true;
+      sky.stars.forEach((st, i) => {
+        const t = Math.max(0, Math.min(1, (now - t0 - delay.get(i)) / dur));
+        if (t < 1) done = false;
+        const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        // a gentle arc, so the planets swing into place rather than slide
+        const lift = Math.sin(Math.PI * e) * Math.min(60, Math.hypot(st.tx - from[i].x, st.ty - from[i].y) * 0.12);
+        st.x = from[i].x + (st.tx - from[i].x) * e;
+        st.y = from[i].y + (st.ty - from[i].y) * e - lift;
+        placeStar(st);
+      });
+      if (!done) starAnim = requestAnimationFrame(step);
+      else { starAnim = 0; if (onDone) onDone(); }
+    };
+    starAnim = requestAnimationFrame(step);
+  }
+  // After a sort, frame enough to read: a stretch of the day around the current planet,
+  // or the current planet's sun with its whole orbit.
+  function sortCam(mode) {
+    const st = starFor(nowIdx);
+    const base = restW(sky.el);
+    if (mode === "timeline" && st) {
+      const w = Math.min(base * 1.7, (sky.box.x1 - sky.box.x0));
+      return { x: Math.max(sky.box.x0 + w / 2, Math.min(sky.box.x1 - w / 2, st.tx)), y: (TL_Y + TL_AXIS) / 2 - 18, w };
+    }
+    if (mode === "area" && st && st.kind === "item" && sky.suns && sky.suns[areaOf(st.it)]) {
+      const c = sky.suns[areaOf(st.it)];
+      const all = overviewCam();
+      const w = Math.max(base * 1.35, 760);
+      return all.w <= w * 1.25 ? all : { x: c.x, y: c.y, w };
+    }
+    return overviewCam();
+  }
+  function overviewCam() {
+    const b = sky.box, el = sky.el;
+    const aspect = el.clientWidth && el.clientHeight ? el.clientHeight / el.clientWidth : 0.85;
+    const w = Math.max(b.x1 - b.x0, (b.y1 - b.y0) / aspect);
+    return { x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2, w: Math.max(SKY_MIN_W, w) };
+  }
+  // Re-sort: a new order for Back / Next, every planet flies to its new place, the camera pulls back to show it.
+  function resort(mode) {
+    if (!sky) { renderNow(); return; }
+    setPrefs({ mode });
+    const curKey = sky.seq[nowIdx] ? seqKey(sky.seq[nowIdx]) : null;
+    const seq = nowSequence();
+    sky.seq = seq;
+    remapStars(sky.stars, seq);
+    const i = curKey ? seq.findIndex((x) => seqKey(x) === curKey) : -1;
+    nowIdx = i >= 0 ? i : 0;
+    markStar(nowIdx);
+    fillCtl(); fillCard();
+    sky.el.classList.add("away");
+    applyLayout(mode, true);
+    animateCam(sortCam(mode), 1250);
+    const sc = sky.el.querySelector(".sky-sort-b");
+    if (sc) sc.textContent = "Sort · " + SKY_MODES[mode];
+  }
+
+  // ---- the Sort button, its menu, and the settings sheet ----
+  function sortControl() {
+    const p = prefs();
+    const box = h("div", { class: "sky-sort" });
+    const btn = h("button", { class: "sky-sort-b", type: "button", "aria-haspopup": "true", "aria-expanded": "false", text: "Sort · " + SKY_MODES[p.mode] });
+    const menu = h("div", { class: "sky-menu", hidden: true, role: "menu" });
+    const close = () => { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); };
+    for (const [m, label] of Object.entries(SKY_MODES)) {
+      const b = h("button", { type: "button", role: "menuitemradio", "aria-checked": String(p.mode === m) }, label,
+        h("span", { class: "sky-menu-sub", text: m === "drive" ? "The map of the drive" : m === "timeline" ? ORDERS[p.order][0] + ", across the day" : "CPA, Medicare, Money, Personal" }));
+      b.addEventListener("click", (ev) => { ev.stopPropagation(); close(); menu.querySelectorAll("[role=menuitemradio]").forEach((x) => x.setAttribute("aria-checked", String(x === b))); resort(m); });
+      menu.append(b);
+    }
+    const set = h("button", { type: "button", class: "sky-menu-set", role: "menuitem", text: "Sort settings…" });
+    set.addEventListener("click", (ev) => { ev.stopPropagation(); close(); openSortSettings(); });
+    menu.append(set);
+    btn.addEventListener("click", (ev) => { ev.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute("aria-expanded", String(!menu.hidden)); });
+    document.addEventListener("click", (ev) => { if (!box.contains(ev.target)) close(); });
+    // keep the sky from treating taps on the control as drags
+    box.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    box.append(btn, menu);
+    return box;
+  }
+
+  let sheetOpen = false;
+  function openSortSettings() {
+    const old = document.getElementById("sortSheet");
+    if (old) old.remove();
+    const p = prefs();
+    const items = openNeeds();
+    sheetOpen = true;
+    const sheet = h("div", { class: "sheet", id: "sortSheet", role: "dialog", "aria-modal": "true", "aria-label": "Sort settings" });
+    const w = h("div", { class: "wrap" });
+    sheet.append(w);
+    const done = () => { sheetOpen = false; sheet.remove(); if (sky) resort(prefs().mode); else renderNow(); };
+    w.append(h("div", { class: "toprow" }, h("p", { class: "daydate", text: "Now · sort settings" }), h("button", { class: "readaloud", type: "button", onclick: done, text: "Done" })));
+    w.append(h("h1", { class: "head", text: "How the sky sorts." }));
+
+    const radios = (name, opts, cur, onPick) => {
+      const g = h("div", { class: "opt-list", role: "radiogroup" });
+      for (const [val, label, sub] of opts) {
+        const id = `${name}-${val}`;
+        const inp = h("input", { type: "radio", name, id, value: val, checked: cur === val });
+        inp.addEventListener("change", () => onPick(val));
+        g.append(h("label", { class: "opt", for: id }, inp, h("span", null, h("b", { text: label }), sub ? h("span", { class: "opt-sub", text: sub }) : null)));
+      }
+      return g;
+    };
+    w.append(h("h2", { class: "sec", text: "Lay the sky out" }));
+    w.append(radios("mode", [["drive", "Drive", "Each place on your drive is a constellation."], ["timeline", "Timeline", "A line across the day, each planet at the time it would start."], ["area", "By area", "CPA, Medicare, Money and Personal as suns, their items in orbit."]], p.mode, (v) => setPrefs({ mode: v })));
+    w.append(h("h2", { class: "sec", text: "Order" }));
+    w.append(h("p", { class: "quiet set-note", text: "Used by the timeline, and for the order you move through each sun." }));
+    w.append(radios("order", Object.entries(ORDERS).map(([k, [l, sub]]) => [k, l, sub]), p.order, (v) => setPrefs({ order: v })));
+
+    w.append(h("h2", { class: "sec", text: "The day" }));
+    const start = h("input", { type: "time", id: "setStart", class: "set-in", value: p.start || "" });
+    start.addEventListener("change", () => setPrefs({ start: start.value }));
+    const gap = h("select", { id: "setGap", class: "set-in" }, [0, 5, 10, 15].map((m) => { const o = h("option", { value: m, text: m ? `${m} minutes` : "None" }); o.selected = Number(p.gap) === m; return o; }));
+    gap.addEventListener("change", () => setPrefs({ gap: Number(gap.value) }));
+    w.append(h("div", { class: "set-row" }, h("label", { for: "setStart", text: "Start the day at" }), start, h("span", { class: "quiet", text: "Blank starts at the next quarter hour." })));
+    w.append(h("div", { class: "set-row" }, h("label", { for: "setGap", text: "Break between tasks" }), gap));
+    const pomo = h("select", { id: "setPomo", class: "set-in" }, [15, 25, 30, 45, 50].map((m) => { const o = h("option", { value: m, text: `${m} minutes` }); o.selected = Number(p.pomo) === m; return o; }));
+    pomo.addEventListener("change", () => setPrefs({ pomo: Number(pomo.value) }));
+    const brk = h("select", { id: "setBreak", class: "set-in" }, [5, 10, 15].map((m) => { const o = h("option", { value: m, text: `${m} minutes` }); o.selected = Number(p.pomoBreak) === m; return o; }));
+    brk.addEventListener("change", () => setPrefs({ pomoBreak: Number(brk.value) }));
+    w.append(h("div", { class: "set-row" }, h("label", { for: "setPomo", text: "Focus timer" }), pomo));
+    w.append(h("div", { class: "set-row" }, h("label", { for: "setBreak", text: "Then a break of" }), brk));
+
+    w.append(h("h2", { class: "sec", text: "Time and effort" }));
+    w.append(h("p", { class: "quiet set-note", text: "Guessed from each title until you set them. A tax return starts at two hours; a call at fifteen minutes." }));
+    const list = h("ul", { class: "set-items" });
+    const MINS = [10, 15, 20, 30, 45, 60, 90, 120, 180, 240];
+    for (const it of items) {
+      const k = keyOf(it);
+      const mine = Number(p.est[k]) || 0;
+      const cur = mine || guessEst(it);
+      const sel = h("select", { class: "set-in", id: "est-" + k, "aria-label": "Time for " + it.title },
+        Array.from(new Set([...MINS, cur])).sort((a, b) => a - b).map((m) => { const o = h("option", { value: m, text: fmtDur(m) + (!mine && m === cur ? " (guess)" : "") }); o.selected = m === cur; return o; }));
+      sel.addEventListener("change", () => { const q = prefs(); q.est[k] = Number(sel.value); setPrefs({ est: q.est }); });
+      const eff = h("div", { class: "effort", role: "group", "aria-label": "Effort for " + it.title });
+      const dcur = diffOf(it, p), dmine = Number(p.diff[k]) || 0;
+      ["Easy", "Medium", "Hard"].forEach((lab, i) => {
+        const b = h("button", { type: "button", "aria-pressed": String(dcur === i + 1), class: !dmine && dcur === i + 1 ? "guess" : null, text: lab });
+        b.addEventListener("click", () => { const q = prefs(); q.diff[k] = i + 1; setPrefs({ diff: q.diff }); eff.querySelectorAll("button").forEach((x) => { x.setAttribute("aria-pressed", String(x === b)); x.classList.remove("guess"); }); });
+        eff.append(b);
+      });
+      list.append(h("li", null, h("span", { class: "set-ttl" }, glyph(it.place), it.title), h("div", { class: "set-ctl" }, sel, eff)));
+    }
+    if (!items.length) list.append(h("li", { class: "quiet", text: "Nothing open right now." }));
+    w.append(list);
+    const reset = h("button", { class: "textlink", type: "button", text: "Clear my times and efforts" });
+    reset.addEventListener("click", () => { setPrefs({ est: {}, diff: {} }); openSortSettings(); });
+    w.append(h("div", { class: "row set-foot" }, h("button", { class: "btn", type: "button", onclick: done, text: "Done" }), reset));
+    sheet.addEventListener("keydown", (ev) => { if (ev.key === "Escape") { ev.stopPropagation(); done(); } });
+    document.body.append(sheet);
+    const first = sheet.querySelector("input[checked], input");
+    if (first) first.focus({ preventScroll: true });
+  }
+
+  // ---- the focus timer: a quiet pomodoro in the sky's dark upper corner ----
+  // State lives on this device so it survives the sky being redrawn or the app being closed.
+  const POMO_KEY = "pomo";
+  const pomoState = () => store.get(POMO_KEY) || { phase: "idle" };
+  let pomoTick = 0, audioCtx = null;
+  function chime(times) {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      for (let i = 0; i < times; i++) {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain(), t = audioCtx.currentTime + i * 0.42;
+        o.type = "sine"; o.frequency.value = 784;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.18, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.38);
+        o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t + 0.4);
+      }
+    } catch { /* no sound available */ }
+    try { if (navigator.vibrate) navigator.vibrate([120, 80, 120]); } catch {}
+  }
+  function pomoLeft(st) { return st.phase === "idle" ? 0 : st.paused != null ? st.paused : Math.max(0, st.end - Date.now()); }
+  function pomoAdvance() {
+    const st = pomoState();
+    if (st.phase === "idle" || st.paused != null || st.end > Date.now()) return st;
+    const p = prefs();
+    let next;
+    const late = Date.now() - st.end > 90000;   // finished while the app was closed: no chime now
+    if (st.phase === "focus") { if (!late) chime(2); next = { phase: "break", end: Date.now() + p.pomoBreak * 60000, len: p.pomoBreak * 60000, done: (st.done || 0) + 1 }; }
+    else { if (!late) chime(1); next = { phase: "idle", done: st.done || 0 }; }
+    store.set(POMO_KEY, next);
+    return next;
+  }
+  function pomoWidget() {
+    const R = 17, C = 2 * Math.PI * R;
+    const box = h("div", { class: "pomo" });
+    const ring = s("svg", { class: "pomo-ring", viewBox: "0 0 44 44", "aria-hidden": "true" });
+    const track = s("circle", { cx: 22, cy: 22, r: R, class: "pomo-track" });
+    const arc = s("circle", { cx: 22, cy: 22, r: R, class: "pomo-arc", "stroke-dasharray": C.toFixed(2), transform: "rotate(-90 22 22)" });
+    ring.append(track, arc);
+    const time = h("span", { class: "pomo-time" });
+    const main = h("button", { type: "button", class: "pomo-main" }, ring, time);
+    const lab = h("span", { class: "pomo-lab" });
+    const reset = h("button", { type: "button", class: "pomo-reset", "aria-label": "Stop the timer", text: "×" });
+    box.append(main, lab, reset);
+    const draw = () => {
+      if (!box.isConnected) { clearInterval(pomoTick); pomoTick = 0; return; }
+      const st = pomoAdvance();
+      const p = prefs();
+      const left = pomoLeft(st);
+      const len = st.len || p.pomo * 60000;
+      const mm = Math.floor((st.phase === "idle" ? p.pomo * 60000 : left) / 60000), ss = Math.floor(((st.phase === "idle" ? 0 : left) % 60000) / 1000);
+      time.textContent = `${mm}:${String(ss).padStart(2, "0")}`;
+      arc.setAttribute("stroke-dashoffset", st.phase === "idle" ? C.toFixed(2) : (C * (1 - left / len)).toFixed(2));
+      box.className = "pomo " + st.phase + (st.paused != null ? " paused" : "");
+      lab.textContent = st.phase === "idle" ? (st.done ? `${st.done} done` : "Focus") : st.phase === "break" ? "Break" : st.paused != null ? "Paused" : "Focus";
+      main.setAttribute("aria-label", st.phase === "idle" ? `Start a ${p.pomo}-minute focus timer` : `${lab.textContent}, ${mm} minutes ${ss} seconds left. ${st.paused != null ? "Resume" : "Pause"}`);
+      reset.hidden = st.phase === "idle";
+    };
+    main.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === "suspended") audioCtx.resume(); } catch {}
+      const st = pomoState(), p = prefs();
+      if (st.phase === "idle") store.set(POMO_KEY, { phase: "focus", end: Date.now() + p.pomo * 60000, len: p.pomo * 60000, done: st.done || 0 });
+      else if (st.paused != null) store.set(POMO_KEY, { ...st, end: Date.now() + st.paused, paused: null });
+      else store.set(POMO_KEY, { ...st, paused: Math.max(0, st.end - Date.now()) });
+      draw();
+    });
+    reset.addEventListener("click", (ev) => { ev.stopPropagation(); store.set(POMO_KEY, { phase: "idle", done: pomoState().done || 0 }); draw(); });
+    box.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    clearInterval(pomoTick);
+    pomoTick = setInterval(draw, 1000);
+    requestAnimationFrame(draw);
+    return box;
   }
 
   const starFor = (i) => sky && sky.stars.find((x) => x.seqIdx === i);
   function clampCam() {
     if (!cam) return;
-    cam.x = Math.max(SKY_BOX.x0, Math.min(SKY_BOX.x1, cam.x));
-    cam.y = Math.max(SKY_BOX.y0, Math.min(SKY_BOX.y1, cam.y));
+    const bx = (sky && sky.box) || SKY_BOX;
+    cam.x = Math.max(bx.x0, Math.min(bx.x1, cam.x));
+    cam.y = Math.max(bx.y0, Math.min(bx.y1, cam.y));
   }
   // the camera has left the bright star: offer the way back, retire the hint
   function lookedAway() {
@@ -704,7 +1161,8 @@
     if (!store.get("skyHintSeen")) { store.set("skyHintSeen", true); const hint = sky.el.querySelector(".sky-hint"); if (hint) hint.classList.add("gone"); }
   }
   function restW(el) { const px = (el && el.clientWidth) || 360; return Math.max(380, Math.min(760, px * 1.05)); }
-  function restCam(st) { return { x: st.x, y: st.y + 6, w: restW(sky.el) }; }
+  function restCam(st) { return { x: st.x, y: st.y + (prefs().mode === "timeline" ? 30 : 6), w: restW(sky.el) * (prefs().mode === "drive" ? 1 : 1.35) }; }
+  const skyMaxW = () => Math.max(SKY_MAX_W, sky && sky.box ? (sky.box.x1 - sky.box.x0) + 500 : 0);
   function setView() {
     if (!sky || !cam) return;
     const el = sky.el;
@@ -735,7 +1193,7 @@
   }
   function markStar(i) {
     for (const st of sky.stars) {
-      const on = st.open && st.seqIdx === i;
+      const on = st.open && !st.gone && st.seqIdx === i;
       st.el.classList.toggle("on", on);
       if (st.open) st.el.setAttribute("aria-current", String(on));
     }
@@ -788,7 +1246,8 @@
       if (e.where) card.append(h("p", { class: "now-gist", text: e.where }));
     } else {
       const it = cur.it;
-      card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: "· " + it.place })));
+      const when = cur.at ? `· ${fmtTime(new Date(cur.at))}, about ${fmtDur(Math.round((cur.end - cur.at) / 60000))}` : "· " + it.place;
+      card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: when })));
       card.append(h("h1", { class: "now-title", onclick: dive }, it.title));
       if (it.sentence) card.append(h("p", { class: "now-gist", text: firstSentence(it.sentence) }));
       if (it.carries > 1) card.append(h("p", { class: "now-carry", text: `Carried ${it.carries} days.` }));
@@ -804,7 +1263,9 @@
     ctl.append(h("button", { text: "← Back", disabled: nowIdx === 0 ? true : null, onclick: () => flyTo(nowIdx - 1) }));
     ctl.append(h("button", { text: "Next →", disabled: nowIdx >= sky.seq.length - 1 ? true : null, onclick: () => flyTo(nowIdx + 1) }));
     const cur = sky.seq[nowIdx];
-    ctl.append(h("span", { class: "pos", text: `${nowIdx + 1} of ${sky.seq.length}${cur && cur.kind === "item" ? " · " + cur.it.place : ""}` }));
+    const mode = prefs().mode;
+    const where = !cur ? "" : cur.at ? " · " + fmtTime(new Date(cur.at)) : cur.kind === "item" ? " · " + (mode === "area" ? areaOf(cur.it) : cur.it.place) : "";
+    ctl.append(h("span", { class: "pos", text: `${nowIdx + 1} of ${sky.seq.length}${where}` }));
     if (isDesk()) ctl.append(h("button", { text: "Close", onclick: () => toggleFocus(false) }));
   }
 
@@ -835,6 +1296,7 @@
     box.classList.add("skyview");
     sky = buildSky(seq);
     box.insertBefore(sky.el, w);
+    applyLayout(prefs().mode, false);
     sky.card = h("div", { class: "now-card" });
     sky.ctl = h("div", { class: "now-ctl" });
     w.append(sky.card, sky.ctl);
@@ -1175,7 +1637,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
 
   // ---------------- keyboard (desktop) ----------------
   document.addEventListener("keydown", (ev) => {
-    if (!isDesk() || !B || !B.day) return;
+    if (!isDesk() || !B || !B.day || sheetOpen) return;
     const typing = ev.target.closest("input, textarea");
     if (ev.key === "Escape" && !typing && document.body.classList.contains("outboxview")) { document.body.classList.remove("outboxview"); markNav("today"); return; }
     if (ev.key === "Escape") { if (typing) ev.target.blur(); else if (document.body.classList.contains("focus") && nowDrilled) surface(); else if (document.body.classList.contains("focus")) toggleFocus(false); else { selKey = null; renderAll(); } return; }
@@ -1503,7 +1965,7 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
       if (await load().catch(() => false)) { noteFresh(); renderAll(); }
     });
     window.matchMedia("(min-width: 980px)").addEventListener("change", renderAll);
-    setInterval(() => { if (camAnim) return; if (!document.activeElement || !document.activeElement.closest("input, textarea")) renderNow(); }, 60_000);
+    setInterval(() => { if (camAnim || starAnim || sheetOpen) return; if (sky && (sky.el.classList.contains("away") || !sky.el.querySelector(".sky-menu[hidden]"))) return; if (!document.activeElement || !document.activeElement.closest("input, textarea")) renderNow(); }, 60_000);
   }
 
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
