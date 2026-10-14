@@ -12,6 +12,7 @@ async function updateItem(id, fields) {
   const it = state.items.find((i) => i.id === id);
   if (!it) throw Object.assign(new Error("not found"), { status: 404 });
   Object.assign(it, fields);
+  if ("delegatedTo" in fields && !fields.delegatedTo) it.delegatedOn = null;
   if ("decision" in fields) it.decidedAt = fields.decision ? new Date().toISOString() : null;
   return { ...it };
 }

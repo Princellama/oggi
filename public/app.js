@@ -313,6 +313,30 @@
     if (!url || !isMail(url)) return null;
     return ext(h("a", { class: "mail-chip", href: url, title: "Open the email thread", "aria-label": "From email: open the thread" }, glyphSvg("g-mail"), "Email"));
   }
+  // Handed off: who has it, and for how long.
+  const HANDS = ["Milli", "Virgilio", "Someone else"];
+  function delegChip(it) {
+    if (!it.delegatedTo) return null;
+    const who = it.delegatedTo === "Someone else" ? "someone" : it.delegatedTo;
+    const on = it.delegatedOn && String(it.delegatedOn).slice(0, 10);
+    const days = on ? Math.max(0, Math.round((new Date(localISO() + "T12:00:00") - new Date(on + "T12:00:00")) / 86400000)) : null;
+    const late = days != null && days >= 3;
+    return h("span", { class: "deleg-chip" + (late ? " late" : ""), title: late ? `With ${who} for ${days} days. Worth a check-in.` : `Handed to ${who}` }, `→ ${who}${days ? ` · ${days}d` : ""}`);
+  }
+  function handoffRow(it, after) {
+    const row = h("div", { class: "choices handoff", role: "group", "aria-label": "Hand it off" });
+    for (const who of HANDS) {
+      const b = h("button", { "aria-pressed": String(it.delegatedTo === who), text: who });
+      b.addEventListener("click", async () => {
+        const next = it.delegatedTo === who ? null : who;
+        row.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x.textContent === next)));
+        try { await patchItem(it, { delegatedTo: next }); } catch { b.setAttribute("aria-pressed", "false"); }
+        if (after) after(); else rerenderListOnly();
+      });
+      row.append(b);
+    }
+    return row;
+  }
   function titleEl(it) {
     const url = safeUrl(it.link);
     const el = url ? ext(h("a", { class: "ttl", href: url })) : h("span", { class: "ttl" });
@@ -425,7 +449,7 @@
       const closed = it.status === "Closed" && live;
       const li = h("li", { "data-id": it.id, class: (closed ? "closed " : "") + (selKey === it.id ? "sel" : "") });
       li.append(h("span", { class: "num", text: String((items.numbers ? items.numbers[idx] : idx) + 1) }));
-      const body = h("div", { class: "body" }, h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), mailChip(it), newBadge(it)), titleEl(it), sentence(it));
+      const body = h("div", { class: "body" }, h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), mailChip(it), delegChip(it), newBadge(it)), titleEl(it), sentence(it));
       if (it.note) body.append(h("p", { class: "mynote", text: it.note }));
       if (live && !closed && !isDesk()) body.append(inlineTools(it, body));
       li.append(body);
@@ -451,7 +475,13 @@
       grow(ta); ta.focus();
     });
     doneBtn.addEventListener("click", async () => { await patchItem(it, { status: "Closed" }); renderAll(); });
-    row.append(noteBtn, doneBtn);
+    const handBtn = h("button", { text: it.delegatedTo ? "Handed off" : "Hand off" });
+    handBtn.addEventListener("click", () => {
+      const open = body.querySelector(".handoff");
+      if (open) { open.remove(); return; }
+      row.after(handoffRow(it));
+    });
+    row.append(noteBtn, handBtn, doneBtn);
     return row;
   }
 
@@ -476,7 +506,7 @@
       const li = h("li", { "data-id": it.id, class: selKey === it.id ? "sel" : "" });
       li.append(h("span", { class: "num", text: String(i + 1) }));
       const body = h("div", { class: "body" });
-      body.append(h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), mailChip(it), newBadge(it)));
+      body.append(h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), mailChip(it), delegChip(it), newBadge(it)));
       body.append(h("span", { class: "ttl", text: it.title }));
       const carried = it.carries > 0 ? `Carried ${it.carries} day${it.carries === 1 ? "" : "s"}.` : "New today.";
       body.append(h("p", { class: "carry", text: `${carried} ${firstSentence(it.sentence)}` }));
@@ -1645,7 +1675,7 @@
     } else {
       const it = cur.it;
       const when = cur.at ? `· ${fmtTime(new Date(cur.at))}, about ${fmtDur(Math.round((cur.end - cur.at) / 60000))}` : "· " + it.place;
-      card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: when }), mailChip(it)));
+      card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: when }), mailChip(it), delegChip(it)));
       card.append(h("h1", { class: "now-title", onclick: onOpen }, it.title));
       if (it.sentence) card.append(h("p", { class: "now-gist", text: firstSentence(it.sentence) }));
       if (it.carries > 1) card.append(h("p", { class: "now-carry", text: `Carried ${it.carries} days.` }));
@@ -1751,6 +1781,7 @@
       w.append(ta, saved);
       setTimeout(() => grow(ta), 0);
       w.append(h("p", { class: "ed-label now-where", text: "Where it goes" }), choiceRow(it));
+      w.append(h("p", { class: "ed-label now-where", text: "Hand it off" }), handoffRow(it, () => {}));
     }
 
     const ctl = h("div", { class: "now-ctl" });
@@ -2002,6 +2033,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
       inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Area" }), areas));
       inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Place" }), places));
       inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: it.carries ? `Where it goes · carried ${it.carries} day${it.carries === 1 ? "" : "s"}` : "Where it goes" }), choiceRow(it)));
+      inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Handed to" }), handoffRow(it, () => { rerenderListOnly(); renderAside(); })));
 
       const links = h("div", { class: "ed-links" });
       const done = h("button", { class: "textlink", text: it.status === "Closed" ? "Mark open again" : "Mark done" });

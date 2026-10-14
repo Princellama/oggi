@@ -178,13 +178,17 @@ app.get("/api/brief", requireAuth, wrap(async (req, res) => {
 }));
 
 app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
-  const allowed = ["title", "note", "place", "area", "order", "decision", "status"];
+  const allowed = ["title", "note", "place", "area", "order", "decision", "status", "delegatedTo"];
   const fields = {};
   for (const k of allowed) if (k in req.body) fields[k] = req.body[k];
   if (fields.place && !["Skyline", "Airport", "Kalihi", "Kakaako", "Kahala", "Hawaii Kai", "Home"].includes(fields.place)) return res.status(400).json({ error: "place" });
   if (fields.area && !["CPA", "Medicare", "Personal", "Money"].includes(fields.area)) return res.status(400).json({ error: "area" });
   if ("decision" in fields && fields.decision !== null && !["Tomorrow", "This week", "Let go"].includes(fields.decision)) return res.status(400).json({ error: "decision" });
   if ("status" in fields && !["Open", "Closed"].includes(fields.status)) return res.status(400).json({ error: "status" });
+  if ("delegatedTo" in fields) {
+    if (fields.delegatedTo !== null && !["Milli", "Virgilio", "Someone else"].includes(fields.delegatedTo)) return res.status(400).json({ error: "delegatedTo" });
+    fields.delegatedOn = fields.delegatedTo ? localDate(req) : null;
+  }
   const item = await store.updateItem(req.params.id, fields);
 
   // Change log line, written in Eric's own terms so it can ride into a Claude prompt.
@@ -198,6 +202,7 @@ app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
   else if ("title" in fields) line = `Renamed an item to “${t}”`;
   else if ("place" in fields) line = `${t} → moved to ${fields.place}`;
   else if ("area" in fields) line = `${t} → area ${fields.area}`;
+  else if ("delegatedTo" in fields) line = fields.delegatedTo ? `${t} → handed to ${fields.delegatedTo === "Someone else" ? "someone else" : fields.delegatedTo}` : `${t} → taken back (no longer delegated)`;
   else if ("note" in fields && fields.note) line = `Note on ${t}: ${fields.note}`;
   const mergeKey = "note" in fields ? `Note on ${t}:` : ("decision" in fields ? `${t} → ` : null);
   if (line && dayId) await store.logEdit(dayId, `${stamp()} ${line}`, mergeKey);

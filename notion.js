@@ -76,6 +76,8 @@ function toItem(page) {
     note: read(p["Note"]) || "",
     decision: read(p["Decision"]),
     decidedAt: read(p["Decided at"]),
+    delegatedTo: read(p["Delegated to"]),
+    delegatedOn: read(p["Delegated on"]),
   };
 }
 
@@ -147,6 +149,10 @@ async function updateItem(id, fields) {
   if ("decision" in fields) {
     props["Decision"] = fields.decision ? { select: { name: fields.decision } } : { select: null };
     props["Decided at"] = fields.decision ? { date: { start: new Date().toISOString() } } : { date: null };
+  }
+  if ("delegatedTo" in fields) {
+    props["Delegated to"] = fields.delegatedTo ? { select: { name: fields.delegatedTo } } : { select: null };
+    props["Delegated on"] = fields.delegatedTo ? { date: { start: fields.delegatedOn } } : { date: null };
   }
   const page = await call("PATCH", `/pages/${id}`, { properties: props });
   return toItem(page);

@@ -636,3 +636,7 @@ body.skyfull { overflow: hidden; }
   .breath-orb { transition: none; }
 }
 .now-kicker .mail-chip .gl, .itemmeta .mail-chip .gl { width: 13px; height: 13px; color: inherit; }
+
+.deleg-chip { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: #8a5a9e; background: rgba(164,121,226,.12); border-radius: 999px; padding: 1px 8px; }
+.deleg-chip.late { color: var(--clay); background: rgba(198,97,63,.12); }
+.choices.handoff { margin-top: 8px; }
