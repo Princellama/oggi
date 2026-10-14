@@ -640,3 +640,10 @@ body.skyfull { overflow: hidden; }
 .deleg-chip { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: #8a5a9e; background: rgba(164,121,226,.12); border-radius: 999px; padding: 1px 8px; }
 .deleg-chip.late { color: var(--clay); background: rgba(198,97,63,.12); }
 .choices.handoff { margin-top: 8px; }
+
+.quick { margin-top: 18px; }
+.quick-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick-ask { display: flex; flex-direction: column; gap: 2px; flex: 1 1 180px; padding: 10px 12px; border: 1px solid var(--edge); border-radius: 10px; text-decoration: none; color: var(--ink); background: var(--bg); }
+.quick-ask:hover { border-color: var(--clay); }
+.quick-ask b { font-size: 13.5px; color: var(--clay); }
+.quick-ask span { font-size: 12px; color: var(--soft); line-height: 1.35; }

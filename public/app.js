@@ -1960,16 +1960,38 @@ ${lines.map((l) => "- " + l.replace(/^\d\d:\d\dZ\s*/, "")).join("\n")}
 Please read the barayuga-notion skill, then act on them: make sure each capture is a QuickAction, that each QuickAction's due date matches the choice I made, and that my notes are carried into the next brief. Tell me in a few lines what you changed, then clear "Edits since brief".`;
     return "https://claude.ai/new?q=" + encodeURIComponent(prompt);
   }
+  // Quick asks: a small Claude run that does one part of the brief, not all of it.
+  const QUICK = [
+    ["Check email", "Logged sent mail, the CPA and Medicare labels, and new mail since the brief",
+      () => `Check my email for Oggi with the mail-check skill. It's ${localISO()}, ${fmtTime(nowD())} where I am. Only mail: my logged sent mail, the CPA and Medicare labels, and anything new since the last brief or check. Update today's items, then tell me in a few lines what changed.`],
+    ["Check hand-offs", "Anything with Milli or Virgilio: done, moving or gone quiet",
+      () => `Check my hand-offs with the mail-check skill, hand-offs only. It's ${localISO()}. Look at every open Brief Item delegated to Milli or Virgilio and at their recent mail, close what's done, and tell me which ones have gone quiet, with a check-in drafted for each.`],
+  ];
+  function quickAsks() {
+    const wrap = h("div", { class: "quick" }, h("p", { class: "ed-label", text: "Quick asks" }));
+    const row = h("div", { class: "quick-row" });
+    for (const [label, sub, prompt] of QUICK) {
+      const a = ext(h("a", { class: "quick-ask", title: sub, href: "#" }, h("b", { text: label }), h("span", { text: sub })));
+      a.addEventListener("click", () => { a.href = "https://claude.ai/new?q=" + encodeURIComponent(prompt()); });
+      a.href = "https://claude.ai/new?q=" + encodeURIComponent(prompt());
+      row.append(a);
+    }
+    wrap.append(row);
+    return wrap;
+  }
   function renderChanges() {
     const box = h("div", { class: "changes", id: "changes" });
     const lines = (B && B.day && B.day.edits ? B.day.edits.split("\n").filter(Boolean) : []);
     box.append(h("h2", { class: "sec", text: "Changes since the brief" }));
-    if (!lines.length) { box.append(h("p", { class: "quiet", text: "Nothing changed yet. Notes, choices and captures will list here." })); return box; }
-    box.append(h("ul", null, lines.slice(-12).map((l) => h("li", { text: l.replace(/^\d\d:\d\dZ\s*/, "") }))));
-    const send = ext(h("a", { class: "btn", href: claudeLink(), text: "Send to Claude" }));
-    const clear = h("button", { class: "textlink", text: "Clear the list" });
-    clear.addEventListener("click", async () => { await api("POST", "/api/edits/clear", { dayId: B.day.id }); B.day.edits = ""; cache(); refreshChanges(); });
-    box.append(h("div", { class: "row" }, send, clear));
+    if (!lines.length) box.append(h("p", { class: "quiet", text: "Nothing changed yet. Notes, choices and captures will list here." }));
+    else {
+      box.append(h("ul", null, lines.slice(-12).map((l) => h("li", { text: l.replace(/^\d\d:\d\dZ\s*/, "") }))));
+      const send = ext(h("a", { class: "btn", href: claudeLink(), text: "Send to Claude" }));
+      const clear = h("button", { class: "textlink", text: "Clear the list" });
+      clear.addEventListener("click", async () => { await api("POST", "/api/edits/clear", { dayId: B.day.id }); B.day.edits = ""; cache(); refreshChanges(); });
+      box.append(h("div", { class: "row" }, send, clear));
+    }
+    box.append(quickAsks());
     return box;
   }
   function refreshChanges() {
