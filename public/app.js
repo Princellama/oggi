@@ -1274,9 +1274,17 @@
     animateCam(sortCam(mode), 1250);
     const sc = sky.el.querySelector(".sky-sort-b");
     if (sc) sc.textContent = "Sort · " + SKY_MODES[mode];
+    syncSeg();
   }
 
   // ---- the Sort button, its menu, and the settings sheet ----
+  function syncSeg() {
+    const seg = sky && sky.el.querySelector(".sky-seg");
+    if (!seg) return;
+    const p = prefs();
+    seg.hidden = p.mode !== "history";
+    seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.textContent === { 7: "7d", 30: "1m", 90: "3m" }[p.histDays])));
+  }
   function sortControl() {
     const p = prefs();
     const box = h("div", { class: "sky-sort" });
@@ -1297,13 +1305,15 @@
     // keep the sky from treating taps on the control as drags
     box.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     box.append(btn, fullBtn(), menu);
-    if (p.mode === "history") {
-      const seg = h("div", { class: "sky-seg", role: "group", "aria-label": "How far back" });
+    {
+      // always there; shown only in Star History (syncSeg), so a sort that just flies the stars keeps it right
+      const seg = h("div", { class: "sky-seg", role: "group", "aria-label": "How far back", hidden: p.mode !== "history" });
       for (const [d, label] of [[7, "7d"], [30, "1m"], [90, "3m"]]) {
         seg.append(h("button", { type: "button", "aria-pressed": String(p.histDays === d), text: label, onclick: (ev) => {
           ev.stopPropagation();
           if (prefs().histDays === d) return;
           setPrefs({ histDays: d });
+          seg.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === ev.currentTarget)));
           loadHistory().then(() => { renderNow(); if (sky) { sky.el.classList.add("away"); cam = sortCam("history"); setView(); } });
         } }));
       }
