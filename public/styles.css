@@ -697,3 +697,25 @@ body.skyfull { overflow: hidden; }
 .nova-btn:hover { background: var(--clay); color: var(--bg); }
 .nova-btn.cool { border-color: #7FA6CC; color: #5F8DB8; }
 .nova-btn.cool:hover { background: #5F8DB8; color: #fff; }
+
+/* ---------- finished jobs: faded and crossed out for three days, with how long they took ---------- */
+.sky .star-d { display: none; font: 500 8px var(--sans); fill: var(--starlight); fill-opacity: .5; text-anchor: middle; pointer-events: none; font-variant-numeric: tabular-nums; }
+.sky.m-drive .star.done .star-d, .sky.m-history .star-d { display: inline; }
+.sky .star.done .core { opacity: .3; }
+.sky .star.done .halo, .sky .star.done .halo2 { opacity: 0; }
+.sky .star.dim.done .star-l { opacity: .5; text-decoration: line-through; }
+.sky .star.dim.dropped .star-l { opacity: .3; font-style: italic; }
+.sky .star.dropped .core { opacity: .22; }
+
+/* ---------- Star History: comets on a line of days ---------- */
+.sky.m-history .star-l, .sky.m-history .star-d { text-anchor: start; transform: translate(11px, -13px); }
+.sky.m-history .star.on .star-l { opacity: 1; }
+.sky .h-tail.open { opacity: 1; }
+.sky .h-tail.done { opacity: .5; }
+.sky .h-tail.dropped { opacity: .25; }
+.sky .h-sum { font: 600 8.5px var(--sans); letter-spacing: 1.3px; fill: var(--starlight); fill-opacity: .55; text-transform: uppercase; }
+.sky-seg { position: absolute; left: 0; top: calc(100% + 8px); display: flex; border: 1px solid rgba(244, 239, 228, .22); border-radius: 999px; overflow: hidden; background: rgba(10, 14, 28, .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.sky-seg button { border: 0; background: transparent; color: var(--starlight); opacity: .6; font: 600 12px var(--sans); padding: 7px 11px; cursor: pointer; }
+.sky-seg button[aria-pressed="true"] { opacity: 1; background: rgba(244, 239, 228, .14); }
+.sky-seg button:focus-visible { outline: 2px solid rgba(244, 239, 228, .7); outline-offset: -2px; }
+@media (max-width: 420px) { .sky-seg button { padding: 7px 8px; } }

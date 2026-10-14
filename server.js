@@ -177,6 +177,12 @@ app.get("/api/brief", requireAuth, wrap(async (req, res) => {
   res.json(b);
 }));
 
+// Star History: every job seen in the last 7, 30 or 90 days, open or done.
+app.get("/api/history", requireAuth, wrap(async (req, res) => {
+  const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 7;
+  res.json({ days, items: await store.getHistory(localDate(req), days) });
+}));
+
 app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
   const allowed = ["title", "note", "place", "area", "order", "decision", "status", "delegatedTo", "novaStart", "novaCooled"];
   const fields = {};
@@ -185,6 +191,7 @@ app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
   if (fields.area && !["CPA", "Medicare", "Personal", "Money"].includes(fields.area)) return res.status(400).json({ error: "area" });
   if ("decision" in fields && fields.decision !== null && !["Tomorrow", "This week", "Let go"].includes(fields.decision)) return res.status(400).json({ error: "decision" });
   if ("status" in fields && !["Open", "Closed"].includes(fields.status)) return res.status(400).json({ error: "status" });
+  if ("status" in fields) fields.closedOn = fields.status === "Closed" ? localDate(req) : null;
   if ("delegatedTo" in fields) {
     if (fields.delegatedTo !== null && !["Milli", "Virgilio", "Someone else"].includes(fields.delegatedTo)) return res.status(400).json({ error: "delegatedTo" });
     fields.delegatedOn = fields.delegatedTo ? localDate(req) : null;

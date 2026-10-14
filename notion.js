@@ -56,6 +56,7 @@ function rich(text) {
 
 function toItem(page) {
   const p = page.properties;
+  const status = read(p["Status"]) || "Open";
   return {
     id: page.id,
     key: read(p["Key"]),
@@ -64,7 +65,7 @@ function toItem(page) {
     place: read(p["Place"]) || "Skyline",
     area: read(p["Area"]),
     list: read(p["List"]),
-    status: read(p["Status"]) || "Open",
+    status,
     order: read(p["Order"]) ?? 99,
     sentence: read(p["Sentence"]),
     sourcePhrase: read(p["Source phrase"]),
@@ -80,6 +81,9 @@ function toItem(page) {
     delegatedOn: read(p["Delegated on"]),
     novaStart: read(p["Supernova"]),
     novaCooled: read(p["Cooled off"]),
+    // The day it was finished. Older rows (and rows the brief closed) have no Closed on;
+    // a closed item's Last seen is the day it closed.
+    closedOn: read(p["Closed on"]) || (status === "Closed" ? read(p["Last seen"]) : null),
   };
 }
 
@@ -135,10 +139,52 @@ async function getBrief(date) {
       page_size: 100,
     }),
   ]);
+  const items = itemsRes.results.map(toItem);
+  const recent = await getRecent(day.date, items).catch(() => []);
   return {
     day: { ...day, ...data, previousIntentions: previous ? previous.intentions : "" },
-    items: itemsRes.results.map(toItem),
+    items,
+    recent,
   };
+}
+
+const isoDay = (s, add) => { const d = new Date(s + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + add); return d.toISOString().slice(0, 10); };
+// Notices the brief files straight into Resolved (keys like r-state-payments) were never jobs.
+const isJob = (it) => !String(it.key || "").startsWith("r-");
+
+// Finished in the last three days but no longer on the day's list: they stay in the sky, faded and crossed out.
+async function getRecent(date, today) {
+  const have = new Set(today.map((i) => i.key || i.id));
+  const rows = await queryAll(DS.items, {
+    filter: { and: [
+      { property: "Status", select: { equals: "Closed" } },
+      { property: "Last seen", date: { on_or_after: isoDay(date, -3) } },
+      { property: "Last seen", date: { before: date } },
+    ] },
+  });
+  return rows.map(toItem).filter((i) => isJob(i) && !have.has(i.key || i.id) && i.closedOn >= isoDay(date, -3));
+}
+
+// Star History: every job seen in the window, open or done, one per key (its latest row).
+async function getHistory(date, days) {
+  const from = isoDay(date, -days);
+  const rows = await queryAll(DS.items, {
+    filter: { or: [
+      { property: "Last seen", date: { on_or_after: from } },
+      { property: "Closed on", date: { on_or_after: from } },
+    ] },
+  });
+  const byKey = new Map();
+  for (const it of rows.map(toItem)) {
+    if (!isJob(it)) continue;
+    const k = it.key || it.id, prev = byKey.get(k);
+    if (!prev || (it.lastSeen || "") > (prev.lastSeen || "")) byKey.set(k, it);
+  }
+  return [...byKey.values()].map((i) => ({
+    id: i.id, key: i.key, title: i.title, mapLabel: i.mapLabel, place: i.place, area: i.area, list: i.list,
+    status: i.status, decision: i.decision, firstSeen: i.firstSeen, lastSeen: i.lastSeen, closedOn: i.closedOn,
+    delegatedTo: i.delegatedTo, link: i.link,
+  }));
 }
 
 async function updateItem(id, fields) {
@@ -157,6 +203,7 @@ async function updateItem(id, fields) {
     props["Delegated to"] = fields.delegatedTo ? { select: { name: fields.delegatedTo } } : { select: null };
     props["Delegated on"] = fields.delegatedTo ? { date: { start: fields.delegatedOn } } : { date: null };
   }
+  if ("closedOn" in fields) props["Closed on"] = fields.closedOn ? { date: { start: fields.closedOn } } : { date: null };
   if ("novaStart" in fields) props["Supernova"] = fields.novaStart ? { date: { start: fields.novaStart } } : { date: null };
   if ("novaCooled" in fields) props["Cooled off"] = fields.novaCooled ? { date: { start: fields.novaCooled } } : { date: null };
   const page = await call("PATCH", `/pages/${id}`, { properties: props });
@@ -280,4 +327,4 @@ async function setPushed(id, date) {
   return toOutbox(page, null);
 }
 
-module.exports = { getOutbox, setPushed, getBrief, updateItem, updateDay, logEdit, applyDecisionToTask, createTask, getPage, toItem };
+module.exports = { getHistory, getOutbox, setPushed, getBrief, updateItem, updateDay, logEdit, applyDecisionToTask, createTask, getPage, toItem };

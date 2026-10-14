@@ -577,7 +577,7 @@
   // line across the day, each at the time it would start, in the order chosen in settings.
   // By area: CPA, Medicare, Money and Personal become suns with their items orbiting them.
   // Preferences, time estimates and effort live on this device only.
-  const SKY_MODES = { drive: "Drive", timeline: "Timeline", area: "By area" };
+  const SKY_MODES = { drive: "Drive", timeline: "Timeline", area: "By area", history: "Star History" };
   const ORDERS = {
     priority: ["By priority", "The brief's own order: what it put first, first."],
     easiest: ["Easiest first", "Quick, light things first to get moving."],
@@ -585,7 +585,7 @@
     shortest: ["Shortest to longest", "By the time each one takes."],
   };
   const AREA_ORDER = ["CPA", "Medicare", "Money", "Personal"];
-  const DEF_PREFS = { mode: "drive", order: "priority", start: "", gap: 5, pomo: 25, pomoBreak: 5, est: {}, diff: {}, remote: false, home: "Pacific/Honolulu" };
+  const DEF_PREFS = { mode: "drive", order: "priority", start: "", gap: 5, pomo: 25, pomoBreak: 5, est: {}, diff: {}, remote: false, home: "Pacific/Honolulu", histDays: 7 };
   // Remote Work mode: the day runs on the time where this device is; home base is shown under it.
   // Places to pick as "where you are" when the device's zone is off.
   const HERES = [["Asia/Tokyo", "Japan"], ["Asia/Seoul", "Korea"], ["Asia/Taipei", "Taiwan"], ["Asia/Shanghai", "China"], ["Asia/Hong_Kong", "Hong Kong"], ["Asia/Manila", "Philippines"], ["Asia/Singapore", "Singapore"], ["Asia/Bangkok", "Thailand"], ["Australia/Sydney", "Sydney"], ["Pacific/Guam", "Guam"], ["Pacific/Honolulu", "Hawaii"], ["America/Anchorage", "Alaska"], ["America/Los_Angeles", "Pacific"], ["America/Denver", "Mountain"], ["America/Chicago", "Central"], ["America/New_York", "Eastern"], ["Europe/London", "London"], ["Europe/Paris", "Central Europe"]];
@@ -660,6 +660,10 @@
     }
     const seq = [];
     if (evs[0]) seq.push({ kind: "event", ev: evs[0] });
+    if (p.mode === "history") {
+      for (const it of open.slice().sort((a, b) => (a.firstSeen || "9").localeCompare(b.firstSeen || "9") || a.order - b.order)) seq.push({ kind: "item", it });
+      return seq;
+    }
     if (p.mode === "area") {
       for (const a of AREA_ORDER) for (const it of orderItems(open.filter((i) => areaOf(i) === a), p.order, p)) seq.push({ kind: "item", it });
       return seq;
@@ -683,7 +687,8 @@
   // a star too; the drive shows only the next one, the timeline shows them all.
   function skyStars(seq) {
     const stars = [];
-    const all = B.items.filter((i) => i.list === "Needs attention" || i.list === "Resolved");
+    const all = B.items.filter((i) => i.list === "Needs attention" || i.list === "Resolved")
+      .concat((B.recent || []).map((i) => ({ ...i, recent: true })));
     const byPlace = {};
     for (const it of all) (byPlace[SKY_AT[it.place] ? it.place : "Skyline"] ||= []).push(it);
     const reach = {};
@@ -698,6 +703,18 @@
         stars.push({ kind: "item", it, place, key: it.id, open: false, seqIdx: -1, dx: x, dy: y, x, y });
         reach[place] = Math.max(reach[place] || 0, y - cy);
       });
+    }
+    // Star History: match each job seen in the window to its star, or add it (hidden outside History)
+    if (H.items && H.days === prefs().histDays) {
+      const byKey = new Map(stars.map((st) => [itemKey(st.it), st]));
+      for (const r of H.items) {
+        const st = byKey.get(itemKey(r));
+        if (st) st.h = r;
+        else {
+          const [cx, cy] = SKY_AT[SKY_AT[r.place] ? r.place : "Skyline"];
+          stars.push({ kind: "item", it: r, h: r, place: r.place, key: r.id, histOnly: true, open: false, seqIdx: -1, dx: cx, dy: cy, x: cx, y: cy });
+        }
+      }
     }
     const t = nowMs();
     events().filter((e) => e.e.getTime() > t).sort((a, b) => a.s - b.s).forEach((ev, j) => {
@@ -746,7 +763,7 @@
     // constellation lines inside each place
     const lines = s("g", { "aria-hidden": "true", class: "lay-drive" });
     for (const place of Object.keys(SKY_AT)) {
-      const ps = stars.filter((x) => x.kind === "item" && x.place === place);
+      const ps = stars.filter((x) => x.kind === "item" && !x.histOnly && x.place === place);
       for (const x of ps) { x.dx = x.x; x.dy = x.y; }
       for (let i = 1; i < ps.length; i++) lines.append(s("line", { class: "cline" + (ps[i].open && ps[i - 1].open ? "" : " faint"), x1: ps[i - 1].x.toFixed(1), y1: ps[i - 1].y.toFixed(1), x2: ps[i].x.toFixed(1), y2: ps[i].y.toFixed(1) }));
     }
@@ -799,6 +816,12 @@
       }
       g.append(s("text", { class: "star-l", y: 17 }, st.kind === "event" ? fmtTime(st.ev.s) : shortLabel(st.it)));
       g.append(s("text", { class: "star-t", y: 28 }));
+      // finished: faded and crossed out, with how long it took
+      if (st.kind === "item") {
+        const j = jobSpan(st.h || st.it);
+        if (j.state !== "open") g.classList.add(j.state);
+        g.append(s("text", { class: "star-d", y: 28 }, j.label));
+      }
       st.el = g;
       starState(st);
       applyNova(st);
@@ -912,7 +935,7 @@
       seenW = el.clientWidth;
       setView();
     }).observe(el);
-    return { el, svg, seq, stars, trails, layer };
+    return { el, svg, seq, stars, trails, layer, hist: !!(H.items && H.days === prefs().histDays) };
   }
 
   // ---- Supernova ----
@@ -962,6 +985,86 @@
   }
   // grow on the hour even while the sky sits open
   setInterval(() => { if (sky) sky.stars.forEach(applyNova); }, 60_000);
+
+  // ---- finished jobs and Star History ----
+  // A job's span: from the day it first appeared to the day it was done (Closed on, or for older
+  // rows the last day it was seen closed). Let go, or dropped off the brief without being closed,
+  // ends on the last day it was seen. Still open runs to today.
+  const dayN = (iso) => Math.round(Date.parse(iso + "T12:00:00Z") / 864e5);
+  function jobSpan(r) {
+    const today = localISO();
+    const start = r.firstSeen || r.lastSeen || today;
+    let state = "open", end = today;
+    if (r.status === "Closed") { state = "done"; end = r.closedOn || r.lastSeen || today; }
+    else if (r.decision === "Let go" || (r.lastSeen && r.lastSeen < (B && B.day ? B.day.date : today))) { state = "dropped"; end = r.lastSeen || today; }
+    const days = Math.max(0, dayN(end) - dayN(start));
+    const took = days === 0 ? "same day" : days === 1 ? "1 day" : `${days} days`;
+    const label = state === "done" ? `✓ ${took}` : state === "dropped" ? `let go · ${took}` : days ? `${took} open` : "new today";
+    return { start, end, days, state, label };
+  }
+  // the window's jobs, from Notion (cached a few minutes)
+  const H = { days: 0, items: null, at: 0, loading: false };
+  const historyReady = () => !!(H.items && H.days === prefs().histDays && Date.now() - H.at < 10 * 60_000);
+  async function loadHistory() {
+    const days = prefs().histDays;
+    H.loading = true;
+    try { const r = await api("GET", `/api/history?days=${days}`); H.items = r.items || []; H.days = days; H.at = Date.now(); }
+    catch { H.items = H.items || []; H.days = days; H.at = Date.now(); }
+    finally { H.loading = false; }
+  }
+  // Comets on a line of days: the head sits on the day it was done (or today), the tail reaches
+  // back to the day it appeared. Rows are packed so comets and labels don't collide.
+  function historyLayout(stars) {
+    const pos = new Map(), draw = [];
+    const days = prefs().histDays, today = localISO();
+    const K = days <= 7 ? 112 : days <= 30 ? 36 : 13;          // sky units per day
+    const d0 = dayN(today) - days;
+    const X = (iso) => 80 + (Math.max(dayN(iso), d0) - d0 + 0.5) * K;
+    const jobs = stars.filter((st) => st.kind === "item").map((st) => ({ st, j: jobSpan(st.h || st.it) }))
+      .filter(({ j }) => dayN(j.end) >= d0)
+      .sort((a, b) => a.j.start.localeCompare(b.j.start) || a.j.end.localeCompare(b.j.end));
+    const laneEnd = [];
+    for (const o of jobs) {
+      const x0 = X(o.j.start), x1 = X(o.j.end);
+      let lane = laneEnd.findIndex((e) => e + 26 < x0);
+      if (lane < 0) { lane = laneEnd.length; laneEnd.push(0); }
+      laneEnd[lane] = x1 + 130;                                   // room for the label after the head
+      o.x0 = x0; o.x1 = x1; o.y = 150 + lane * 46;
+      pos.set(o.st, { x: x1, y: o.y, show: true });
+    }
+    for (const st of stars) if (!pos.has(st)) pos.set(st, { x: st.dx, y: st.dy, show: false });
+    const axisY = 150 + Math.max(1, laneEnd.length) * 46 + 4;
+    const xEnd = X(today) + K * 0.5 + 40;
+    draw.push((g) => {
+      // tails, faint where the job began and bright at its head
+      const defs = s("defs");
+      for (const [a, tint] of Object.entries(STAR_TINT)) {
+        const gr = s("linearGradient", { id: "tail-" + a, x1: 0, y1: 0, x2: 1, y2: 0 });
+        gr.append(s("stop", { offset: "0", "stop-color": tint, "stop-opacity": 0.04 }), s("stop", { offset: "1", "stop-color": tint, "stop-opacity": 0.75 }));
+        defs.append(gr);
+      }
+      g.append(defs);
+      for (const o of jobs) {
+        const w = Math.max(2, o.x1 - o.x0);
+        g.append(s("rect", { class: "h-tail " + o.j.state, x: o.x1 - w, y: o.y - 2, width: w, height: 4, rx: 2, fill: `url(#tail-${areaOf(o.st.h || o.st.it)})` }));
+      }
+      // the line of days
+      g.append(s("line", { class: "tl-axis", x1: 60, y1: axisY, x2: xEnd, y2: axisY }));
+      const step = days <= 7 ? 1 : days <= 30 ? 7 : 14;
+      for (let n = 0; n <= days; n++) {
+        const iso = isoAdd(today, n - days), x = X(iso);
+        g.append(s("line", { class: "tl-tick", x1: x, y1: axisY - (n % step ? 2 : 5), x2: x, y2: axisY + (n % step ? 2 : 5) }));
+        if ((days - n) % step === 0) g.append(s("text", { class: "tl-hour", x, y: axisY + 20 }, n === days ? "TODAY" : new Date(iso + "T12:00:00").toLocaleDateString("en-US", days <= 7 ? { weekday: "short", day: "numeric" } : { month: "short", day: "numeric" })));
+      }
+      const nx = X(today);
+      g.append(s("line", { class: "tl-now", x1: nx, y1: 110, x2: nx, y2: axisY + 6 }));
+      const done = jobs.filter((o) => o.j.state === "done").length;
+      g.append(s("text", { class: "h-sum", x: 80, y: 110 }, `${done} done · ${jobs.filter((o) => o.j.state === "open").length} open · last ${days === 7 ? "7 days" : days === 30 ? "month" : "3 months"}`));
+    });
+    const pts = jobs.flatMap((o) => [{ x: o.x0, y: o.y }, { x: o.x1 + 90, y: o.y }]).concat([{ x: 60, y: 100 }, { x: xEnd, y: axisY + 30 }]);
+    return { pos, draw, box: boxOf(pts, 60) };
+  }
+  const isoAdd = (iso, n) => { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
   // ---- sky layouts ----
   function starState(st) {
@@ -1069,7 +1172,8 @@
       });
       return { pos, draw, suns, box: boxOf([...pos.values()].filter((p) => p.show), 160) };
     }
-    for (const st of stars) pos.set(st, { x: st.dx, y: st.dy, show: st.kind === "item" || st.open });
+    if (mode === "history") return historyLayout(stars);
+    for (const st of stars) pos.set(st, { x: st.dx, y: st.dy, show: !st.histOnly && (st.kind === "item" || st.open) });
     return { pos, draw, box: { ...SKY_BOX } };
   }
   function placeStar(st) { st.el.setAttribute("transform", `translate(${st.x.toFixed(1)} ${st.y.toFixed(1)})`); }
@@ -1078,7 +1182,7 @@
   function applyLayout(mode, animate, onDone) {
     if (!sky) return;
     const L = layoutFor(mode, sky.stars);
-    sky.el.classList.remove("m-drive", "m-timeline", "m-area");
+    sky.el.classList.remove("m-drive", "m-timeline", "m-area", "m-history");
     sky.el.classList.add("m-" + mode);
     sky.layer.replaceChildren();
     for (const d of L.draw) d(sky.layer);
@@ -1124,6 +1228,15 @@
       const w = Math.min(base * 1.7, (sky.box.x1 - sky.box.x0));
       return { x: Math.max(sky.box.x0 + w / 2, Math.min(sky.box.x1 - w / 2, st.tx)), y: (TL_Y + TL_AXIS) / 2 - 18, w };
     }
+    if (mode === "history") {
+      // the most recent stretch, ending today; a computer fits every row, a phone starts at the top
+      const b = sky.box, el = sky.el;
+      const aspect = el.clientWidth && el.clientHeight ? el.clientHeight / el.clientWidth : 0.85;
+      let w = Math.min(b.x1 - b.x0, base * (isDesk() ? 1.6 : 1.5));
+      if (isDesk()) w = Math.max(w, (b.y1 - b.y0) / aspect);
+      const y = isDesk() ? (b.y0 + b.y1) / 2 : Math.min((b.y0 + b.y1) / 2, b.y0 + (w * aspect) * 0.3); // clear of the buttons on top
+      return { x: Math.max((b.x0 + b.x1) / 2, b.x1 - w / 2), y, w };
+    }
     if (mode === "area" && st && st.kind === "item" && sky.suns && sky.suns[areaOf(st.it)]) {
       const c = sky.suns[areaOf(st.it)];
       const all = overviewCam();
@@ -1141,6 +1254,12 @@
   // Re-sort: a new order for Back / Next, every planet flies to its new place, the camera pulls back to show it.
   function resort(mode) {
     if (!sky) { renderNow(); return; }
+    // History needs the window's jobs as stars: fetch them and rebuild the sky once
+    if (mode === "history" && (!historyReady() || !sky.hist)) {
+      setPrefs({ mode });
+      (historyReady() ? Promise.resolve() : loadHistory()).then(() => renderNow());
+      return;
+    }
     setPrefs({ mode });
     const curKey = sky.seq[nowIdx] ? seqKey(sky.seq[nowIdx]) : null;
     const seq = nowSequence();
@@ -1166,7 +1285,7 @@
     const close = () => { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); };
     for (const [m, label] of Object.entries(SKY_MODES)) {
       const b = h("button", { type: "button", role: "menuitemradio", "aria-checked": String(p.mode === m) }, label,
-        h("span", { class: "sky-menu-sub", text: m === "drive" ? "The map of the drive" : m === "timeline" ? ORDERS[p.order][0] + ", across the day" : "CPA, Medicare, Money, Personal" }));
+        h("span", { class: "sky-menu-sub", text: m === "drive" ? "The map of the drive" : m === "timeline" ? ORDERS[p.order][0] + ", across the day" : m === "history" ? "Done and open, over days or months" : "CPA, Medicare, Money, Personal" }));
       b.addEventListener("click", (ev) => { ev.stopPropagation(); close(); menu.querySelectorAll("[role=menuitemradio]").forEach((x) => x.setAttribute("aria-checked", String(x === b))); resort(m); });
       menu.append(b);
     }
@@ -1178,6 +1297,18 @@
     // keep the sky from treating taps on the control as drags
     box.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     box.append(btn, fullBtn(), menu);
+    if (p.mode === "history") {
+      const seg = h("div", { class: "sky-seg", role: "group", "aria-label": "How far back" });
+      for (const [d, label] of [[7, "7d"], [30, "1m"], [90, "3m"]]) {
+        seg.append(h("button", { type: "button", "aria-pressed": String(p.histDays === d), text: label, onclick: (ev) => {
+          ev.stopPropagation();
+          if (prefs().histDays === d) return;
+          setPrefs({ histDays: d });
+          loadHistory().then(() => { renderNow(); if (sky) { sky.el.classList.add("away"); cam = sortCam("history"); setView(); } });
+        } }));
+      }
+      box.append(seg);
+    }
     return box;
   }
 
@@ -1206,7 +1337,7 @@
       return g;
     };
     w.append(h("h2", { class: "sec", text: "Lay the sky out" }));
-    w.append(radios("mode", [["drive", "Drive", "Each place on your drive is a constellation."], ["timeline", "Timeline", "A line across the day, each planet at the time it would start."], ["area", "By area", "CPA, Medicare, Money and Personal as suns, their items in orbit."]], p.mode, (v) => setPrefs({ mode: v })));
+    w.append(radios("mode", [["drive", "Drive", "Each place on your drive is a constellation."], ["timeline", "Timeline", "A line across the day, each planet at the time it would start."], ["area", "By area", "CPA, Medicare, Money and Personal as suns, their items in orbit."], ["history", "Star History", "Every job over the last 7 days, month or 3 months: each a comet from the day it appeared to the day it was done."]], p.mode, (v) => setPrefs({ mode: v })));
     w.append(h("h2", { class: "sec", text: "Order" }));
     w.append(h("p", { class: "quiet set-note", text: "Used by the timeline, and for the order you move through each sun." }));
     w.append(radios("order", Object.entries(ORDERS).map(([k, [l, sub]]) => [k, l, sub]), p.order, (v) => setPrefs({ order: v })));
@@ -1857,9 +1988,11 @@
       setView();
       requestAnimationFrame(() => { sky.el.classList.remove("rising"); animateCam(restCam(st), 620); });
     } else {
-      cam = restCam(st);
+      cam = prefs().mode === "history" ? sortCam("history") : restCam(st);
+      if (prefs().mode === "history") sky.el.classList.add("away");
       setView();
     }
+    if (prefs().mode === "history" && !historyReady() && !H.loading) loadHistory().then(() => { if (prefs().mode === "history") renderNow(); });
   }
 
   // Inside a star: everything the old Now card had, plus its recommendation and plan.
