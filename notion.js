@@ -94,6 +94,7 @@ function toDay(page) {
     log: read(p["Log"]) || "",
     edits: read(p["Edits since brief"]) || "",
     published: read(p["Published"]),
+    mailChecked: read(p["Mail checked"]),
   };
 }
 

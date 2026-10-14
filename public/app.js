@@ -388,7 +388,7 @@
     // top band
     const top = h("div", { class: "wrap" });
     top.append(h("div", { class: "toprow" },
-      h("p", { class: "daydate", text: dayline }),
+      h("p", { class: "daydate" }, dayline, stampEl("quiet")),
       h("span", null,
         isDesk() ? h("button", { class: "readaloud focusbar", onclick: () => toggleFocus(true), text: "Focus", title: "Focus (f)" }) : null,
         isDesk() ? " · " : null,
@@ -894,7 +894,10 @@
     const home = h("button", { class: "sky-home", type: "button", "aria-label": "Back to the bright star", onclick: () => { const st = starFor(nowIdx); if (st) { el.classList.remove("away"); animateCam(restCam(st), 560); } } }, "◎");
     el.append(home);
 
-    el.append(sortControl(), cornerTools(), freshPill());
+    // bottom-left: "✦ 2 updated" (when something changed) and, quietly, when Claude last ran
+    const corner = h("div", { class: "sky-fresh-box" }, freshPill(), stampEl("sky-stamp"));
+    corner.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    el.append(sortControl(), cornerTools(), corner);
 
     if (!isDesk() && !store.get("skyHintSeen") && seq.length > 1) el.append(h("p", { class: "sky-hint", text: "Drag to look around · pinch to zoom · tap a star to go there" }));
     let seenW = 0;
@@ -2435,6 +2438,38 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
     base.sigs[itemKey(it)] = itemSig(it);
     store.set("seenSigs", base);
   }
+  // How fresh the data is: when Claude last wrote this day — the later of the brief's Published
+  // and the last mail check. Date-only values carry no time, so they don't count.
+  function lastRun() {
+    const d = B && B.day;
+    if (!d) return null;
+    const runs = [["brief", d.published], ["mail check", d.mailChecked]]
+      .filter(([, v]) => v && String(v).length > 10 && !isNaN(Date.parse(v)))
+      .map(([what, v]) => ({ what, at: Date.parse(v) }));
+    return runs.length ? runs.reduce((a, b) => (b.at > a.at ? b : a)) : null;
+  }
+  function agoText(ms) {
+    const m = Math.round((nowMs() - ms) / 60000);
+    if (m < 2) return "just now";
+    if (m < 60) return `${m} min ago`;
+    const hr = Math.round(m / 60);
+    return hr < 24 ? `${hr}h ago` : `${Math.round(hr / 24)}d ago`;
+  }
+  function stampText() {
+    const r = lastRun();
+    if (!r) return "";
+    const d = new Date(r.at);
+    const z = pickedTz();
+    const day = nowMs() - r.at > 18 * 3600000 ? d.toLocaleDateString("en-US", { weekday: "short", ...(z ? { timeZone: z } : {}) }) + " " : "";
+    return `Updated ${day}${fmtTime(d)} · ${agoText(r.at)}`;
+  }
+  function stampEl(cls) {
+    const r = lastRun();
+    if (!r) return null;
+    return h("span", { class: "stamp " + (cls || ""), text: stampText(), title: `Last Claude run: the ${r.what}` });
+  }
+  // keep "· 3h ago" honest while the app sits open
+  setInterval(() => { const t = stampText(); if (t) document.querySelectorAll(".stamp").forEach((el) => { el.textContent = t; }); }, 60_000);
   const freshOf = (it) => readFresh()[itemKey(it)] || null;
   const isFresh = (it) => !!freshOf(it);
   function unFresh(it) { const f = readFresh(); if (f[itemKey(it)]) { delete f[itemKey(it)]; store.set("freshKeys", f); } }
