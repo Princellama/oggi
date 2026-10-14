@@ -2650,7 +2650,10 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
     if (!d) return null;
     const runs = [["brief", d.published], ["mail check", d.mailChecked]]
       .filter(([, v]) => v && String(v).length > 10 && !isNaN(Date.parse(v)))
-      .map(([what, v]) => ({ what, at: Date.parse(v) }));
+      .map(([what, v]) => ({ what, at: Date.parse(v) }))
+      // A run can't have happened in the future: a stamp more than 10 minutes ahead was written
+      // with the wrong clock or offset, so don't let it pose as "just now".
+      .filter((r) => r.at - nowMs() < 10 * 60000);
     return runs.length ? runs.reduce((a, b) => (b.at > a.at ? b : a)) : null;
   }
   function agoText(ms) {
