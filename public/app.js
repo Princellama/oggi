@@ -778,11 +778,15 @@
       const g = s("g", { class: "star" + (st.kind === "event" ? " ev" : ""), transform: `translate(${st.x.toFixed(1)} ${st.y.toFixed(1)})` });
       const body = s("g", { class: "star-b" });
       body.append(
+        s("circle", { class: "nova-c", r: 46, fill: tint }),
         s("circle", { class: "halo2", r: 30, fill: tint }),
         s("circle", { class: "halo", r: 18, fill: tint }),
-        s("circle", { class: "core", r: 10, fill: tint }));
+        s("circle", { class: "core", r: 10, fill: tint }),
+        s("circle", { class: "hot", r: 10, fill: "#FFF8EE" }));
       if (st.kind === "event") body.append(s("circle", { class: "orbit", r: 15, fill: "none", stroke: tint }));
-      g.append(body);
+      const novaW = s("g", { class: "nova-w" });
+      novaW.append(body);
+      g.append(novaW);
       // new or updated since he last looked: a ring that keeps rippling out and a twinkling glint
       if (st.kind === "item" && isFresh(st.it)) {
         g.classList.add("fresh");
@@ -797,6 +801,7 @@
       g.append(s("text", { class: "star-t", y: 28 }));
       st.el = g;
       starState(st);
+      applyNova(st);
       field.append(g);
     }
     svg.append(field);
@@ -909,6 +914,54 @@
     }).observe(el);
     return { el, svg, seq, stars, trails, layer };
   }
+
+  // ---- Supernova ----
+  // Light a star and it grows one step bigger and brighter every hour (up to 12) until it's done.
+  // Cool it off and it shrinks one step at once, then one more every hour until it settles.
+  // Two dates on the Brief Items row carry it, so it burns the same on every device:
+  //   Supernova = when it was lit, Cooled off = when cooling began.
+  const NOVA_H = 3600000, NOVA_MAX = 12;
+  function novaLevel(it, t = nowMs()) {
+    if (!it || !it.novaStart || it.status === "Closed") return 0;
+    const s0 = Date.parse(it.novaStart);
+    if (isNaN(s0)) return 0;
+    const c = it.novaCooled ? Date.parse(it.novaCooled) : NaN;
+    if (isNaN(c)) return Math.min(NOVA_MAX, Math.max(1, Math.floor((t - s0) / NOVA_H) + 1));
+    const peak = Math.min(NOVA_MAX, Math.max(1, Math.floor((c - s0) / NOVA_H) + 1));
+    return Math.max(0, peak - Math.floor((t - c) / NOVA_H) - 1);
+  }
+  const novaGrowing = (it) => novaLevel(it) > 0 && !it.novaCooled;
+  function applyNova(st) {
+    if (!st || st.kind !== "item" || !st.el) return;
+    const lv = novaLevel(st.it);
+    const g = st.el, w = g.querySelector(".nova-w");
+    g.classList.toggle("nova", lv > 0);
+    g.classList.toggle("cooling", lv > 0 && !!st.it.novaCooled);
+    const sc = 1 + lv * 0.15;
+    if (w) w.setAttribute("transform", `scale(${sc.toFixed(2)})`);
+    g.style.setProperty("--nova", (lv / NOVA_MAX).toFixed(3));
+    const lab = g.querySelector(".star-l");
+    if (lab) lab.setAttribute("y", (17 + (sc - 1) * 6).toFixed(1));
+  }
+  function novaRow(it, onChange) {
+    if (!it || it.status === "Closed") return null;
+    const lv = novaLevel(it), t = nowMs();
+    const row = h("div", { class: "nova-row" });
+    const go = async (fields) => { await patchItem(it, fields); onChange(); };
+    const ignite = () => go({ novaStart: new Date(t - Math.max(0, lv - 1) * NOVA_H).toISOString(), novaCooled: null });
+    if (novaGrowing(it)) {
+      const next = Math.ceil((NOVA_H - ((t - Date.parse(it.novaStart)) % NOVA_H)) / 60000);
+      row.append(
+        h("span", { class: "nova-state", text: `✹ Supernova · ${lv} of ${NOVA_MAX}` + (lv < NOVA_MAX ? ` · grows in ${next} min` : " · full blaze") }),
+        h("button", { class: "nova-btn cool", type: "button", text: "❄ Cool off", title: "Shrink it back one step now, then one more every hour", onclick: () => go({ novaCooled: new Date(t).toISOString() }) }));
+    } else {
+      if (lv > 0) row.append(h("span", { class: "nova-state cooling", text: `❄ Cooling · settles in about ${lv}h` }));
+      row.append(h("button", { class: "nova-btn", type: "button", text: lv > 0 ? "✹ Reignite" : "✹ Supernova", title: "It grows bigger and brighter every hour until it's done", onclick: ignite }));
+    }
+    return row;
+  }
+  // grow on the hour even while the sky sits open
+  setInterval(() => { if (sky) sky.stars.forEach(applyNova); }, 60_000);
 
   // ---- sky layouts ----
   function starState(st) {
@@ -1733,6 +1786,13 @@
     const open = h("div", { class: "now-open" }, h("button", { class: "btn", onclick: onOpen, text: "Open it" }));
     if (rec && (rec.claude === "yes" || rec.claude === "partly")) open.append(h("span", { class: "now-claude" }, glyphSvg("g-spark"), CLAUDE_SAYS[rec.claude]));
     card.append(open);
+    if (cur.kind === "item") card.append(novaRow(cur.it, () => {
+      // change it where it stands: the star swells or settles, the card and any open modal refill
+      if (!sky) return renderNow();
+      applyNova(sky.stars.find((x) => x.kind === "item" && x.it === cur.it));
+      fillCard();
+      const m = modalEl(); if (m && !m.hidden) fillModal(m);
+    }));
     return Array.from(card.childNodes);
   }
   function fillCtl() {
@@ -1832,6 +1892,7 @@
       setTimeout(() => grow(ta), 0);
       w.append(h("p", { class: "ed-label now-where", text: "Where it goes" }), choiceRow(it));
       w.append(h("p", { class: "ed-label now-where", text: "Hand it off" }), handoffRow(it, () => {}));
+      w.append(novaRow(it, () => renderNow()));
     }
 
     const ctl = h("div", { class: "now-ctl" });
@@ -2106,6 +2167,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
       inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Place" }), places));
       inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: it.carries ? `Where it goes · carried ${it.carries} day${it.carries === 1 ? "" : "s"}` : "Where it goes" }), choiceRow(it)));
       inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Handed to" }), handoffRow(it, () => { rerenderListOnly(); renderAside(); })));
+      if (it.status !== "Closed") inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Supernova" }), novaRow(it, () => renderAll())));
 
       const links = h("div", { class: "ed-links" });
       const done = h("button", { class: "textlink", text: it.status === "Closed" ? "Mark open again" : "Mark done" });

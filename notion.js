@@ -78,6 +78,8 @@ function toItem(page) {
     decidedAt: read(p["Decided at"]),
     delegatedTo: read(p["Delegated to"]),
     delegatedOn: read(p["Delegated on"]),
+    novaStart: read(p["Supernova"]),
+    novaCooled: read(p["Cooled off"]),
   };
 }
 
@@ -155,6 +157,8 @@ async function updateItem(id, fields) {
     props["Delegated to"] = fields.delegatedTo ? { select: { name: fields.delegatedTo } } : { select: null };
     props["Delegated on"] = fields.delegatedTo ? { date: { start: fields.delegatedOn } } : { date: null };
   }
+  if ("novaStart" in fields) props["Supernova"] = fields.novaStart ? { date: { start: fields.novaStart } } : { date: null };
+  if ("novaCooled" in fields) props["Cooled off"] = fields.novaCooled ? { date: { start: fields.novaCooled } } : { date: null };
   const page = await call("PATCH", `/pages/${id}`, { properties: props });
   return toItem(page);
 }
