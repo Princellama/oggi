@@ -31,11 +31,21 @@
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   };
+  // The zone the day runs on. Normally the device's own; picked by hand when the phone has it wrong
+  // (ship Wi-Fi, VPN, a roaming SIM), saved on this device as "hereTz".
+  const autoTz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch { return ""; } };
+  const pickedTz = () => store.get("hereTz") || "";
+  const hereTz = () => pickedTz() || autoTz();
+  // Minutes to add to the device clock so its local getters read the picked zone's wall time.
+  function shiftMin(d = new Date()) { const z = pickedTz(); return z ? tzOffset(z, d) + d.getTimezoneOffset() : 0; }
+  const wall = (d) => { const m = shiftMin(d); return m ? new Date(d.getTime() + m * 60000) : d; };
   const localISO = (d = new Date()) => {
-    const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    const w = wall(d);
+    const z = new Date(w.getTime() - w.getTimezoneOffset() * 60000);
     return z.toISOString().slice(0, 10);
   };
   function fmtTime(d) {
+    d = wall(d);
     let h = d.getHours(), m = d.getMinutes();
     const ap = h >= 12 ? "PM" : "AM";
     h = h % 12 || 12;
@@ -58,7 +68,6 @@
     } catch {}
     return (tz.split("/").pop() || tz).replace(/_/g, " ");
   }
-  const hereTz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch { return ""; } };
   // Minutes a zone is ahead of UTC at a moment, to tell whether two zones differ right now.
   function tzOffset(tz, d = new Date()) {
     try {
@@ -132,7 +141,7 @@
     const q = new URLSearchParams(location.search).get("pass");
     if (q) return q[0].toUpperCase() + q.slice(1).toLowerCase();
     if (B && B.day && B.day.pass === "Evening") return "Evening";
-    if (B && B.day && B.day.date === localISO() && new Date().getHours() >= 19) return "Evening";
+    if (B && B.day && B.day.date === localISO() && wall(new Date()).getHours() >= 19) return "Evening";
     return (B && B.day && B.day.pass) || "Morning";
   };
   const needs = () => B.items.filter((i) => i.list === "Needs attention").sort((a, b) => a.order - b.order);
@@ -175,6 +184,7 @@
     const W = 840, H = 170, BASE = 128, START = 6, END = 24;
     const evs = events().filter((e) => localISO(e.s) === B.day.date);
     const xOf = (d) => {
+      d = wall(d);
       const hrs = d.getHours() + d.getMinutes() / 60;
       return ((Math.min(Math.max(hrs, START), END) - START) / (END - START)) * W;
     };
@@ -522,11 +532,13 @@
   const AREA_ORDER = ["CPA", "Medicare", "Money", "Personal"];
   const DEF_PREFS = { mode: "drive", order: "priority", start: "", gap: 5, pomo: 25, pomoBreak: 5, est: {}, diff: {}, remote: false, home: "Pacific/Honolulu" };
   // Remote Work mode: the day runs on the time where this device is; home base is shown under it.
+  // Places to pick as "where you are" when the device's zone is off.
+  const HERES = [["Asia/Tokyo", "Japan"], ["Asia/Seoul", "Korea"], ["Asia/Taipei", "Taiwan"], ["Asia/Shanghai", "China"], ["Asia/Hong_Kong", "Hong Kong"], ["Asia/Manila", "Philippines"], ["Asia/Singapore", "Singapore"], ["Asia/Bangkok", "Thailand"], ["Australia/Sydney", "Sydney"], ["Pacific/Guam", "Guam"], ["Pacific/Honolulu", "Hawaii"], ["America/Anchorage", "Alaska"], ["America/Los_Angeles", "Pacific"], ["America/Denver", "Mountain"], ["America/Chicago", "Central"], ["America/New_York", "Eastern"], ["Europe/London", "London"], ["Europe/Paris", "Central Europe"]];
   const HOMES = [["Pacific/Honolulu", "Hawaii"], ["America/Los_Angeles", "Los Angeles"], ["America/Denver", "Denver"], ["America/Chicago", "Chicago"], ["America/New_York", "New York"], ["Asia/Tokyo", "Tokyo"], ["Asia/Manila", "Manila"], ["Europe/London", "London"]];
   function homeZone(p = prefs()) {
     if (!p.remote) return null;
     const home = p.home || "Pacific/Honolulu";
-    return tzOffset(home) === -new Date().getTimezoneOffset() ? null : home;   // same time here as at home: nothing to add
+    return tzOffset(home) === tzOffset(hereTz()) ? null : home;   // same time here as at home: nothing to add
   }
   function prefs() { const p = store.get("skyPrefs") || {}; return { ...DEF_PREFS, ...p, est: { ...(p.est || {}) }, diff: { ...(p.diff || {}) } }; }
   function setPrefs(patch) { store.set("skyPrefs", { ...prefs(), ...patch }); }
@@ -561,7 +573,8 @@
     let t = new Date(Math.ceil(now.getTime() / 300000) * 300000);   // the next five minutes
     if (/^\d\d:\d\d$/.test(p.start || "")) {
       const [hh, mm] = p.start.split(":").map(Number);
-      const s0 = new Date(now); s0.setHours(hh, mm, 0, 0);
+      const w0 = wall(now); w0.setHours(hh, mm, 0, 0);
+      const s0 = new Date(w0.getTime() - shiftMin(now) * 60000);
       if (s0 > t) t = s0;
     }
     return t.getTime();
@@ -871,8 +884,9 @@
         const x0 = X(t0), x1 = X(tEnd);
         g.append(s("line", { class: "tl-axis", x1: x0, y1: TL_AXIS, x2: x1, y2: TL_AXIS }));
         // hour ticks
-        const h0 = new Date(t0); h0.setMinutes(0, 0, 0);
-        for (let t = h0.getTime() + 3600000; t < tEnd; t += 3600000) {
+        const w0 = wall(new Date(t0));
+        const h0 = t0 - (w0.getMinutes() * 60000 + w0.getSeconds() * 1000 + w0.getMilliseconds());
+        for (let t = h0 + 3600000; t < tEnd; t += 3600000) {
           const x = X(t);
           g.append(s("line", { class: "tl-tick", x1: x, y1: TL_AXIS - 5, x2: x, y2: TL_AXIS + 5 }));
           g.append(s("text", { class: "tl-hour", x, y: TL_AXIS + 22 }, fmtTime(new Date(t))));
@@ -1046,7 +1060,7 @@
     return box;
   }
 
-  let sheetOpen = false;
+  let sheetOpen = false, zoneMoved = false;
   function openSortSettings() {
     const old = document.getElementById("sortSheet");
     if (old) old.remove();
@@ -1056,7 +1070,7 @@
     const sheet = h("div", { class: "sheet", id: "sortSheet", role: "dialog", "aria-modal": "true", "aria-label": "Sort settings" });
     const w = h("div", { class: "wrap" });
     sheet.append(w);
-    const done = () => { sheetOpen = false; sheet.remove(); if (sky) resort(prefs().mode); else renderNow(); };
+    const done = () => { sheetOpen = false; sheet.remove(); if (zoneMoved) { zoneMoved = false; try { renderToday(); } catch {} renderNow(); return; } if (sky) resort(prefs().mode); else renderNow(); };
     w.append(h("div", { class: "toprow" }, h("p", { class: "daydate", text: "Now · sort settings" }), h("button", { class: "readaloud", type: "button", onclick: done, text: "Done" })));
     w.append(h("h1", { class: "head", text: "How the sky sorts." }));
 
@@ -1091,6 +1105,18 @@
     w.append(h("div", { class: "set-row" }, h("label", { for: "setBreak", text: "Then a break of" }), brk));
 
     w.append(h("h2", { class: "sec", text: "Where you are" }));
+    const auto = autoTz();
+    const zones = [...new Map([...HOMES, ...HERES].map(([z, l]) => [z, l])).entries()];
+    const hereSel = h("select", { id: "setHere", class: "set-in" }, [
+      (() => { const o = h("option", { value: "", text: `Automatic · ${auto ? tzLabel(auto) : "this device"}` }); o.selected = !pickedTz(); return o; })(),
+      ...zones.map(([z, l]) => { const o = h("option", { value: z, text: `${l} (${tzLabel(z)} · ${fmtTimeIn(new Date(), z)})` }); o.selected = pickedTz() === z; return o; }),
+    ]);
+    const hereNote = h("p", { class: "quiet set-note" });
+    const noteHere = () => { hereNote.textContent = `It's ${fmtTime(new Date())} ${tzLabel(hereTz())} here. If that's wrong (ship Wi-Fi or a VPN can fool the phone), pick where you are.`; };
+    noteHere();
+    hereSel.addEventListener("change", () => { store.set("hereTz", hereSel.value || null); zoneMoved = true; noteHere(); });
+    w.append(h("div", { class: "set-row" }, h("label", { for: "setHere", text: "Your time" }), hereSel));
+    w.append(hereNote);
     const remote = h("input", { type: "checkbox", id: "setRemote", checked: !!p.remote });
     const homeSel = h("select", { id: "setHome", class: "set-in", disabled: !p.remote }, HOMES.map(([z, l]) => { const o = h("option", { value: z, text: `${l} (${tzLabel(z)})` }); o.selected = (p.home || "Pacific/Honolulu") === z; return o; }));
     remote.addEventListener("change", () => { setPrefs({ remote: remote.checked }); homeSel.disabled = !remote.checked; });
@@ -2257,7 +2283,7 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
   function unFresh(it) { const f = store.get("freshKeys") || {}; if (f[itemKey(it)]) { delete f[itemKey(it)]; store.set("freshKeys", f); } }
   const newBadge = (it) => (isFresh(it) ? h("span", { class: "newbadge", text: "New" }) : null);
 
-  function briefPassNow() { const hr = new Date().getHours(); return hr < 12 ? "morning" : hr < 17 ? "afternoon" : "evening"; }
+  function briefPassNow() { const hr = wall(new Date()).getHours(); return hr < 12 ? "morning" : hr < 17 ? "afternoon" : "evening"; }
   function runBriefLink() {
     const pass = briefPassNow();
     const prompt =
