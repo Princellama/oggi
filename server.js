@@ -168,6 +168,9 @@ const wrap = (fn) => (req, res) => fn(req, res).catch((e) => {
 const localDate = (req) => (/^\d{4}-\d{2}-\d{2}$/.test(req.query.d || req.body?.d || "") ? (req.query.d || req.body.d) : new Date().toISOString().slice(0, 10));
 const stamp = () => new Date().toISOString().slice(11, 16) + "Z";
 
+// The true time, so a phone whose clock is off (ship Wi-Fi, a hand-set clock) can correct itself.
+app.get("/api/time", (req, res) => { res.set("Cache-Control", "no-store"); res.json({ t: Date.now() }); });
+
 app.get("/api/brief", requireAuth, wrap(async (req, res) => {
   const b = await store.getBrief(localDate(req));
   if (!b) return res.json({ day: null, items: [] });

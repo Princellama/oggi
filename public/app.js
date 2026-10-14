@@ -31,15 +31,32 @@
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   };
+  // "Now", corrected by the server's clock when the phone's own is more than a minute off
+  // (a hand-set clock on the wrong zone is hours out). Timers keep the raw device clock.
+  let SKEW = Number(store.get("clockSkew")) || 0;
+  const nowMs = () => Date.now() + SKEW;
+  const nowD = () => new Date(nowMs());
+  async function syncClock() {
+    try {
+      const t0 = Date.now();
+      const { t } = await (await fetch("/api/time", { cache: "no-store" })).json();
+      const t1 = Date.now();
+      if (t1 - t0 > 15000 || !Number.isFinite(t)) return false;   // too slow to trust
+      const sk = t - (t0 + t1) / 2, next = Math.abs(sk) > 60000 ? Math.round(sk) : 0;
+      const moved = Math.abs(next - SKEW) > 60000;
+      SKEW = next; store.set("clockSkew", SKEW);
+      return moved;
+    } catch { return false; }
+  }
   // The zone the day runs on. Normally the device's own; picked by hand when the phone has it wrong
   // (ship Wi-Fi, VPN, a roaming SIM), saved on this device as "hereTz".
   const autoTz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch { return ""; } };
   const pickedTz = () => store.get("hereTz") || "";
   const hereTz = () => pickedTz() || autoTz();
   // Minutes to add to the device clock so its local getters read the picked zone's wall time.
-  function shiftMin(d = new Date()) { const z = pickedTz(); return z ? tzOffset(z, d) + d.getTimezoneOffset() : 0; }
+  function shiftMin(d = nowD()) { const z = pickedTz(); return z ? tzOffset(z, d) + d.getTimezoneOffset() : 0; }
   const wall = (d) => { const m = shiftMin(d); return m ? new Date(d.getTime() + m * 60000) : d; };
-  const localISO = (d = new Date()) => {
+  const localISO = (d = nowD()) => {
     const w = wall(d);
     const z = new Date(w.getTime() - w.getTimezoneOffset() * 60000);
     return z.toISOString().slice(0, 10);
@@ -61,7 +78,7 @@
     } catch { return fmtTime(d); }
   }
   // A short name for a zone: HST, PDT… where the browser knows one, otherwise the city.
-  function tzLabel(tz, d = new Date()) {
+  function tzLabel(tz, d = nowD()) {
     try {
       const n = (new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "short" }).formatToParts(d).find((x) => x.type === "timeZoneName") || {}).value || "";
       if (/^[A-Z]{2,5}$/.test(n)) return n;
@@ -69,7 +86,7 @@
     return (tz.split("/").pop() || tz).replace(/_/g, " ");
   }
   // Minutes a zone is ahead of UTC at a moment, to tell whether two zones differ right now.
-  function tzOffset(tz, d = new Date()) {
+  function tzOffset(tz, d = nowD()) {
     try {
       const p = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(d);
       const g = (t) => Number((p.find((x) => x.type === t) || {}).value);
@@ -141,7 +158,7 @@
     const q = new URLSearchParams(location.search).get("pass");
     if (q) return q[0].toUpperCase() + q.slice(1).toLowerCase();
     if (B && B.day && B.day.pass === "Evening") return "Evening";
-    if (B && B.day && B.day.date === localISO() && wall(new Date()).getHours() >= 19) return "Evening";
+    if (B && B.day && B.day.date === localISO() && wall(nowD()).getHours() >= 19) return "Evening";
     return (B && B.day && B.day.pass) || "Morning";
   };
   const needs = () => B.items.filter((i) => i.list === "Needs attention").sort((a, b) => a.order - b.order);
@@ -203,7 +220,7 @@
     };
 
     const today = B.day.date === localISO();
-    const nowX = today && passOf() !== "Morning" ? xOf(new Date()) : null;
+    const nowX = today && passOf() !== "Morning" ? xOf(nowD()) : null;
     const svg = s("svg", { class: "terrain", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": terrainLabel(evs) });
     const common = { fill: "none", "stroke-width": "1.5", "stroke-linecap": "round", "stroke-linejoin": "round" };
     if (nowX != null && nowX > 0) {
@@ -334,7 +351,7 @@
     const pass = passOf();
     const evening = pass === "Evening";
     const d = new Date(B.day.date + "T12:00:00");
-    const dayline = d.toLocaleDateString("en-US", { weekday: "long" }) + " · " + d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }).replace(",", "") + (pass !== "Morning" ? " · " + fmtTime(new Date()) : "");
+    const dayline = d.toLocaleDateString("en-US", { weekday: "long" }) + " · " + d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }).replace(",", "") + (pass !== "Morning" ? " · " + fmtTime(nowD()) : "");
 
     // top band
     const top = h("div", { class: "wrap" });
@@ -569,7 +586,7 @@
     return a;
   }
   function dayStart(p = prefs()) {
-    const now = new Date();
+    const now = nowD();
     let t = new Date(Math.ceil(now.getTime() / 300000) * 300000);   // the next five minutes
     if (/^\d\d:\d\d$/.test(p.start || "")) {
       const [hh, mm] = p.start.split(":").map(Number);
@@ -594,7 +611,7 @@
   }
   function nowSequence() {
     const p = prefs();
-    const t = Date.now();
+    const t = nowMs();
     const evs = events().filter((e) => e.e.getTime() > t).sort((a, b) => a.s - b.s);
     const open = openNeeds();
     if (p.mode === "timeline") {
@@ -644,7 +661,7 @@
         reach[place] = Math.max(reach[place] || 0, y - cy);
       });
     }
-    const t = Date.now();
+    const t = nowMs();
     events().filter((e) => e.e.getTime() > t).sort((a, b) => a.s - b.s).forEach((ev, j) => {
       const x = EVENT_AT[0] + j * 64, y = EVENT_AT[1] - j * 18;
       stars.push({ kind: "event", ev, key: evKey(ev), open: false, seqIdx: -1, dx: x, dy: y, x, y });
@@ -898,10 +915,10 @@
           g.append(s("text", { class: "tl-zone tl-home", x: x0 - 8, y: TL_AXIS + 38 }, tzLabel(home) + " · home"));
         }
         // now
-        const nx = X(Date.now());
+        const nx = X(nowMs());
         if (nx >= x0 && nx <= x1) {
           g.append(s("line", { class: "tl-now", x1: nx, y1: TL_AXIS - 18, x2: nx, y2: TL_AXIS + 8 }));
-          g.append(s("text", { class: "tl-nowl", x: nx, y: TL_AXIS - 24 }, home ? `now · ${fmtTimeIn(new Date(), home)} ${tzLabel(home)}` : "now"));
+          g.append(s("text", { class: "tl-nowl", x: nx, y: TL_AXIS - 24 }, home ? `now · ${fmtTimeIn(nowD(), home)} ${tzLabel(home)}` : "now"));
         }
         // each block of time, and a thread up to its planet
         for (const st of live) {
@@ -1109,10 +1126,10 @@
     const zones = [...new Map([...HOMES, ...HERES].map(([z, l]) => [z, l])).entries()];
     const hereSel = h("select", { id: "setHere", class: "set-in" }, [
       (() => { const o = h("option", { value: "", text: `Automatic · ${auto ? tzLabel(auto) : "this device"}` }); o.selected = !pickedTz(); return o; })(),
-      ...zones.map(([z, l]) => { const o = h("option", { value: z, text: `${l} (${tzLabel(z)} · ${fmtTimeIn(new Date(), z)})` }); o.selected = pickedTz() === z; return o; }),
+      ...zones.map(([z, l]) => { const o = h("option", { value: z, text: `${l} (${tzLabel(z)} · ${fmtTimeIn(nowD(), z)})` }); o.selected = pickedTz() === z; return o; }),
     ]);
     const hereNote = h("p", { class: "quiet set-note" });
-    const noteHere = () => { hereNote.textContent = `It's ${fmtTime(new Date())} ${tzLabel(hereTz())} here. If that's wrong (ship Wi-Fi or a VPN can fool the phone), pick where you are.`; };
+    const noteHere = () => { hereNote.textContent = `It's ${fmtTime(nowD())} ${tzLabel(hereTz())} here. If that's wrong (ship Wi-Fi or a VPN can fool the phone), pick where you are.`; };
     noteHere();
     hereSel.addEventListener("change", () => { store.set("hereTz", hereSel.value || null); zoneMoved = true; noteHere(); });
     w.append(h("div", { class: "set-row" }, h("label", { for: "setHere", text: "Your time" }), hereSel));
@@ -1122,7 +1139,7 @@
     remote.addEventListener("change", () => { setPrefs({ remote: remote.checked }); homeSel.disabled = !remote.checked; });
     homeSel.addEventListener("change", () => setPrefs({ home: homeSel.value }));
     w.append(h("label", { class: "opt", for: "setRemote" }, remote, h("span", null, h("b", { text: "Remote Work mode" }),
-      h("span", { class: "opt-sub", text: `The day runs on the time where you are (${tzLabel(hereTz()) || "this device"}, ${fmtTime(new Date())}). The timeline also shows your home base under each hour.` }))));
+      h("span", { class: "opt-sub", text: `The day runs on the time where you are (${tzLabel(hereTz()) || "this device"}, ${fmtTime(nowD())}). The timeline also shows your home base under each hour.` }))));
     w.append(h("div", { class: "set-row" }, h("label", { for: "setHome", text: "Home base" }), homeSel));
 
     w.append(h("h2", { class: "sec", text: "Time and effort" }));
@@ -1613,7 +1630,7 @@
   function cardBits(cur, onOpen) {
     const card = h("div");
     if (cur.kind === "event") {
-      const e = cur.ev, t = Date.now();
+      const e = cur.ev, t = nowMs();
       const running = e.s.getTime() <= t;
       card.append(h("p", { class: "now-kicker" }, glyphSvg("g-clock"), running ? `Until ${fmtTime(e.e)}` : `${fmtTime(e.s)} · ${fmtIn(e.s.getTime() - t)}`));
       card.append(h("h1", { class: "now-title", onclick: onOpen }, e.title));
@@ -1706,7 +1723,7 @@
     if (rec) { box.classList.add("has-rec"); rec.classList.add("drilled"); pane.append(rec); }
 
     if (cur.kind === "event") {
-      const e = cur.ev, t = Date.now();
+      const e = cur.ev, t = nowMs();
       const running = e.s.getTime() <= t;
       w.append(h("p", { class: "now-kicker" }, glyphSvg("g-clock"), running ? `Until ${fmtTime(e.e)}` : `${fmtTime(e.s)} · ${fmtIn(e.s.getTime() - t)}`));
       w.append(h("h1", { class: "now-title", text: e.title }));
@@ -2271,7 +2288,7 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
     const cur = B.items.map(itemKey);
     const seen = store.get("seenKeys");
     const fresh = store.get("freshKeys") || {};
-    const now = Date.now();
+    const now = nowMs();
     for (const k of Object.keys(fresh)) if (now - fresh[k] > FRESH_MS || !cur.includes(k)) delete fresh[k];
     let added = 0;
     if (Array.isArray(seen)) for (const k of cur) if (!seen.includes(k) && !fresh[k]) { fresh[k] = now; added++; }
@@ -2283,7 +2300,7 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
   function unFresh(it) { const f = store.get("freshKeys") || {}; if (f[itemKey(it)]) { delete f[itemKey(it)]; store.set("freshKeys", f); } }
   const newBadge = (it) => (isFresh(it) ? h("span", { class: "newbadge", text: "New" }) : null);
 
-  function briefPassNow() { const hr = wall(new Date()).getHours(); return hr < 12 ? "morning" : hr < 17 ? "afternoon" : "evening"; }
+  function briefPassNow() { const hr = wall(nowD()).getHours(); return hr < 12 ? "morning" : hr < 17 ? "afternoon" : "evening"; }
   function runBriefLink() {
     const pass = briefPassNow();
     const prompt =
@@ -2302,7 +2319,7 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
     refreshMsg = !ok ? "Couldn't reach Notion — showing the last copy."
       : dayMoved ? `New brief for ${new Date(B.day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" })}${added ? ` · ${added} new` : ""}.`
       : added ? `${added} new since you last looked.`
-      : `Up to date · ${fmtTime(new Date())}`;
+      : `Up to date · ${fmtTime(nowD())}`;
     renderAll();
   }
 
@@ -2332,16 +2349,19 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
     if (!me.signedIn) { showSignin(); return; }
     $("#signin").hidden = true;
     $("#app").hidden = false;
+    const clock = syncClock();
     const ok = await load().catch(() => false);
     if (ok === false && !B) return;
     noteFresh();
     renderAll();
+    clock.then((moved) => { if (moved) renderAll(); });
     if (!isDesk()) go(p.get("view") || "today", false);
     if (isDesk() && p.get("view") === "now") toggleFocus(true);
     if (isDesk() && p.get("view") === "outbox") { document.body.classList.add("outboxview"); markNav("outbox"); showOutbox(); }
     // refresh quietly when the app comes back to the foreground
     document.addEventListener("visibilitychange", async () => {
       if (document.visibilityState !== "visible") return;
+      syncClock();
       if (document.activeElement && document.activeElement.closest("input, textarea")) return;
       if (await load().catch(() => false)) { noteFresh(); renderAll(); }
     });
