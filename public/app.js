@@ -357,6 +357,7 @@
     Object.assign(it, fields);
     const upd = await api("PATCH", `/api/item/${it.id}`, { ...fields, dayId: B.day.id });
     Object.assign(it, upd);
+    rememberSig(it);
     cache();
     refreshChanges();
     return upd;
@@ -782,6 +783,16 @@
         s("circle", { class: "core", r: 10, fill: tint }));
       if (st.kind === "event") body.append(s("circle", { class: "orbit", r: 15, fill: "none", stroke: tint }));
       g.append(body);
+      // new or updated since he last looked: a ring that keeps rippling out and a twinkling glint
+      if (st.kind === "item" && isFresh(st.it)) {
+        g.classList.add("fresh");
+        const at = s("g", { transform: "translate(8.5 -8.5)", "aria-hidden": "true" });
+        at.append(s("path", { class: "glint", d: "M0 -6 L1.3 -1.3 L6 0 L1.3 1.3 L0 6 L-1.3 1.3 L-6 0 L-1.3 -1.3 Z" }));
+        g.append(
+          s("circle", { class: "fresh-ring", r: 9, fill: "none", stroke: tint, "aria-hidden": "true" }),
+          s("circle", { class: "fresh-ring r2", r: 9, fill: "none", stroke: tint, "aria-hidden": "true" }),
+          at);
+      }
       g.append(s("text", { class: "star-l", y: 17 }, st.kind === "event" ? fmtTime(st.ev.s) : shortLabel(st.it)));
       g.append(s("text", { class: "star-t", y: 28 }));
       st.el = g;
@@ -798,7 +809,7 @@
       if (!g || swiped) return;
       const st = stars.find((x) => x.el === g);
       if (!st || !st.open || st.gone) return;
-      if (skyFull) { if (st.seqIdx === nowIdx) openModal(); else flyTo(st.seqIdx, true); return; }
+      if (skyFull) { if (st.seqIdx === nowIdx) { openModal(); seeStar(st); } else flyTo(st.seqIdx, true); return; }
       if (st.seqIdx === nowIdx) dive(); else flyTo(st.seqIdx);
     };
     svg.addEventListener("click", pick);
@@ -883,7 +894,7 @@
     const home = h("button", { class: "sky-home", type: "button", "aria-label": "Back to the bright star", onclick: () => { const st = starFor(nowIdx); if (st) { el.classList.remove("away"); animateCam(restCam(st), 560); } } }, "◎");
     el.append(home);
 
-    el.append(sortControl(), cornerTools());
+    el.append(sortControl(), cornerTools(), freshPill());
 
     if (!isDesk() && !store.get("skyHintSeen") && seq.length > 1) el.append(h("p", { class: "sky-hint", text: "Drag to look around · pinch to zoom · tap a star to go there" }));
     let seenW = 0;
@@ -1643,12 +1654,47 @@
     drawTrail(a, b);
     sky.card.classList.add("swap");
     fillCtl();
-    animateCam(withCard ? cardCam(b) : restCam(b), 820, () => { fillCard(); sky.card.classList.remove("swap"); if (withCard) openModal(); });
+    animateCam(withCard ? cardCam(b) : restCam(b), 820, () => { fillCard(); sky.card.classList.remove("swap"); if (withCard) openModal(); seeStar(b); });
+  }
+  // Going to a planet, or opening it, is looking at it: its sparkle settles.
+  // (The card filled on arrival still says New or Updated, so he sees why it was lit.)
+  function seeStar(st) {
+    if (!st || st.kind !== "item" || !isFresh(st.it)) return;
+    unFresh(st.it);
+    st.el.classList.remove("fresh");
+    syncFreshPill();
+  }
+  const freshIdxs = () => (sky ? sky.seq.map((x, i) => (x.kind === "item" && isFresh(x.it) ? i : -1)).filter((i) => i >= 0) : []);
+  // "✦ 2 updated" beside Sort: each tap flies to the next lit planet; on the last one it opens it.
+  function freshPill() {
+    const b = h("button", { class: "sky-sort-b sky-fresh", type: "button", hidden: true });
+    b.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    b.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const list = freshIdxs();
+      if (!list.length) return;
+      const next = list.find((i) => i > nowIdx) ?? list.find((i) => i !== nowIdx);
+      if (next == null) { if (skyFull) { openModal(); seeStar(starFor(nowIdx)); } else dive(); return; }
+      flyTo(next, skyFull);
+    });
+    return b;
+  }
+  function syncFreshPill() {
+    const b = sky && sky.el.querySelector(".sky-fresh");
+    if (!b) return;
+    const list = freshIdxs();
+    b.hidden = !list.length;
+    if (!list.length) return;
+    const kinds = new Set(list.map((i) => freshOf(sky.seq[i].it).kind));
+    const word = kinds.size > 1 ? "changed" : kinds.has("updated") ? "updated" : "new";
+    b.textContent = `✦ ${list.length} ${word}`;
+    b.setAttribute("aria-label", `${list.length} ${word} since you last looked. Go to the next one.`);
   }
   function dive() {
     if (skyFull) exitFull();
     const st = starFor(nowIdx);
     if (!st) return;
+    seeStar(st);
     if (!store.get("skyHintSeen")) store.set("skyHintSeen", true);
     sky.el.classList.add("diving");
     sky.card.classList.add("swap");
@@ -1675,7 +1721,7 @@
     } else {
       const it = cur.it;
       const when = cur.at ? `· ${fmtTime(new Date(cur.at))}, about ${fmtDur(Math.round((cur.end - cur.at) / 60000))}` : "· " + it.place;
-      card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: when }), mailChip(it), delegChip(it)));
+      card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: when }), mailChip(it), delegChip(it), newBadge(it)));
       card.append(h("h1", { class: "now-title", onclick: onOpen }, it.title));
       if (it.sentence) card.append(h("p", { class: "now-gist", text: firstSentence(it.sentence) }));
       if (it.carries > 1) card.append(h("p", { class: "now-carry", text: `Carried ${it.carries} days.` }));
@@ -1737,6 +1783,7 @@
     markStar(nowIdx);
     fillCard();
     fillCtl();
+    syncFreshPill();
     if (keepFull && !surfacing) enterFull();
     const st = starFor(nowIdx);
     if (!st) return;
@@ -2339,27 +2386,59 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
   }, 60));
 
 
-  // ---------------- refresh + "New" badges ----------------
-  // An item is new if it was not in the brief the last time this device loaded it.
-  // Badges last a day, or until the item is opened, so a quiet re-load does not wipe them.
+  // ---------------- refresh + "New" / "Updated" badges ----------------
+  // An item is new if it was not in the brief the last time this device loaded it, and updated if
+  // something Claude writes on it (title, sentence, status, list, link, hand-off) changed since then
+  // within the same brief pass — a mail check between briefs, say. A new pass (another Published)
+  // resets the baseline, so a fresh morning brief doesn't light up every planet; Eric's own edits
+  // never count. Each mark lasts a day, or until he goes to that planet or opens the item.
   const FRESH_MS = 24 * 3600 * 1000;
   const itemKey = (it) => it.key || it.id;
+  const itemSig = (it) => [it.title, it.sentence, it.status, it.list, it.link, it.delegatedTo].map((x) => x || "").join("␞");
+  const passKey = () => (B && B.day ? `${B.day.date}|${B.day.published || ""}` : "");
+  function readFresh() {
+    const f = store.get("freshKeys") || {};
+    for (const k of Object.keys(f)) if (typeof f[k] === "number") f[k] = { at: f[k], kind: "new" };
+    return f;
+  }
   function noteFresh() {
-    if (!B || !B.day) return 0;
+    if (!B || !B.day) return { added: 0, updated: 0 };
     const cur = B.items.map(itemKey);
     const seen = store.get("seenKeys");
-    const fresh = store.get("freshKeys") || {};
+    const fresh = readFresh();
+    const base = store.get("seenSigs");
+    const samePass = !!(base && base.pass === passKey() && base.sigs);
     const now = nowMs();
-    for (const k of Object.keys(fresh)) if (now - fresh[k] > FRESH_MS || !cur.includes(k)) delete fresh[k];
-    let added = 0;
-    if (Array.isArray(seen)) for (const k of cur) if (!seen.includes(k) && !fresh[k]) { fresh[k] = now; added++; }
+    for (const k of Object.keys(fresh)) if (now - fresh[k].at > FRESH_MS || !cur.includes(k)) delete fresh[k];
+    let added = 0, updated = 0;
+    const sigs = {};
+    for (const it of B.items) {
+      const k = itemKey(it), sig = itemSig(it);
+      sigs[k] = sig;
+      if (!Array.isArray(seen)) continue; // first run on this device: just take a baseline
+      if (!seen.includes(k)) { if (!fresh[k]) { fresh[k] = { at: now, kind: "new" }; added++; } }
+      else if (samePass && base.sigs[k] != null && base.sigs[k] !== sig) {
+        const was = fresh[k];
+        fresh[k] = { at: now, kind: was && was.kind === "new" ? "new" : "updated" };
+        if (!was) updated++;
+      }
+    }
     store.set("seenKeys", Array.from(new Set([...(seen || []), ...cur])).slice(-600));
+    store.set("seenSigs", { pass: passKey(), sigs });
     store.set("freshKeys", fresh);
-    return added;
+    return { added, updated };
   }
-  const isFresh = (it) => !!(store.get("freshKeys") || {})[itemKey(it)];
-  function unFresh(it) { const f = store.get("freshKeys") || {}; if (f[itemKey(it)]) { delete f[itemKey(it)]; store.set("freshKeys", f); } }
-  const newBadge = (it) => (isFresh(it) ? h("span", { class: "newbadge", text: "New" }) : null);
+  // After Eric's own edit, take the new wording as seen so it doesn't come back as an update.
+  function rememberSig(it) {
+    const base = store.get("seenSigs");
+    if (!base || base.pass !== passKey() || !base.sigs) return;
+    base.sigs[itemKey(it)] = itemSig(it);
+    store.set("seenSigs", base);
+  }
+  const freshOf = (it) => readFresh()[itemKey(it)] || null;
+  const isFresh = (it) => !!freshOf(it);
+  function unFresh(it) { const f = readFresh(); if (f[itemKey(it)]) { delete f[itemKey(it)]; store.set("freshKeys", f); } }
+  const newBadge = (it) => { const f = freshOf(it); return f ? h("span", { class: "newbadge" + (f.kind === "updated" ? " upd" : ""), text: f.kind === "updated" ? "Updated" : "New" }) : null; };
 
   function briefPassNow() { const hr = wall(nowD()).getHours(); return hr < 12 ? "morning" : hr < 17 ? "afternoon" : "evening"; }
   function runBriefLink() {
@@ -2375,11 +2454,12 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
     const beforeDate = B && B.day ? B.day.date : null;
     let ok = false;
     try { ok = await load(); } catch {}
-    const added = ok ? noteFresh() : 0;
+    const { added, updated } = ok ? noteFresh() : { added: 0, updated: 0 };
     const dayMoved = ok && B && B.day && beforeDate && B.day.date !== beforeDate;
+    const tally = [added ? `${added} new` : "", updated ? `${updated} updated` : ""].filter(Boolean).join(" · ");
     refreshMsg = !ok ? "Couldn't reach Notion — showing the last copy."
-      : dayMoved ? `New brief for ${new Date(B.day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" })}${added ? ` · ${added} new` : ""}.`
-      : added ? `${added} new since you last looked.`
+      : dayMoved ? `New brief for ${new Date(B.day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" })}${tally ? ` · ${tally}` : ""}.`
+      : tally ? `${tally} since you last looked.`
       : `Up to date · ${fmtTime(nowD())}`;
     renderAll();
   }
