@@ -306,6 +306,13 @@
     p.append(txt.slice(0, i), ext(h("a", { href: url, text: ph })), txt.slice(i + ph.length));
     return p;
   }
+  // Items the brief found in Gmail carry the thread as their link: mark them, and tap through to the mail.
+  const isMail = (u) => { try { return new URL(u).hostname === "mail.google.com"; } catch { return false; } };
+  function mailChip(it) {
+    const url = safeUrl(it.link);
+    if (!url || !isMail(url)) return null;
+    return ext(h("a", { class: "mail-chip", href: url, title: "Open the email thread", "aria-label": "From email: open the thread" }, glyphSvg("g-mail"), "Email"));
+  }
   function titleEl(it) {
     const url = safeUrl(it.link);
     const el = url ? ext(h("a", { class: "ttl", href: url })) : h("span", { class: "ttl" });
@@ -418,7 +425,7 @@
       const closed = it.status === "Closed" && live;
       const li = h("li", { "data-id": it.id, class: (closed ? "closed " : "") + (selKey === it.id ? "sel" : "") });
       li.append(h("span", { class: "num", text: String((items.numbers ? items.numbers[idx] : idx) + 1) }));
-      const body = h("div", { class: "body" }, h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), newBadge(it)), titleEl(it), sentence(it));
+      const body = h("div", { class: "body" }, h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), mailChip(it), newBadge(it)), titleEl(it), sentence(it));
       if (it.note) body.append(h("p", { class: "mynote", text: it.note }));
       if (live && !closed && !isDesk()) body.append(inlineTools(it, body));
       li.append(body);
@@ -469,7 +476,7 @@
       const li = h("li", { "data-id": it.id, class: selKey === it.id ? "sel" : "" });
       li.append(h("span", { class: "num", text: String(i + 1) }));
       const body = h("div", { class: "body" });
-      body.append(h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), newBadge(it)));
+      body.append(h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), mailChip(it), newBadge(it)));
       body.append(h("span", { class: "ttl", text: it.title }));
       const carried = it.carries > 0 ? `Carried ${it.carries} day${it.carries === 1 ? "" : "s"}.` : "New today.";
       body.append(h("p", { class: "carry", text: `${carried} ${firstSentence(it.sentence)}` }));
@@ -1638,7 +1645,7 @@
     } else {
       const it = cur.it;
       const when = cur.at ? `· ${fmtTime(new Date(cur.at))}, about ${fmtDur(Math.round((cur.end - cur.at) / 60000))}` : "· " + it.place;
-      card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: when })));
+      card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: when }), mailChip(it)));
       card.append(h("h1", { class: "now-title", onclick: onOpen }, it.title));
       if (it.sentence) card.append(h("p", { class: "now-gist", text: firstSentence(it.sentence) }));
       if (it.carries > 1) card.append(h("p", { class: "now-carry", text: `Carried ${it.carries} days.` }));
@@ -2000,7 +2007,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
       const done = h("button", { class: "textlink", text: it.status === "Closed" ? "Mark open again" : "Mark done" });
       done.addEventListener("click", async () => { await patchItem(it, { status: it.status === "Closed" ? "Open" : "Closed" }); renderAll(); });
       links.append(done);
-      if (safeUrl(it.link)) links.append(ext(h("a", { class: "textlink", href: it.link, text: "Open the source" })));
+      if (safeUrl(it.link)) links.append(ext(h("a", { class: "textlink", href: it.link, text: isMail(it.link) ? "Open the email" : "Open the source" })));
       if (safeUrl(it.task)) links.append(ext(h("a", { class: "textlink", href: it.task, text: "Open the task" })));
       inner.append(h("div", { class: "ed-row" }, links));
       const own = renderRecommendation(recForItem(it));

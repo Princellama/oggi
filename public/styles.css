@@ -229,6 +229,9 @@ ul.added li .quiet { margin-left: 8px; }
 .itemmeta { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 12px; }
 .area { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ac); }
 .area .gl { width: 14px; height: 14px; margin: 0; color: var(--ac); }
+.mail-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--soft); text-decoration: none; border: 1px solid currentColor; border-radius: 999px; padding: 1px 7px 1px 5px; opacity: .8; }
+.mail-chip:hover { opacity: 1; }
+.mail-chip .gl { width: 13px; height: 13px; margin: 0; }
 .now-kicker .area .gl { width: 16px; height: 16px; color: var(--ac); }
 .areas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 0 0 26px; }
 .areatile {
@@ -632,3 +635,4 @@ body.skyfull { overflow: hidden; }
   .veil-motes circle { animation: none; opacity: .25; }
   .breath-orb { transition: none; }
 }
+.now-kicker .mail-chip .gl, .itemmeta .mail-chip .gl { width: 13px; height: 13px; color: inherit; }
