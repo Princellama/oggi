@@ -807,6 +807,8 @@
       // new or updated since he last looked: a ring that keeps rippling out and a twinkling glint
       if (st.kind === "item" && isFresh(st.it)) {
         g.classList.add("fresh");
+        if (!isUnread(st.it)) g.classList.add("read");
+        g.style.setProperty("--fade", freshFade(st.it).toFixed(2));
         const at = s("g", { transform: "translate(8.5 -8.5)", "aria-hidden": "true" });
         at.append(s("path", { class: "glint", d: "M0 -6 L1.3 -1.3 L6 0 L1.3 1.3 L0 6 L-1.3 1.3 L-6 0 L-1.3 -1.3 Z" }));
         g.append(
@@ -1304,7 +1306,7 @@
     document.addEventListener("click", (ev) => { if (!box.contains(ev.target)) close(); });
     // keep the sky from treating taps on the control as drags
     box.addEventListener("pointerdown", (ev) => ev.stopPropagation());
-    box.append(btn, fullBtn(), menu);
+    box.append(btn, fullBtn(), findBtn(), menu, findPanel());
     {
       // always there; shown only in Star History (syncSeg), so a sort that just flies the stars keeps it right
       const seg = h("div", { class: "sky-seg", role: "group", "aria-label": "How far back", hidden: p.mode !== "history" });
@@ -1707,6 +1709,106 @@
     b._sync = set;
     return b;
   }
+  // ---- Search the sky: type a name, place or area; matching planets stay lit, the rest dim ----
+  function findBtn() {
+    const b = h("button", { class: "sky-sort-b sky-find-b", type: "button", "aria-label": "Search the sky", title: "Search the sky (/)", "aria-expanded": "false" });
+    const ic = s("svg", { viewBox: "0 0 24 24", width: 15, height: 15, "aria-hidden": "true" });
+    ic.append(s("circle", { cx: 10.5, cy: 10.5, r: 6, fill: "none", stroke: "currentColor", "stroke-width": 1.8 }), s("path", { d: "M15 15 L20 20", stroke: "currentColor", "stroke-width": 1.8, "stroke-linecap": "round" }));
+    b.append(ic);
+    b.addEventListener("click", (ev) => { ev.stopPropagation(); const p = sky && sky.el.querySelector(".sky-find"); if (p && !p.hidden) closeFind(); else openFind(); });
+    return b;
+  }
+  function findPanel() {
+    const p = h("div", { class: "sky-find", hidden: true, role: "search" });
+    const inp = h("input", { class: "sky-find-in", type: "search", placeholder: "Search planets: Von, Kahala, Medicare…", autocomplete: "off", enterkeyhint: "go", "aria-label": "Search the sky" });
+    const res = h("ul", { class: "sky-find-res", role: "listbox" });
+    p.append(inp, res);
+    inp.addEventListener("input", () => runFind(inp.value));
+    inp.addEventListener("keydown", (ev) => {
+      ev.stopPropagation();
+      const items = [...res.querySelectorAll("li button")];
+      const at = items.indexOf(document.activeElement);
+      if (ev.key === "Escape") { ev.preventDefault(); closeFind(); }
+      else if (ev.key === "Enter") { ev.preventDefault(); if (items[0]) items[0].click(); }
+      else if (ev.key === "ArrowDown" && items.length) { ev.preventDefault(); items[Math.min(items.length - 1, at + 1)].focus(); }
+    });
+    res.addEventListener("keydown", (ev) => {
+      ev.stopPropagation();
+      const items = [...res.querySelectorAll("li button")], at = items.indexOf(document.activeElement);
+      if (ev.key === "Escape") { ev.preventDefault(); closeFind(); }
+      if (ev.key === "ArrowDown") { ev.preventDefault(); (items[at + 1] || items[at]).focus(); }
+      if (ev.key === "ArrowUp") { ev.preventDefault(); (at > 0 ? items[at - 1] : inp).focus(); }
+    });
+    for (const t of ["pointerdown", "wheel", "click"]) p.addEventListener(t, (ev) => ev.stopPropagation());
+    return p;
+  }
+  function openFind() {
+    const p = sky && sky.el.querySelector(".sky-find");
+    if (!p) return;
+    p.hidden = false;
+    sky.el.querySelector(".sky-find-b").setAttribute("aria-expanded", "true");
+    const inp = p.querySelector("input");
+    inp.focus({ preventScroll: true });
+    runFind(inp.value);
+  }
+  function closeFind() {
+    const p = sky && sky.el.querySelector(".sky-find");
+    if (!p) return;
+    p.hidden = true;
+    p.querySelector("input").value = "";
+    sky.el.querySelector(".sky-find-b").setAttribute("aria-expanded", "false");
+    runFind("");
+  }
+  const norm = (x) => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[’']/g, "");
+  function runFind(q) {
+    if (!sky) return;
+    const p = sky.el.querySelector(".sky-find"), res = p.querySelector(".sky-find-res");
+    const words = norm(q).split(/\s+/).filter(Boolean);
+    const shown = sky.stars.filter((st) => !st.gone);
+    sky.el.classList.toggle("finding", words.length > 0);
+    const hits = [];
+    for (const st of shown) {
+      const hay = st.kind === "event" ? norm(`${st.ev.title} ${st.ev.where || ""} event calendar`)
+        : norm(`${st.it.title} ${st.it.mapLabel || ""} ${st.it.sentence || ""} ${st.it.place || ""} ${areaOf(st.it)} ${st.it.delegatedTo || ""} ${st.it.note || ""}`);
+      const hit = words.length > 0 && words.every((w) => hay.includes(w));
+      st.el.classList.toggle("hit", hit);
+      if (hit) {
+        // titles that match rank first
+        const title = norm(st.kind === "event" ? st.ev.title : `${st.it.title} ${st.it.mapLabel || ""}`);
+        hits.push({ st, score: words.filter((w) => title.includes(w)).length * 10 + (st.open ? 5 : 0) });
+      }
+    }
+    hits.sort((a, b) => b.score - a.score);
+    res.replaceChildren();
+    if (!words.length) return;
+    if (!hits.length) { res.append(h("li", { class: "sky-find-none", text: "Nothing in the sky by that name." })); return; }
+    for (const { st } of hits.slice(0, 7)) {
+      const it = st.it, j = st.kind === "item" ? jobSpan(st.h || it) : null;
+      const sub = st.kind === "event" ? `${fmtTime(st.ev.s)} · calendar`
+        : [areaOf(it), it.place, j.state === "done" ? "done" : j.state === "dropped" ? "let go" : null, isUnread(it) ? "new" : null].filter(Boolean).join(" · ");
+      const b = h("button", { type: "button", role: "option" },
+        h("span", { class: "sky-find-t", text: st.kind === "event" ? st.ev.title : it.title }),
+        h("span", { class: "sky-find-s", text: sub }));
+      if (st.kind === "item") b.prepend(h("i", { class: "sky-find-dot", style: `background:${tintOf(st)}` }));
+      b.addEventListener("click", () => goToStar(st));
+      res.append(h("li", null, b));
+    }
+  }
+  // fly to a found planet; one that isn't on today's path (done, let go) is shown where it sits
+  function goToStar(st) {
+    const p = sky.el.querySelector(".sky-find");
+    if (!isDesk()) closeFind();                    // on a phone, get the search out of the way
+    st.el.classList.remove("found"); st.el.getBoundingClientRect(); st.el.classList.add("found");
+    setTimeout(() => st.el.classList.remove("found"), 2400);
+    if (st.open && st.seqIdx >= 0) {
+      if (st.seqIdx === nowIdx) { sky.el.classList.remove("away"); animateCam(skyFull ? cardCam(st) : restCam(st), 560); if (skyFull) openModal(); seeStar(st); }
+      else flyTo(st.seqIdx, skyFull);
+      return;
+    }
+    sky.el.classList.add("away");
+    animateCam({ x: st.tx ?? st.x, y: (st.ty ?? st.y) + 6, w: restW(sky.el) }, 700);
+  }
+
   function syncFullBtn() { const b = sky && sky.el.querySelector(".sky-full-b"); if (b && b._sync) b._sync(); }
   function enterFull() {
     if (!sky) return;
@@ -1856,12 +1958,12 @@
   // Going to a planet, or opening it, is looking at it: its sparkle settles.
   // (The card filled on arrival still says New or Updated, so he sees why it was lit.)
   function seeStar(st) {
-    if (!st || st.kind !== "item" || !isFresh(st.it)) return;
-    unFresh(st.it);
-    st.el.classList.remove("fresh");
+    if (!st || st.kind !== "item" || !isUnread(st.it)) return;
+    markRead(st.it);
+    st.el.classList.add("read");
     syncFreshPill();
   }
-  const freshIdxs = () => (sky ? sky.seq.map((x, i) => (x.kind === "item" && isFresh(x.it) ? i : -1)).filter((i) => i >= 0) : []);
+  const freshIdxs = () => (sky ? sky.seq.map((x, i) => (x.kind === "item" && isUnread(x.it) ? i : -1)).filter((i) => i >= 0) : []);
   // "✦ 2 updated" beside Sort: each tap flies to the next lit planet; on the last one it opens it.
   function freshPill() {
     const b = h("button", { class: "sky-sort-b sky-fresh", type: "button", hidden: true });
@@ -2173,7 +2275,8 @@
     const inp = h("input", { class: "miss", placeholder: "Type it and press Enter", autocomplete: "off", enterkeyhint: "done", id: target ? "deskCapture" : "phoneCapture" });
     const list = h("ul", { class: "added" });
     const key = "captures:" + localISO();
-    const draw = () => { list.replaceChildren(...(store.get(key) || []).map((c) => h("li", null, c.text, c.ok ? null : h("span", { class: "quiet", text: "not filed yet" })))); };
+    let syncSend = () => {};
+    const draw = () => { syncSend(); list.replaceChildren(...(store.get(key) || []).map((c) => h("li", null, c.text, c.ok ? null : h("span", { class: "quiet", text: "not filed yet" }), c.sent ? h("span", { class: "quiet", text: " · sent to Claude" }) : null))); };
     inp.addEventListener("keydown", async (ev) => {
       if (ev.key !== "Enter") return;
       ev.preventDefault();
@@ -2185,21 +2288,54 @@
       all.push(entry); store.set(key, all); draw();
       try { await api("POST", "/api/capture", { text, dayId: B && B.day ? B.day.id : null }); entry.ok = true; store.set(key, all); draw(); refreshChanges(); }
       catch {}
+      finally { draw(); }
     });
     w.append(inp, list);
     if (!target) w.append(h("p", { class: "quiet", style: "margin-top:26px", text: "Each line becomes a QuickAction in Notion, due today." }));
-    w.append(h("div", { class: "row", style: "margin-top:22px" }, ext(h("a", { class: "btn", href: plaudLink(), text: "Retrieve Plaud (voice notes)" }))));
+    const send = ext(h("a", { class: "btn", href: plaudLink(), text: "Retrieve Voice Notes / Send Updates" }));
+    const pend = h("p", { class: "quiet", style: "margin-top:8px" });
+    // what goes along: the lines typed since the last send, read at the moment of the tap;
+    // once sent they're marked, so they don't go twice
+    send.addEventListener("click", () => { send.href = plaudLink(); setTimeout(() => { markCapturesSent(); draw(); }, 0); });
+    w.append(h("div", { class: "row", style: "margin-top:22px" }, send), pend);
+    syncSend = () => {
+      send.href = plaudLink();
+      const n = unsentCaptures().length;
+      pend.textContent = n ? `${n} typed line${n === 1 ? "" : "s"} will go with it.` : "";
+      pend.hidden = !n;
+    };
     host.append(w);
     draw();
   }
 
-  // ---------------- Plaud → Claude ----------------
-  // Opens a new Claude chat that runs the process-captures skill on any new recordings.
+  // ---------------- Voice notes + typed updates → Claude ----------------
+  // Opens a new Claude chat that runs the process-captures skill on new Plaud recordings and on
+  // the lines typed in "Anything I missed" (the last three days, not yet sent).
+  function unsentCaptures() {
+    const out = [];
+    for (let n = 2; n >= 0; n--) {
+      const day = isoAdd(localISO(), -n);
+      for (const c of store.get("captures:" + day) || []) if (!c.sent) out.push({ day, ...c });
+    }
+    return out;
+  }
+  function markCapturesSent() {
+    for (let n = 0; n <= 2; n++) {
+      const k = "captures:" + isoAdd(localISO(), -n), all = store.get(k);
+      if (Array.isArray(all) && all.some((c) => !c.sent)) store.set(k, all.map((c) => ({ ...c, sent: true })));
+    }
+  }
   function plaudLink() {
+    const typed = unsentCaptures();
+    const lines = typed.map((c) => `- ${c.text}${c.day !== localISO() ? ` (typed ${c.day})` : ""}${c.ok ? "" : " (not filed yet: Oggi couldn't reach Notion)"}`);
     const prompt =
-`Check Plaud. It's ${localISO()} and I may have recorded new voice notes since the last run.
+`Retrieve my voice notes and send my updates. It's ${localISO()}.
 
-Please read the process-captures skill, then route any new Plaud recordings into Notion: work from the transcripts, not Plaud's summaries; turn anything I asked for into QuickActions; stop and ask me on any near-match name. Tell me in a few lines what you created, what you skipped, and anything you need me to confirm.`;
+Please read the process-captures skill and run it on both:
+1. Any new Plaud recordings since the last run.
+2. ${typed.length ? `What I typed in Oggi under "Anything I missed":\n${lines.join("\n")}` : `Nothing typed in Oggi since the last send.`}
+
+Tell me in a few lines what you created or changed, what you skipped, and anything you need me to confirm.`;
     return "https://claude.ai/new?q=" + encodeURIComponent(prompt);
   }
 
@@ -2262,7 +2398,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
   // ---------------- DESKTOP aside ----------------
   function select(id) {
     selKey = id;
-    { const it = B && B.items.find((i) => i.id === id); if (it && isFresh(it)) { unFresh(it); const b = document.querySelector(`ol.items li[data-id="${CSS.escape(id)}"] .newbadge`); if (b) b.remove(); } }
+    { const it = B && B.items.find((i) => i.id === id); if (it && isUnread(it)) { markRead(it); const b = document.querySelector(`ol.items li[data-id="${CSS.escape(id)}"] .newbadge`); if (b) b.replaceWith(newBadge(it)); } }
     document.querySelectorAll("ol.items li").forEach((li) => li.classList.toggle("sel", li.getAttribute("data-id") === id));
     renderAside();
   }
@@ -2357,6 +2493,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
     if (ev.key === "Escape") { if (typing) ev.target.blur(); else if (document.body.classList.contains("focus") && nowDrilled) surface(); else if (document.body.classList.contains("focus")) toggleFocus(false); else { selKey = null; renderAll(); } return; }
     if (typing || ev.metaKey || ev.ctrlKey || ev.altKey) return;
     if (document.body.classList.contains("outboxview")) return;
+    if (ev.key === "/" && sky) { ev.preventDefault(); if (!document.body.classList.contains("focus")) toggleFocus(true); setTimeout(openFind, 30); return; }
     // in focus, the arrows travel the sky and Enter dives into the bright star
     if (document.body.classList.contains("focus") && sky) {
       if (ev.key === "ArrowRight" || ev.key === "l") { ev.preventDefault(); flyTo(nowIdx + 1); return; }
@@ -2628,7 +2765,7 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
       else if (samePass && base.sigs[k] != null && base.sigs[k] !== sig) {
         const was = fresh[k];
         fresh[k] = { at: now, kind: was && was.kind === "new" ? "new" : "updated" };
-        if (!was) updated++;
+        if (!was || was.read) updated++;
       }
     }
     store.set("seenKeys", Array.from(new Set([...(seen || []), ...cur])).slice(-600));
@@ -2680,8 +2817,17 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
   setInterval(() => { const t = stampText(); if (t) document.querySelectorAll(".stamp").forEach((el) => { el.textContent = t; }); }, 60_000);
   const freshOf = (it) => readFresh()[itemKey(it)] || null;
   const isFresh = (it) => !!freshOf(it);
-  function unFresh(it) { const f = readFresh(); if (f[itemKey(it)]) { delete f[itemKey(it)]; store.set("freshKeys", f); } }
-  const newBadge = (it) => { const f = freshOf(it); return f ? h("span", { class: "newbadge" + (f.kind === "updated" ? " upd" : ""), text: f.kind === "updated" ? "Updated" : "New" }) : null; };
+  // Reading it doesn't put it out: it stays lit for the rest of its day, just quieter (read).
+  const isUnread = (it) => { const f = freshOf(it); return !!(f && !f.read); };
+  function markRead(it) { const f = readFresh(), k = itemKey(it); if (f[k] && !f[k].read) { f[k].read = true; store.set("freshKeys", f); } }
+  // 1 when it just arrived, easing to 0.25 by the end of its day, so a read one quietly fades
+  const freshFade = (it) => { const f = freshOf(it); return f ? Math.max(0.25, 1 - (nowMs() - f.at) / FRESH_MS) : 0; };
+  const newBadge = (it) => {
+    const f = freshOf(it);
+    if (!f) return null;
+    const word = f.kind === "updated" ? "Updated" : "New";
+    return h("span", { class: "newbadge" + (f.kind === "updated" ? " upd" : "") + (f.read ? " seen" : ""), text: f.read ? word + " · seen" : word, title: f.read ? "You've looked at this; it stays marked for the day" : "Not opened yet" });
+  };
 
   function briefPassNow() { const hr = wall(nowD()).getHours(); return hr < 12 ? "morning" : hr < 17 ? "afternoon" : "evening"; }
   function runBriefLink() {

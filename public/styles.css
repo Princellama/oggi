@@ -720,3 +720,46 @@ body.skyfull { overflow: hidden; }
 .sky-seg button[aria-pressed="true"] { opacity: 1; background: rgba(244, 239, 228, .14); }
 .sky-seg button:focus-visible { outline: 2px solid rgba(244, 239, 228, .7); outline-offset: -2px; }
 @media (max-width: 420px) { .sky-seg button { padding: 7px 8px; } }
+
+/* ---------- fresh but read: still lit for its day, quieter, fading as the day goes ---------- */
+.newbadge.seen { background: transparent; color: var(--soft); box-shadow: inset 0 0 0 1px var(--hair); }
+.sky .star.fresh.read .fresh-ring { animation: none !important; opacity: calc(var(--fade, 1) * .35); transform: scale(1.45); }
+.sky .star.fresh.read .fresh-ring.r2 { display: none; }
+.sky .star.fresh.read .glint { opacity: calc(var(--fade, 1) * .75); transform: scale(.7); }
+@media (prefers-reduced-motion: no-preference) {
+  .sky .star.fresh.read .glint { animation: fresh-glint-soft 4.5s ease-in-out infinite; }
+}
+@keyframes fresh-glint-soft { 0%, 100% { transform: scale(.6) rotate(0deg); } 50% { transform: scale(.8) rotate(45deg); } }
+.sky .star.fresh.read .star-l { fill-opacity: .8; }
+.sky .star.fresh.read .halo { opacity: .14; }
+
+/* ---------- Search the sky ---------- */
+.sky-find-b { display: grid; place-items: center; padding: 7px 10px; }
+.sky-find-b[aria-expanded="true"] { border-color: rgba(244, 239, 228, .55); background: rgba(244, 239, 228, .12); }
+.sky-find { position: absolute; left: 0; top: calc(100% + 8px); width: min(340px, calc(100vw - 72px)); z-index: 3;
+  background: rgba(16, 15, 13, .82); border: 1px solid rgba(244, 239, 228, .2); border-radius: 14px; padding: 6px;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+.sky-find[hidden] { display: none; }
+.sky.m-history .sky-find { top: calc(100% + 52px); }
+.sky-find-in { width: 100%; box-sizing: border-box; border: 0; outline: none; background: rgba(244, 239, 228, .08); color: var(--starlight);
+  font: 500 14px var(--sans); padding: 9px 11px; border-radius: 9px; -webkit-appearance: none; appearance: none; }
+.sky-find-in::placeholder { color: rgba(244, 239, 228, .42); }
+.sky-find-in:focus-visible { box-shadow: 0 0 0 1px rgba(244, 239, 228, .45); }
+.sky-find-res { list-style: none; margin: 4px 0 0; padding: 0; max-height: min(46vh, 300px); overflow-y: auto; }
+.sky-find-res:empty { display: none; }
+.sky-find-res button { display: grid; grid-template-columns: 10px 1fr; column-gap: 9px; align-items: baseline; width: 100%; text-align: left;
+  border: 0; background: transparent; color: var(--starlight); padding: 8px 9px; border-radius: 8px; cursor: pointer; }
+.sky-find-res button:hover, .sky-find-res button:focus-visible { background: rgba(244, 239, 228, .1); outline: none; }
+.sky-find-dot { width: 8px; height: 8px; border-radius: 50%; grid-row: span 2; align-self: center; }
+.sky-find-t { font: 600 13px var(--sans); grid-column: 2; }
+.sky-find-s { font: 500 11px var(--sans); opacity: .55; grid-column: 2; margin-top: 2px; }
+.sky-find-none { color: var(--starlight); opacity: .55; font: 500 12.5px var(--sans); padding: 8px 10px; }
+.sky.finding .star:not(.hit) { opacity: .16; }
+.sky.finding .star.hit .star-l, .sky.finding .star.hit .star-d { opacity: 1 !important; fill-opacity: 1; }
+.sky.finding .star.hit.dim .core { opacity: .8; }
+.sky .star.found .halo2 { opacity: .35; }
+@media (prefers-reduced-motion: no-preference) {
+  .sky .star.found .star-b { animation: found-pop 1.1s ease-out 2; }
+}
+@keyframes found-pop { 0% { filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0)); } 40% { filter: drop-shadow(0 0 14px rgba(255, 246, 230, .95)); } 100% { filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0)); } }
+@media (max-width: 420px) { .sky-sort-b { padding: 7px 10px; } }
