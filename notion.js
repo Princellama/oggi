@@ -78,6 +78,8 @@ function toItem(page) {
     decision: read(p["Decision"]),
     decidedAt: read(p["Decided at"]),
     delegatedTo: read(p["Delegated to"]),
+    // the Key of the parent item this one revolves around; empty when it stands alone
+    orbits: read(p["Orbits"]) || null,
     delegatedOn: read(p["Delegated on"]),
     novaStart: read(p["Supernova"]),
     novaCooled: read(p["Cooled off"]),

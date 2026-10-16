@@ -609,6 +609,26 @@
     [/password|renew|w-?9|\bsign|card|\bpay|autopay|balance|declined/i, 15],
   ];
   const keyOf = (it) => it.key || it.id;
+
+  // ---- parents and the items that orbit them ----
+  // An item whose Orbits names another item on today's page is that item's child (one level only).
+  // Children stay folded away in the sky until their parent is tapped; tapping it again folds
+  // them back, so the sky stays clean and a parent opens into its detail. Kept on the device.
+  const openKids = () => new Set(store.get("skyOpenKids") || []);
+  function parentOf(it) {
+    if (!it || !it.orbits) return null;
+    return B.items.find((p) => p !== it && p.key === it.orbits && !p.orbits) || null;
+  }
+  const kidsOf = (it) => (it && it.key ? B.items.filter((c) => c !== it && c.orbits === it.key && (c.list === "Needs attention" || c.list === "Resolved")) : []);
+  const isParent = (it) => kidsOf(it).length > 0;
+  function folded(it) { const p = parentOf(it); return !!p && !openKids().has(p.key); }
+  function toggleKids(it) {
+    const o = openKids();
+    if (o.has(it.key)) o.delete(it.key); else o.add(it.key);
+    store.set("skyOpenKids", [...o]);
+  }
+  // a child sorts right after its parent, in the brief's order among its siblings
+  const familyOrder = (it) => { const p = parentOf(it); return p ? p.order + 0.01 + (it.order || 0) / 1e4 : it.order; };
   function guessEst(it) { for (const [re, m] of EST_RULES) if (re.test(it.title || "")) return m; for (const [re, m] of EST_RULES) if (re.test(it.sentence || "")) return m; return 30; }
   function estOf(it, p = prefs()) { return Number(p.est[keyOf(it)]) || guessEst(it); }
   function guessDiff(it, p) { const m = estOf(it, p); return Math.min(3, (m >= 90 ? 3 : m >= 30 ? 2 : 1) + ((it.carries || 0) >= 7 ? 1 : 0)); }
@@ -651,7 +671,7 @@
     const p = prefs();
     const t = nowMs();
     const evs = events().filter((e) => e.e.getTime() > t).sort((a, b) => a.s - b.s);
-    const open = openNeeds();
+    const open = openNeeds().filter((i) => !folded(i));
     if (p.mode === "timeline") {
       const fixed = evs.filter(blocksTime);
       const slots = schedule(orderItems(open, p.order, p), fixed, p).map((x) => ({ kind: "item", ...x }));
@@ -669,7 +689,7 @@
       return seq;
     }
     // the drive, west to east and Home last; the brief's own order inside a place
-    const items = open.slice().sort((a, b) => placeRank(a.place) - placeRank(b.place) || a.order - b.order);
+    const items = open.slice().sort((a, b) => placeRank(a.place) - placeRank(b.place) || familyOrder(a) - familyOrder(b));
     for (const it of items) seq.push({ kind: "item", it });
     return seq;
   }
@@ -690,7 +710,8 @@
     const all = B.items.filter((i) => i.list === "Needs attention" || i.list === "Resolved")
       .concat((B.recent || []).map((i) => ({ ...i, recent: true })));
     const byPlace = {};
-    for (const it of all) (byPlace[SKY_AT[it.place] ? it.place : "Skyline"] ||= []).push(it);
+    const kids = all.filter((it) => parentOf(it) && all.includes(parentOf(it)));
+    for (const it of all) if (!kids.includes(it)) (byPlace[SKY_AT[it.place] ? it.place : "Skyline"] ||= []).push(it);
     const reach = {};
     for (const [place, list] of Object.entries(byPlace)) {
       const [cx, cy] = SKY_AT[place];
@@ -702,6 +723,22 @@
         const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a) * 0.9;
         stars.push({ kind: "item", it, place, key: it.id, open: false, seqIdx: -1, dx: x, dy: y, x, y });
         reach[place] = Math.max(reach[place] || 0, y - cy);
+      });
+    }
+    // children: a short orbit out from their parent, spaced evenly round it
+    const starOf = new Map(stars.map((st) => [st.it, st]));
+    const ring = new Map();
+    for (const it of kids) { const p = parentOf(it); (ring.get(p) || ring.set(p, []).get(p)).push(it); }
+    for (const [p, list] of ring) {
+      const ps = starOf.get(p);
+      list.sort((a, b) => a.order - b.order);
+      const n = Math.max(list.length, 4);
+      list.forEach((it, k) => {
+        const r = 64 + Math.floor(k / 8) * 40;
+        const a = -Math.PI / 2 + 0.6 + (k % 8) * (Math.PI * 2 / Math.min(n, 8));
+        const x = ps.dx + r * Math.cos(a), y = ps.dy + r * Math.sin(a) * 0.9;
+        stars.push({ kind: "item", it, place: ps.place, key: it.id, parentSt: ps, open: false, seqIdx: -1, dx: x, dy: y, x, y });
+        reach[ps.place] = Math.max(reach[ps.place] || 0, y - SKY_AT[ps.place][1]);
       });
     }
     // Star History: match each job seen in the window to its star, or add it (hidden outside History)
@@ -763,7 +800,7 @@
     // constellation lines inside each place
     const lines = s("g", { "aria-hidden": "true", class: "lay-drive" });
     for (const place of Object.keys(SKY_AT)) {
-      const ps = stars.filter((x) => x.kind === "item" && !x.histOnly && x.place === place);
+      const ps = stars.filter((x) => x.kind === "item" && !x.histOnly && !x.parentSt && x.place === place);
       for (const x of ps) { x.dx = x.x; x.dy = x.y; }
       for (let i = 1; i < ps.length; i++) lines.append(s("line", { class: "cline" + (ps[i].open && ps[i - 1].open ? "" : " faint"), x1: ps[i - 1].x.toFixed(1), y1: ps[i - 1].y.toFixed(1), x2: ps[i].x.toFixed(1), y2: ps[i].y.toFixed(1) }));
     }
@@ -801,6 +838,14 @@
         s("circle", { class: "core", r: 10, fill: tint }),
         s("circle", { class: "hot", r: 10, fill: "#FFF8EE" }));
       if (st.kind === "event") body.append(s("circle", { class: "orbit", r: 15, fill: "none", stroke: tint }));
+      // a parent: a dotted ring and how many items orbit it; tapping it opens or folds them
+      if (st.kind === "item" && isParent(st.it)) {
+        g.classList.add("parent");
+        g.classList.toggle("unfolded", openKids().has(st.it.key));
+        const n = kidsOf(st.it).filter((c) => c.status !== "Closed").length;
+        g.append(s("circle", { class: "kid-ring", r: 16, fill: "none", stroke: tint, "aria-hidden": "true" }));
+        if (n) g.append(s("text", { class: "kid-n", x: 14, y: -12, "aria-hidden": "true" }, String(n)));
+      }
       const novaW = s("g", { class: "nova-w" });
       novaW.append(body);
       g.append(novaW);
@@ -839,6 +884,7 @@
       if (!g || swiped) return;
       const st = stars.find((x) => x.el === g);
       if (!st || !st.open || st.gone) return;
+      if (st.kind === "item" && isParent(st.it)) { unfold(st); return; }
       if (skyFull) { if (st.seqIdx === nowIdx) { openModal(); seeStar(st); } else flyTo(st.seqIdx, true); return; }
       if (st.seqIdx === nowIdx) dive(); else flyTo(st.seqIdx);
     };
@@ -1175,7 +1221,7 @@
       return { pos, draw, suns, box: boxOf([...pos.values()].filter((p) => p.show), 160) };
     }
     if (mode === "history") return historyLayout(stars);
-    for (const st of stars) pos.set(st, { x: st.dx, y: st.dy, show: !st.histOnly && (st.kind === "item" || st.open) });
+    for (const st of stars) pos.set(st, { x: st.dx, y: st.dy, show: !st.histOnly && (st.kind === "item" || st.open) && !(st.parentSt && folded(st.it)) });
     return { pos, draw, box: { ...SKY_BOX } };
   }
   function placeStar(st) { st.el.setAttribute("transform", `translate(${st.x.toFixed(1)} ${st.y.toFixed(1)})`); }
@@ -1188,6 +1234,12 @@
     sky.el.classList.add("m-" + mode);
     sky.layer.replaceChildren();
     for (const d of L.draw) d(sky.layer);
+    // the threads from a parent out to each child it has opened
+    if (mode !== "history") for (const st of sky.stars) {
+      if (!st.parentSt) continue;
+      const a = L.pos.get(st.parentSt), b = L.pos.get(st);
+      if (a && b && a.show && b.show) sky.layer.append(s("line", { class: "kid-link", x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: tintOf(st.parentSt) }));
+    }
     sky.layer.classList.remove("fresh"); sky.layer.getBoundingClientRect(); sky.layer.classList.add("fresh");
     sky.box = L.box;
     sky.suns = L.suns || null;
@@ -1220,6 +1272,22 @@
       else { starAnim = 0; if (onDone) onDone(); }
     };
     starAnim = requestAnimationFrame(step);
+  }
+  // Tap a parent: its children swing out round it (or fold back in), it becomes the bright star.
+  function unfold(st) {
+    toggleKids(st.it);
+    const seq = nowSequence();
+    sky.seq = seq;
+    remapStars(sky.stars, seq);
+    const i = seq.findIndex((x) => seqKey(x) === st.key);
+    nowIdx = i >= 0 ? i : 0;
+    for (const x of sky.stars) if (x.kind === "item" && isParent(x.it)) x.el.classList.toggle("unfolded", openKids().has(x.it.key));
+    markStar(nowIdx);
+    fillCtl(); fillCard();
+    sky.el.classList.remove("away");
+    applyLayout(prefs().mode, true);
+    if (prefs().mode === "drive") animateCam(restCam(st), 700);
+    seeStar(st);
   }
   // After a sort, frame enough to read: a stretch of the day around the current planet,
   // or the current planet's sun with its whole orbit.
@@ -2024,6 +2092,10 @@
       card.append(h("h1", { class: "now-title", onclick: onOpen }, it.title));
       if (it.sentence) card.append(h("p", { class: "now-gist", text: firstSentence(it.sentence) }));
       if (it.carries > 1) card.append(h("p", { class: "now-carry", text: `Carried ${it.carries} days.` }));
+      const kids = kidsOf(it).filter((c) => c.status !== "Closed");
+      if (kids.length) card.append(h("p", { class: "now-carry", text: `${kids.length} in orbit · tap its star to ${openKids().has(it.key) ? "fold them away" : "show them"}.` }));
+      const par = parentOf(it);
+      if (par) card.append(h("p", { class: "now-carry", text: `Orbits ${par.title}.` }));
     }
     const rec = recFor(cur);
     const open = h("div", { class: "now-open" }, h("button", { class: "btn", onclick: onOpen, text: "Open it" }));
