@@ -771,3 +771,11 @@ body.skyfull { overflow: hidden; }
 .sky .kid-n { font: 600 8px var(--sans); fill: var(--starlight); fill-opacity: .85; text-anchor: middle; pointer-events: none; }
 .sky .star.unfolded .kid-n { fill-opacity: .4; }
 .sky .kid-link { stroke-width: .8; stroke-opacity: .42; stroke-dasharray: 2 3; }
+
+/* waiting on them: the ball is with someone else */
+.wait-chip { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--soft); background: rgba(107,106,99,.10); border-radius: 999px; padding: 1px 8px; }
+.wait-chip.late { color: var(--clay); background: rgba(198,97,63,.12); }
+.blk.waiting ol.items { opacity: .72; }
+.blk.waiting .waitnote { margin: -8px 0 14px; font-size: 13px; }
+.waitrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin-top: 10px; font-size: 13px; }
+.waitrow .wait-in { flex: 1 1 180px; min-width: 0; }

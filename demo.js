@@ -21,6 +21,12 @@ const past = PAST.map(([title, place, area, first, closed, decision], i) => ({
   lastSeen: iso(closed == null ? first + 3 : closed), closedOn: closed == null ? null : iso(closed),
 }));
 
+// Two waiting-on-them items: one quiet (asked yesterday), one back after four days of silence.
+for (const [key, who, ago] of [["kikuyo-return", "Kikuyo", -1], ["louis-adjustment", "Rona", -4]]) {
+  const it = state.items.find((i) => i.key === key);
+  if (it) Object.assign(it, { waitingOn: who, waitingSince: iso(ago) });
+}
+
 async function getBrief() {
   const recent = past.filter((i) => i.closedOn && i.closedOn >= iso(-3));
   return { day: { ...state.day }, items: state.items.map((i) => ({ ...i })), recent: recent.map((i) => ({ ...i })) };
@@ -35,6 +41,7 @@ async function updateItem(id, fields) {
   if (!it) throw Object.assign(new Error("not found"), { status: 404 });
   Object.assign(it, fields);
   if ("delegatedTo" in fields && !fields.delegatedTo) it.delegatedOn = null;
+  if ("waitingOn" in fields && !fields.waitingOn) it.waitingSince = null;
   if ("decision" in fields) it.decidedAt = fields.decision ? new Date().toISOString() : null;
   return { ...it };
 }

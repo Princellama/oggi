@@ -164,6 +164,12 @@
   const needs = () => B.items.filter((i) => i.list === "Needs attention").sort((a, b) => a.order - b.order);
   const resolved = () => B.items.filter((i) => i.list === "Resolved").sort((a, b) => a.order - b.order);
   const openNeeds = () => needs().filter((i) => i.status !== "Closed");
+  // Waiting on them: the ball is with someone outside. It sits in a quiet band, out of Now,
+  // until they answer (the item is cleared) or three days pass with no word (it comes back).
+  const WAIT_DAYS = 3;
+  const waitDays = (it) => (it.waitingSince ? Math.max(0, Math.round((new Date(localISO() + "T12:00:00") - new Date(String(it.waitingSince).slice(0, 10) + "T12:00:00")) / 86400000)) : 0);
+  const quietWait = (it) => !!it.waitingOn && it.status !== "Closed" && waitDays(it) < WAIT_DAYS;
+  const needsMe = () => openNeeds().filter((i) => !quietWait(i));
   const events = () => ((B.day && B.day.events) || []).map((e) => ({ ...e, s: new Date(e.start), e: new Date(e.end) })).filter((e) => !isNaN(e.s));
 
   // ---------------- sign in ----------------
@@ -323,6 +329,28 @@
     const late = days != null && days >= 3;
     return h("span", { class: "deleg-chip" + (late ? " late" : ""), title: late ? `With ${who} for ${days} days. Worth a check-in.` : `Handed to ${who}` }, `→ ${who}${days ? ` · ${days}d` : ""}`);
   }
+  function waitChip(it) {
+    if (!it.waitingOn || it.status === "Closed") return null;
+    const d = waitDays(it), late = d >= WAIT_DAYS;
+    return h("span", { class: "wait-chip" + (late ? " late" : ""), title: late ? `No word from ${it.waitingOn} for ${d} days. It's back with you.` : `Waiting on ${it.waitingOn}` }, `⏳ ${it.waitingOn}${d ? ` · ${d}d` : ""}`);
+  }
+  // Set who the ball is with, or clear it when they answer.
+  function waitRow(it, after) {
+    const row = h("div", { class: "waitrow" });
+    const done = () => { if (after) after(); else renderAll(); };
+    if (it.waitingOn) {
+      const d = waitDays(it);
+      row.append(h("span", { class: "quiet", text: `Waiting on ${it.waitingOn}${d ? ` · ${d} day${d === 1 ? "" : "s"}` : " · since today"}` }));
+      row.append(h("button", { class: "textlink", text: "They answered", onclick: async () => { await patchItem(it, { waitingOn: null }); done(); } }));
+      row.append(h("button", { class: "textlink", text: "Still waiting", title: "Start the three days again", onclick: async () => { await patchItem(it, { waitingOn: it.waitingOn }); done(); } }));
+    } else {
+      const inp = h("input", { class: "miss wait-in", placeholder: "Waiting on who? e.g. Von", maxlength: 60 });
+      const go = async () => { const v = inp.value.trim(); if (!v) return; await patchItem(it, { waitingOn: v }); done(); };
+      inp.addEventListener("keydown", (ev) => { if (ev.key === "Enter") go(); });
+      row.append(inp, h("button", { class: "textlink", text: "Set", onclick: go }));
+    }
+    return row;
+  }
   function handoffRow(it, after) {
     const row = h("div", { class: "choices handoff", role: "group", "aria-label": "Hand it off" });
     for (const who of HANDS) {
@@ -420,10 +448,15 @@
       if (!n.length && !r.length) bot.append(h("p", { class: "calm", text: "Nothing needs you this morning." }));
       if (n.length) {
         bot.append(areaStrip(n));
-        const shown = areaFilter ? n.filter((it) => areaOf(it) === areaFilter) : n;
+        const all = areaFilter ? n.filter((it) => areaOf(it) === areaFilter) : n;
+        const shown = all.filter((it) => !quietWait(it)), waiting = all.filter(quietWait);
         shown.numbers = shown.map((it) => n.indexOf(it));
-        bot.append(h("div", { class: "blk" }, h("h2", { class: "sec", text: areaFilter ? `Needs attention · ${areaFilter}` : "Needs attention" }),
-          shown.length ? listOf(shown, true) : h("p", { class: "quiet", text: `Nothing open in ${areaFilter}.` })));
+        waiting.numbers = waiting.map((it) => n.indexOf(it));
+        bot.append(h("div", { class: "blk" }, h("h2", { class: "sec", text: areaFilter ? `Needs me · ${areaFilter}` : "Needs me" }),
+          shown.length ? listOf(shown, true) : h("p", { class: "quiet", text: areaFilter ? `Nothing of yours open in ${areaFilter}.` : "Nothing is waiting on you." })));
+        if (waiting.length) bot.append(h("div", { class: "blk waiting" }, h("h2", { class: "sec", text: `Waiting on them · ${waiting.length}` }),
+          h("p", { class: "quiet waitnote", text: "The ball is with someone else. Each comes back to you when they answer, or after three days without a word." }),
+          listOf(waiting, true)));
       }
       if (r.length) bot.append(h("div", { class: "blk" }, h("h2", { class: "sec", text: "Resolved" }), listOf(r, false)));
       bot.append(renderIntentions(pass));
@@ -450,7 +483,7 @@
       const closed = it.status === "Closed" && live;
       const li = h("li", { "data-id": it.id, class: (closed ? "closed " : "") + (selKey === it.id ? "sel" : "") });
       li.append(h("span", { class: "num", text: String((items.numbers ? items.numbers[idx] : idx) + 1) }));
-      const body = h("div", { class: "body" }, h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), mailChip(it), delegChip(it), newBadge(it)), titleEl(it), sentence(it));
+      const body = h("div", { class: "body" }, h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), mailChip(it), delegChip(it), waitChip(it), newBadge(it)), titleEl(it), sentence(it));
       if (it.note) body.append(h("p", { class: "mynote", text: it.note }));
       if (live && !closed && !isDesk()) body.append(inlineTools(it, body));
       li.append(body);
@@ -476,13 +509,20 @@
       grow(ta); ta.focus();
     });
     doneBtn.addEventListener("click", async () => { await patchItem(it, { status: "Closed" }); renderAll(); });
+    const waitBtn = h("button", { text: it.waitingOn ? "Waiting…" : "Waiting on them" });
+    waitBtn.addEventListener("click", () => {
+      const open = body.querySelector(".waitrow");
+      if (open) { open.remove(); return; }
+      row.after(waitRow(it));
+      const inp = body.querySelector(".wait-in"); if (inp) inp.focus();
+    });
     const handBtn = h("button", { text: it.delegatedTo ? "Handed off" : "Hand off" });
     handBtn.addEventListener("click", () => {
       const open = body.querySelector(".handoff");
       if (open) { open.remove(); return; }
       row.after(handoffRow(it));
     });
-    row.append(noteBtn, handBtn, doneBtn);
+    row.append(noteBtn, waitBtn, handBtn, doneBtn);
     return row;
   }
 
@@ -507,7 +547,7 @@
       const li = h("li", { "data-id": it.id, class: selKey === it.id ? "sel" : "" });
       li.append(h("span", { class: "num", text: String(i + 1) }));
       const body = h("div", { class: "body" });
-      body.append(h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), mailChip(it), delegChip(it), newBadge(it)));
+      body.append(h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), mailChip(it), delegChip(it), waitChip(it), newBadge(it)));
       body.append(h("span", { class: "ttl", text: it.title }));
       const carried = it.carries > 0 ? `Carried ${it.carries} day${it.carries === 1 ? "" : "s"}.` : "New today.";
       body.append(h("p", { class: "carry", text: `${carried} ${firstSentence(it.sentence)}` }));
@@ -671,7 +711,7 @@
     const p = prefs();
     const t = nowMs();
     const evs = events().filter((e) => e.e.getTime() > t).sort((a, b) => a.s - b.s);
-    const open = openNeeds().filter((i) => !folded(i));
+    const open = needsMe().filter((i) => !folded(i));
     if (p.mode === "timeline") {
       const fixed = evs.filter(blocksTime);
       const slots = schedule(orderItems(open, p.order, p), fixed, p).map((x) => ({ kind: "item", ...x }));
@@ -2088,7 +2128,7 @@
     } else {
       const it = cur.it;
       const when = cur.at ? `· ${fmtTime(new Date(cur.at))}, about ${fmtDur(Math.round((cur.end - cur.at) / 60000))}` : "· " + it.place;
-      card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: when }), mailChip(it), delegChip(it), newBadge(it)));
+      card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: when }), mailChip(it), delegChip(it), waitChip(it), newBadge(it)));
       card.append(h("h1", { class: "now-title", onclick: onOpen }, it.title));
       if (it.sentence) card.append(h("p", { class: "now-gist", text: firstSentence(it.sentence) }));
       if (it.carries > 1) card.append(h("p", { class: "now-carry", text: `Carried ${it.carries} days.` }));
@@ -2209,6 +2249,7 @@
       setTimeout(() => grow(ta), 0);
       w.append(h("p", { class: "ed-label now-where", text: "Where it goes" }), choiceRow(it));
       w.append(h("p", { class: "ed-label now-where", text: "Hand it off" }), handoffRow(it, () => {}));
+      w.append(h("p", { class: "ed-label now-where", text: "Waiting on them" }), waitRow(it, () => renderAll()));
       w.append(novaRow(it, () => renderNow()));
     }
 
@@ -2518,6 +2559,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
       inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Place" }), places));
       inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: it.carries ? `Where it goes · carried ${it.carries} day${it.carries === 1 ? "" : "s"}` : "Where it goes" }), choiceRow(it)));
       inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Handed to" }), handoffRow(it, () => { rerenderListOnly(); renderAside(); })));
+      if (it.status !== "Closed") inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Waiting on them" }), waitRow(it, () => renderAll())));
       if (it.status !== "Closed") inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Supernova" }), novaRow(it, () => renderAll())));
 
       const links = h("div", { class: "ed-links" });

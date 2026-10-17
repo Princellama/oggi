@@ -184,7 +184,7 @@ app.get("/api/history", requireAuth, wrap(async (req, res) => {
 }));
 
 app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
-  const allowed = ["title", "note", "place", "area", "order", "decision", "status", "delegatedTo", "novaStart", "novaCooled"];
+  const allowed = ["title", "note", "place", "area", "order", "decision", "status", "delegatedTo", "waitingOn", "novaStart", "novaCooled"];
   const fields = {};
   for (const k of allowed) if (k in req.body) fields[k] = req.body[k];
   if (fields.place && !["Skyline", "Airport", "Kalihi", "Kakaako", "Kahala", "Hawaii Kai", "Home"].includes(fields.place)) return res.status(400).json({ error: "place" });
@@ -195,6 +195,11 @@ app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
   if ("delegatedTo" in fields) {
     if (fields.delegatedTo !== null && !["Milli", "Virgilio", "Someone else"].includes(fields.delegatedTo)) return res.status(400).json({ error: "delegatedTo" });
     fields.delegatedOn = fields.delegatedTo ? localDate(req) : null;
+  }
+  if ("waitingOn" in fields) {
+    if (fields.waitingOn !== null && (typeof fields.waitingOn !== "string" || !fields.waitingOn.trim() || fields.waitingOn.length > 60)) return res.status(400).json({ error: "waitingOn" });
+    fields.waitingOn = fields.waitingOn ? fields.waitingOn.trim() : null;
+    fields.waitingSince = fields.waitingOn ? localDate(req) : null;
   }
   for (const k of ["novaStart", "novaCooled"]) if (k in fields && fields[k] !== null && (typeof fields[k] !== "string" || isNaN(Date.parse(fields[k])))) return res.status(400).json({ error: k });
   const item = await store.updateItem(req.params.id, fields);
@@ -211,6 +216,7 @@ app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
   else if ("place" in fields) line = `${t} → moved to ${fields.place}`;
   else if ("area" in fields) line = `${t} → area ${fields.area}`;
   else if ("delegatedTo" in fields) line = fields.delegatedTo ? `${t} → handed to ${fields.delegatedTo === "Someone else" ? "someone else" : fields.delegatedTo}` : `${t} → taken back (no longer delegated)`;
+  else if ("waitingOn" in fields) line = fields.waitingOn ? `${t} → waiting on ${fields.waitingOn}` : `${t} → they answered (no longer waiting)`;
   else if ("note" in fields && fields.note) line = `Note on ${t}: ${fields.note}`;
   else if ("novaCooled" in fields && fields.novaCooled) line = `${t} → supernova cooling off`;
   else if ("novaStart" in fields && fields.novaStart) line = `${t} → supernova lit (grows every hour until it's done)`;
