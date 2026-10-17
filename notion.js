@@ -83,6 +83,9 @@ function toItem(page) {
     // the ball is with someone outside (a client, a CFP): who, and since when
     waitingOn: read(p["Waiting on"]) || null,
     waitingSince: read(p["Waiting since"]),
+    person: read(p["Person"]) || null,
+    amount: read(p["Amount"]),
+    invoice: read(p["Invoice"]),
     delegatedOn: read(p["Delegated on"]),
     novaStart: read(p["Supernova"]),
     novaCooled: read(p["Cooled off"]),
@@ -208,6 +211,7 @@ async function updateItem(id, fields) {
     props["Delegated to"] = fields.delegatedTo ? { select: { name: fields.delegatedTo } } : { select: null };
     props["Delegated on"] = fields.delegatedTo ? { date: { start: fields.delegatedOn } } : { date: null };
   }
+  if ("invoice" in fields) props["Invoice"] = fields.invoice ? { select: { name: fields.invoice } } : { select: null };
   if ("waitingOn" in fields) {
     props["Waiting on"] = { rich_text: rich(fields.waitingOn || "") };
     props["Waiting since"] = fields.waitingOn ? { date: { start: fields.waitingSince } } : { date: null };

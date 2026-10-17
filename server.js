@@ -184,7 +184,7 @@ app.get("/api/history", requireAuth, wrap(async (req, res) => {
 }));
 
 app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
-  const allowed = ["title", "note", "place", "area", "order", "decision", "status", "delegatedTo", "waitingOn", "novaStart", "novaCooled"];
+  const allowed = ["title", "note", "place", "area", "order", "decision", "status", "delegatedTo", "waitingOn", "invoice", "novaStart", "novaCooled"];
   const fields = {};
   for (const k of allowed) if (k in req.body) fields[k] = req.body[k];
   if (fields.place && !["Skyline", "Airport", "Kalihi", "Kakaako", "Kahala", "Hawaii Kai", "Home"].includes(fields.place)) return res.status(400).json({ error: "place" });
@@ -195,6 +195,12 @@ app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
   if ("delegatedTo" in fields) {
     if (fields.delegatedTo !== null && !["Milli", "Virgilio", "Someone else"].includes(fields.delegatedTo)) return res.status(400).json({ error: "delegatedTo" });
     fields.delegatedOn = fields.delegatedTo ? localDate(req) : null;
+  }
+  if ("invoice" in fields) {
+    if (fields.invoice !== null && !["To send", "Sent", "Paid"].includes(fields.invoice)) return res.status(400).json({ error: "invoice" });
+    // paid closes the invoice; moving it back reopens it
+    fields.status = fields.invoice === "Paid" ? "Closed" : "Open";
+    fields.closedOn = fields.invoice === "Paid" ? localDate(req) : null;
   }
   if ("waitingOn" in fields) {
     if (fields.waitingOn !== null && (typeof fields.waitingOn !== "string" || !fields.waitingOn.trim() || fields.waitingOn.length > 60)) return res.status(400).json({ error: "waitingOn" });
@@ -216,6 +222,7 @@ app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
   else if ("place" in fields) line = `${t} → moved to ${fields.place}`;
   else if ("area" in fields) line = `${t} → area ${fields.area}`;
   else if ("delegatedTo" in fields) line = fields.delegatedTo ? `${t} → handed to ${fields.delegatedTo === "Someone else" ? "someone else" : fields.delegatedTo}` : `${t} → taken back (no longer delegated)`;
+  else if ("invoice" in fields) line = `${t} → invoice ${String(fields.invoice || "cleared").toLowerCase()}`;
   else if ("waitingOn" in fields) line = fields.waitingOn ? `${t} → waiting on ${fields.waitingOn}` : `${t} → they answered (no longer waiting)`;
   else if ("note" in fields && fields.note) line = `Note on ${t}: ${fields.note}`;
   else if ("novaCooled" in fields && fields.novaCooled) line = `${t} → supernova cooling off`;

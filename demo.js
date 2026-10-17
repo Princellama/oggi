@@ -27,6 +27,14 @@ for (const [key, who, ago] of [["kikuyo-return", "Kikuyo", -1], ["louis-adjustme
   if (it) Object.assign(it, { waitingOn: who, waitingSince: iso(ago) });
 }
 
+// People, invoices and a long-carried item, so the demo shows each.
+for (const [key, f] of [
+  ["invoice-kaylee", { person: "Kaylee", amount: 750, invoice: "To send" }],
+  ["invoice-mori", { person: "Mori", amount: 400, invoice: "Sent" }],
+  ["kikuyo-return", { person: "Kaylee" }],
+  ["louis-adjustment", { person: "Rona", carries: 23 }],
+]) { const it = state.items.find((i) => i.key === key); if (it) Object.assign(it, f); }
+
 async function getBrief() {
   const recent = past.filter((i) => i.closedOn && i.closedOn >= iso(-3));
   return { day: { ...state.day }, items: state.items.map((i) => ({ ...i })), recent: recent.map((i) => ({ ...i })) };
@@ -42,6 +50,7 @@ async function updateItem(id, fields) {
   Object.assign(it, fields);
   if ("delegatedTo" in fields && !fields.delegatedTo) it.delegatedOn = null;
   if ("waitingOn" in fields && !fields.waitingOn) it.waitingSince = null;
+  if ("invoice" in fields) it.status = fields.invoice === "Paid" ? "Closed" : "Open";
   if ("decision" in fields) it.decidedAt = fields.decision ? new Date().toISOString() : null;
   return { ...it };
 }

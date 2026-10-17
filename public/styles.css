@@ -779,3 +779,20 @@ body.skyfull { overflow: hidden; }
 .blk.waiting .waitnote { margin: -8px 0 14px; font-size: 13px; }
 .waitrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin-top: 10px; font-size: 13px; }
 .waitrow .wait-in { flex: 1 1 180px; min-width: 0; }
+
+/* people, decisions, home clock, invoices, folding on Today */
+.person-chip { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--ink); background: rgba(46,44,39,.07); border: 0; border-radius: 999px; padding: 1px 8px; cursor: pointer; }
+.person-chip.on { background: var(--ink); color: var(--bg, #FCFCFB); }
+.people { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 18px; }
+.people-l { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--grey); margin-right: 4px; }
+.decide { margin-top: 10px; }
+.decide-l { margin: 0 0 4px; font-size: 13px; color: var(--clay); }
+.homeclock { color: var(--grey); }
+.inv-chip { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; border-radius: 999px; padding: 1px 8px; color: #3c6e9e; background: rgba(147,184,222,.22); }
+.inv-chip.to-send { color: var(--clay); background: rgba(198,97,63,.12); }
+.inv-chip.paid { color: #3f7a55; background: rgba(140,201,162,.22); }
+.choices.invoice { margin-top: 10px; gap: 20px; }
+.kids-toggle { margin-top: 8px; font-size: 13px; color: var(--soft); background: none; border: 0; padding: 0; cursor: pointer; }
+.kids-toggle:hover { color: var(--ink); }
+ol.items li.child { margin-left: 22px; padding-left: 12px; border-left: 1px dashed rgba(46,44,39,.18); }
+.sky .person-link { stroke: var(--starlight, #F4EFE4); stroke-opacity: .16; stroke-width: .7; stroke-dasharray: 1 4; }

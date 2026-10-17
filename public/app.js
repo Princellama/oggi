@@ -147,6 +147,7 @@
     return h("span", { class: "area " + a.cls, title: a.name }, glyphSvg(a.glyph), withLabel ? a.name : null);
   }
   let areaFilter = null;
+  let personFilter = null;   // a client's name: Today shows only their items
 
   // ---------------- state ----------------
   let B = null;         // { day, items }
@@ -170,6 +171,33 @@
   const waitDays = (it) => (it.waitingSince ? Math.max(0, Math.round((new Date(localISO() + "T12:00:00") - new Date(String(it.waitingSince).slice(0, 10) + "T12:00:00")) / 86400000)) : 0);
   const quietWait = (it) => !!it.waitingOn && it.status !== "Closed" && waitDays(it) < WAIT_DAYS;
   const needsMe = () => openNeeds().filter((i) => !quietWait(i));
+  // Carried long enough that it should be decided rather than carried again.
+  const LONG_CARRY = 10;
+  const longCarried = (it) => it.status !== "Closed" && (it.carries || 0) >= LONG_CARRY && !quietWait(it) && !it.decision;
+  // Home base: when you're away, Honolulu's own clock rides along on the day line and the Now card.
+  function awayHome() {
+    const home = prefs().home || "Pacific/Honolulu";
+    return tzOffset(home) === tzOffset(hereTz()) ? null : home;
+  }
+  function homeClock(d = nowD()) {
+    const z = awayHome();
+    if (!z) return null;
+    let day = "";
+    try { day = new Intl.DateTimeFormat("en-US", { timeZone: z, weekday: "short" }).format(d); } catch {}
+    const city = (z.split("/").pop() || z).replace(/_/g, " ");
+    return `${city} ${day} ${fmtTimeIn(d, z)}`.replace(/\s+/g, " ").trim();
+  }
+  // Invoices: an amount and where it stands. Paid closes the item.
+  const money = (n) => "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const isInvoice = (it) => it.amount != null || !!it.invoice;
+  const owedIn = (parent) => kidsOf(parent).filter((c) => c.invoice !== "Paid" && c.amount != null).reduce((s, c) => s + Number(c.amount), 0);
+  // People: items about the same client, gathered by name.
+  const personOf = (it) => (it.person || "").trim();
+  function peopleOpen() {
+    const m = new Map();
+    for (const it of openNeeds()) { const p = personOf(it); if (p) m.set(p, (m.get(p) || 0) + 1); }
+    return [...m.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }
   const events = () => ((B.day && B.day.events) || []).map((e) => ({ ...e, s: new Date(e.start), e: new Date(e.end) })).filter((e) => !isNaN(e.s));
 
   // ---------------- sign in ----------------
@@ -329,6 +357,32 @@
     const late = days != null && days >= 3;
     return h("span", { class: "deleg-chip" + (late ? " late" : ""), title: late ? `With ${who} for ${days} days. Worth a check-in.` : `Handed to ${who}` }, `→ ${who}${days ? ` · ${days}d` : ""}`);
   }
+  function personChip(it) {
+    const p = personOf(it);
+    if (!p) return null;
+    const b = h("button", { class: "person-chip" + (personFilter === p ? " on" : ""), type: "button", title: `Show everything about ${p}`, text: p });
+    b.addEventListener("click", (ev) => { ev.stopPropagation(); personFilter = personFilter === p ? null : p; showToday(); });
+    return b;
+  }
+  function invoiceChip(it) {
+    if (!isInvoice(it)) return null;
+    const st = it.invoice || "To send";
+    return h("span", { class: "inv-chip " + st.toLowerCase().replace(" ", "-") }, `${it.amount != null ? money(it.amount) + " · " : ""}${st}`);
+  }
+  function invoiceRow(it, after) {
+    const row = h("div", { class: "choices invoice", role: "group", "aria-label": "Invoice" });
+    for (const st of ["To send", "Sent", "Paid"]) {
+      const b = h("button", { "aria-pressed": String((it.invoice || "To send") === st), text: st });
+      b.addEventListener("click", async () => { await patchItem(it, { invoice: st }); if (after) after(); else renderAll(); });
+      row.append(b);
+    }
+    return row;
+  }
+  // Long-carried: the three evening choices, offered in the day too.
+  function decideRow(it) {
+    if (!longCarried(it)) return null;
+    return h("div", { class: "decide" }, h("p", { class: "decide-l", text: `Carried ${it.carries} days. Decide where it goes:` }), choiceRow(it));
+  }
   function waitChip(it) {
     if (!it.waitingOn || it.status === "Closed") return null;
     const d = waitDays(it), late = d >= WAIT_DAYS;
@@ -416,7 +470,7 @@
     // top band
     const top = h("div", { class: "wrap" });
     top.append(h("div", { class: "toprow" },
-      h("p", { class: "daydate" }, dayline, stampEl("quiet")),
+      h("p", { class: "daydate" }, dayline, homeClock() ? h("span", { class: "homeclock", text: " · " + homeClock() }) : null, stampEl("quiet")),
       h("span", null,
         isDesk() ? h("button", { class: "readaloud focusbar", onclick: () => toggleFocus(true), text: "Focus", title: "Focus (f)" }) : null,
         isDesk() ? " · " : null,
@@ -448,11 +502,24 @@
       if (!n.length && !r.length) bot.append(h("p", { class: "calm", text: "Nothing needs you this morning." }));
       if (n.length) {
         bot.append(areaStrip(n));
-        const all = areaFilter ? n.filter((it) => areaOf(it) === areaFilter) : n;
-        const shown = all.filter((it) => !quietWait(it)), waiting = all.filter(quietWait);
+        let all = areaFilter ? n.filter((it) => areaOf(it) === areaFilter) : n;
+        if (personFilter) all = all.filter((it) => personOf(it) === personFilter);
+        const unfoldedOk = (it) => personFilter || !folded(it);   // a person's view shows every piece
+        const shown = all.filter((it) => !quietWait(it) && unfoldedOk(it)), waiting = all.filter((it) => quietWait(it) && unfoldedOk(it));
+        const ppl = peopleOpen();
+        if (ppl.length || personFilter) {
+          const strip = h("div", { class: "people", role: "group", "aria-label": "Gather by person" }, h("span", { class: "people-l", text: "People" }));
+          for (const [p, k] of ppl) {
+            const b = h("button", { class: "person-chip" + (personFilter === p ? " on" : ""), type: "button", "aria-pressed": String(personFilter === p), text: `${p} · ${k}` });
+            b.addEventListener("click", () => { personFilter = personFilter === p ? null : p; rerenderListOnly(); });
+            strip.append(b);
+          }
+          if (personFilter && !ppl.some(([p]) => p === personFilter)) strip.append(h("button", { class: "person-chip on", type: "button", text: personFilter, onclick: () => { personFilter = null; rerenderListOnly(); } }));
+          bot.append(strip);
+        }
         shown.numbers = shown.map((it) => n.indexOf(it));
         waiting.numbers = waiting.map((it) => n.indexOf(it));
-        bot.append(h("div", { class: "blk" }, h("h2", { class: "sec", text: areaFilter ? `Needs me · ${areaFilter}` : "Needs me" }),
+        bot.append(h("div", { class: "blk" }, h("h2", { class: "sec", text: personFilter ? `Needs me · ${personFilter}` : areaFilter ? `Needs me · ${areaFilter}` : "Needs me" }),
           shown.length ? listOf(shown, true) : h("p", { class: "quiet", text: areaFilter ? `Nothing of yours open in ${areaFilter}.` : "Nothing is waiting on you." })));
         if (waiting.length) bot.append(h("div", { class: "blk waiting" }, h("h2", { class: "sec", text: `Waiting on them · ${waiting.length}` }),
           h("p", { class: "quiet waitnote", text: "The ball is with someone else. Each comes back to you when they answer, or after three days without a word." }),
@@ -483,8 +550,19 @@
       const closed = it.status === "Closed" && live;
       const li = h("li", { "data-id": it.id, class: (closed ? "closed " : "") + (selKey === it.id ? "sel" : "") });
       li.append(h("span", { class: "num", text: String((items.numbers ? items.numbers[idx] : idx) + 1) }));
-      const body = h("div", { class: "body" }, h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), mailChip(it), delegChip(it), waitChip(it), newBadge(it)), titleEl(it), sentence(it));
+      if (parentOf(it)) li.classList.add("child");
+      const body = h("div", { class: "body" }, h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), personChip(it), invoiceChip(it), mailChip(it), delegChip(it), waitChip(it), newBadge(it)), titleEl(it), sentence(it));
       if (it.note) body.append(h("p", { class: "mynote", text: it.note }));
+      if (live && !closed && isParent(it)) {
+        const open = kidsOf(it).filter((c) => c.status !== "Closed").length, owed = owedIn(it);
+        const shownKids = openKids().has(it.key);
+        const tg = h("button", { class: "kids-toggle", type: "button", "aria-expanded": String(shownKids) },
+          `${shownKids ? "▾ Hide" : "▸ Show"} ${open} in orbit${owed ? ` · ${money(owed)} outstanding` : ""}`);
+        tg.addEventListener("click", (ev) => { ev.stopPropagation(); toggleKids(it); renderAll(); });
+        body.append(tg);
+      }
+      if (live && !closed) { const d = decideRow(it); if (d) body.append(d); }
+      if (live && !closed && isInvoice(it) && !isDesk()) body.append(invoiceRow(it));
       if (live && !closed && !isDesk()) body.append(inlineTools(it, body));
       li.append(body);
       if (live && isDesk()) li.addEventListener("click", (ev) => { if (ev.target.closest("a")) return; select(it.id); });
@@ -1274,6 +1352,12 @@
     sky.el.classList.add("m-" + mode);
     sky.layer.replaceChildren();
     for (const d of L.draw) d(sky.layer);
+    // faint threads between the shown stars that are about the same person
+    if (mode === "drive") {
+      const byP = new Map();
+      for (const st of sky.stars) { if (st.kind !== "item" || st.histOnly) continue; const p = personOf(st.it), q = L.pos.get(st); if (p && q && q.show && st.it.status !== "Closed") (byP.get(p) || byP.set(p, []).get(p)).push(q); }
+      for (const pts of byP.values()) for (let i = 1; i < pts.length; i++) sky.layer.append(s("line", { class: "person-link", x1: pts[i - 1].x, y1: pts[i - 1].y, x2: pts[i].x, y2: pts[i].y }));
+    }
     // the threads from a parent out to each child it has opened
     if (mode !== "history") for (const st of sky.stars) {
       if (!st.parentSt) continue;
@@ -2128,12 +2212,14 @@
     } else {
       const it = cur.it;
       const when = cur.at ? `· ${fmtTime(new Date(cur.at))}, about ${fmtDur(Math.round((cur.end - cur.at) / 60000))}` : "· " + it.place;
-      card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: when }), mailChip(it), delegChip(it), waitChip(it), newBadge(it)));
+      card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: when }), personChip(it), invoiceChip(it), mailChip(it), delegChip(it), waitChip(it), newBadge(it)));
       card.append(h("h1", { class: "now-title", onclick: onOpen }, it.title));
       if (it.sentence) card.append(h("p", { class: "now-gist", text: firstSentence(it.sentence) }));
       if (it.carries > 1) card.append(h("p", { class: "now-carry", text: `Carried ${it.carries} days.` }));
       const kids = kidsOf(it).filter((c) => c.status !== "Closed");
-      if (kids.length) card.append(h("p", { class: "now-carry", text: `${kids.length} in orbit · tap its star to ${openKids().has(it.key) ? "fold them away" : "show them"}.` }));
+      if (kids.length) { const owed = owedIn(it); card.append(h("p", { class: "now-carry", text: `${kids.length} in orbit${owed ? ` · ${money(owed)} outstanding` : ""} · tap its star to ${openKids().has(it.key) ? "fold them away" : "show them"}.` })); }
+      const dr = decideRow(it); if (dr) card.append(dr);
+      if (isInvoice(it)) card.append(invoiceRow(it, () => renderAll()));
       const par = parentOf(it);
       if (par) card.append(h("p", { class: "now-carry", text: `Orbits ${par.title}.` }));
     }
@@ -2560,6 +2646,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
       inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: it.carries ? `Where it goes · carried ${it.carries} day${it.carries === 1 ? "" : "s"}` : "Where it goes" }), choiceRow(it)));
       inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Handed to" }), handoffRow(it, () => { rerenderListOnly(); renderAside(); })));
       if (it.status !== "Closed") inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Waiting on them" }), waitRow(it, () => renderAll())));
+      if (isInvoice(it)) inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: it.amount != null ? `Invoice · ${money(it.amount)}` : "Invoice" }), invoiceRow(it, () => renderAll())));
       if (it.status !== "Closed") inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Supernova" }), novaRow(it, () => renderAll())));
 
       const links = h("div", { class: "ed-links" });
@@ -2589,6 +2676,8 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
       h("div", null, h("b", { text: "d" }), "  done   ", h("b", { text: "n" }), "  note   ", h("b", { text: "c" }), "  capture"),
       h("div", null, h("b", { text: "f" }), "  focus   ", h("b", { text: "r" }), "  read aloud   ", h("b", { text: "esc" }), "  back")));
   }
+  // tapping a person's name anywhere opens Today gathered to them
+  function showToday() { rerenderListOnly(); if (!isDesk()) go("today"); }
   function rerenderListOnly() { const y = $("#paneToday").scrollTop; renderToday(); $("#paneToday").scrollTop = y; }
 
   function toggleFocus(on) {
