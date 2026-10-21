@@ -31,7 +31,7 @@ const state = {
       ig: "Wednesday mornings you'll find me at the Salt Lake store, answering Medicare questions over a cup of coffee. No appointment, no pressure. Stop by and say hi.",
       fb: "Every Wednesday and Thursday this AEP I'm at the Salt Lake store from 8 to 11. If your plan is changing next year or you just want someone to explain your options, come by the table.",
       summary: "Eric's weekly kiosk hours at Salt Lake during AEP.", cta: "Stop by Wednesdays and Thursdays, 8–11, or call (808) 256-6736.",
-      disclaimer: "We do not offer every plan available in your area. Any information we provide is limited to those plans we do offer in your area. Please contact Medicare.gov, 1-800-MEDICARE, or your local State Health Insurance Program (SHIP) to get information on all of your options.",
+      disclaimer: "We do not offer every plan available in your area. Currently we represent 3 organizations which offer 26 products in your area. Please contact Medicare.gov or 1-800-MEDICARE to get information on all of your options.",
       compliance: "Educational - no plan named", status: "Ready", postDate: null },
     { title: "If your HMSA plan is ending", kind: "Educational", photos: 0, thumbs: 0, brief: "Explain what members of the closing HMSA plans can do. No plan names.", status: "Requested" },
   ].map((r) => ({ id: id(), url: null, ig: "", fb: "", summary: "", cta: "", disclaimer: "", compliance: null, materialId: "", postDate: null, campaign: null, created: new Date().toISOString(), ...r })),
