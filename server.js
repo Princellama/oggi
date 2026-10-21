@@ -14,6 +14,7 @@ if (!DEMO && !process.env.NOTION_TOKEN) {
   process.exit(1);
 }
 const store = DEMO ? require("./demo") : require("./notion");
+const mstore = DEMO ? require("./medicare-demo") : require("./medicare");
 
 const PORT = process.env.PORT || 8080;
 const SECRET = process.env.SESSION_SECRET || (DEMO ? "demo-secret" : null);
@@ -32,7 +33,10 @@ if (!SECRET) {
 const app = express();
 app.set("trust proxy", 1); // Railway sits in front; needed for per-device lockout
 app.disable("x-powered-by");
-app.use(express.json({ limit: "64kb" }));
+// Photos for /medicare come up as base64 JSON, so that one route takes a larger body.
+const smallJson = express.json({ limit: "64kb" });
+const bigJson = express.json({ limit: "14mb" });
+app.use((req, res, next) => (req.method === "POST" && req.path === "/api/medicare/content" ? bigJson : smallJson)(req, res, next));
 app.use((req, res, next) => {
   res.set("X-Robots-Tag", "noindex, nofollow");
   res.set("Referrer-Policy", "no-referrer");
@@ -277,6 +281,96 @@ app.post("/api/edits/clear", requireAuth, wrap(async (req, res) => {
   await store.updateDay(req.body.dayId, { edits: "" });
   res.json({ ok: true });
 }));
+
+// ---------- /medicare ----------
+const CARRIERS = ["Devoted", "UHC", "Humana", "HMSA", "CMS", "Other"];
+const strOrNull = (v, max) => (v == null || v === "" ? null : String(v).slice(0, max));
+const isDay = (v) => v === null || /^\d{4}-\d{2}-\d{2}$/.test(String(v));
+
+app.get("/api/medicare", requireAuth, wrap(async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json(await mstore.getAll(localDate(req)));
+}));
+
+app.patch("/api/medicare/pulse/:id", requireAuth, wrap(async (req, res) => {
+  if (!["New", "Read", "Acted", "Archived"].includes(req.body.status)) return res.status(400).json({ error: "status" });
+  res.json(await mstore.setPulse(req.params.id, { status: req.body.status }));
+}));
+
+function campaignFields(b) {
+  const f = {};
+  if ("name" in b) { f.name = String(b.name || "").trim().slice(0, 140); if (!f.name) throw Object.assign(new Error("name"), { status: 400 }); }
+  if ("channel" in b) { if (!["Kiosk", "Mailer", "Social", "Event", "Seminar", "Referral", "Other"].includes(b.channel)) throw Object.assign(new Error("channel"), { status: 400 }); f.channel = b.channel; }
+  if ("carriers" in b) f.carriers = (Array.isArray(b.carriers) ? b.carriers : []).filter((c) => ["Devoted", "UHC", "Humana", "Multi"].includes(c));
+  for (const k of ["start", "end"]) if (k in b) { if (!isDay(b[k] || null)) throw Object.assign(new Error(k), { status: 400 }); f[k] = b[k] || null; }
+  for (const k of ["cost", "pieces"]) if (k in b) { const v = b[k] === "" || b[k] == null ? null : Number(b[k]); if (v !== null && (!Number.isFinite(v) || v < 0 || v > 1e7)) throw Object.assign(new Error(k), { status: 400 }); f[k] = v; }
+  if ("status" in b) { if (!["Planned", "Running", "Done"].includes(b.status)) throw Object.assign(new Error("status"), { status: 400 }); f.status = b.status; }
+  for (const k of ["notes", "tracking", "match"]) if (k in b) f[k] = String(b[k] || "").slice(0, 2000);
+  return f;
+}
+app.patch("/api/medicare/campaign/:id", requireAuth, wrap(async (req, res) => res.json(await mstore.updateCampaign(req.params.id, campaignFields(req.body)))));
+app.post("/api/medicare/campaign", requireAuth, wrap(async (req, res) => {
+  const f = campaignFields(req.body);
+  if (!f.name) return res.status(400).json({ error: "name" });
+  res.json(await mstore.createCampaign({ status: "Running", ...f }));
+}));
+
+app.patch("/api/medicare/content/:id", requireAuth, wrap(async (req, res) => {
+  const b = req.body, f = {};
+  if ("status" in b) { if (!["Requested", "Draft", "Ready", "Posted"].includes(b.status)) return res.status(400).json({ error: "status" }); f.status = b.status; }
+  if ("postDate" in b) { if (!isDay(b.postDate || null)) return res.status(400).json({ error: "postDate" }); f.postDate = b.postDate || null; }
+  if ("compliance" in b) { if (b.compliance !== null && !["Educational - no plan named", "Needs carrier approval", "Approved"].includes(b.compliance)) return res.status(400).json({ error: "compliance" }); f.compliance = b.compliance; }
+  for (const k of ["ig", "fb", "cta", "summary", "brief", "materialId"]) if (k in b) f[k] = String(b[k] || "").slice(0, 4000);
+  if (f.status === "Posted" && !("postDate" in f)) f.postDate = localDate(req);
+  res.json(await mstore.updateContent(req.params.id, f));
+}));
+
+// A new post: a line about it, optionally one photo (JPEG/PNG/WebP, resized on the phone first).
+app.post("/api/medicare/content", requireAuth, wrap(async (req, res) => {
+  const b = req.body;
+  const title = String(b.title || "").trim().slice(0, 140);
+  const kind = b.kind;
+  if (!title) return res.status(400).json({ error: "title" });
+  if (!["In the field", "Educational", "Mailer follow-up", "Event promo", "Carrier news"].includes(kind)) return res.status(400).json({ error: "kind" });
+  let image = null;
+  if (b.image) {
+    const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(b.image));
+    if (!m) return res.status(400).json({ error: "image" });
+    const buf = Buffer.from(m[2], "base64");
+    if (buf.length > 9 * 1024 * 1024) return res.status(413).json({ error: "That photo is too large. Try a smaller one." });
+    const ext = m[1].split("/")[1].replace("jpeg", "jpg");
+    image = { buf, type: m[1], name: `${localDate(req)}-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}.${ext}` };
+  }
+  res.json(await mstore.createContent({ title, kind, brief: String(b.brief || "").slice(0, 2000), campaign: strOrNull(b.campaign, 64), image }));
+}));
+
+app.patch("/api/medicare/partner/:id", requireAuth, wrap(async (req, res) => {
+  const b = req.body, f = {};
+  if ("nextStep" in b) f.nextStep = String(b.nextStep || "").slice(0, 1000);
+  if ("disruption" in b) { if (b.disruption !== null && !["HMSA plan closing", "Humana changes", "Devoted fit", "None known"].includes(b.disruption)) return res.status(400).json({ error: "disruption" }); f.disruption = b.disruption; }
+  if ("networks" in b) f.networks = (Array.isArray(b.networks) ? b.networks : []).filter((c) => ["Devoted", "UHC", "Humana", "HMSA", "Unknown"].includes(c));
+  if ("contacted" in b && b.contacted) f.lastContact = localDate(req);
+  res.json(await mstore.updatePartner(req.params.id, f));
+}));
+
+// Photos and thumbnails are private Notion files with short-lived URLs, so they come through here.
+const PLACEHOLDER = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#EDECE6"/><path d="M30 64 L44 48 L54 58 L62 50 L72 64 Z" fill="#D6D5CC"/><circle cx="62" cy="38" r="5" fill="#D6D5CC"/></svg>');
+app.get("/api/medicare/img/:id", requireAuth, wrap(async (req, res) => {
+  const prop = req.query.p === "Thumbnail" ? "Thumbnail" : "Photo";
+  const i = Math.max(0, Math.min(9, Number(req.query.i) || 0));
+  const url = await mstore.fileUrl(req.params.id, prop, i);
+  if (!url) { res.set("Content-Type", "image/svg+xml"); res.set("Cache-Control", "no-store"); return res.send(PLACEHOLDER); }
+  const r = await fetch(url);
+  if (!r.ok) return res.status(502).end();
+  res.set("Content-Type", r.headers.get("content-type") || "image/jpeg");
+  res.set("Cache-Control", "private, max-age=1800");
+  res.send(Buffer.from(await r.arrayBuffer()));
+}));
+
+app.get(["/medicare", "/medicare/*"], (req, res) => {
+  res.set("Cache-Control", "no-cache");
+  res.sendFile(path.join(__dirname, "public", "medicare.html"));
+});
 
 // ---------- static ----------
 app.use(express.static(path.join(__dirname, "public"), {

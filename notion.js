@@ -340,4 +340,4 @@ async function setPushed(id, date) {
   return toOutbox(page, null);
 }
 
-module.exports = { getHistory, getOutbox, setPushed, getBrief, updateItem, updateDay, logEdit, applyDecisionToTask, createTask, getPage, toItem };
+module.exports = { getHistory, getOutbox, setPushed, getBrief, updateItem, updateDay, logEdit, applyDecisionToTask, createTask, getPage, toItem, _call: call, _read: read, _rich: rich, _plain: plain, _queryAll: queryAll, _queryDS: queryDS, API, VERSION };

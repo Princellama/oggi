@@ -32,6 +32,7 @@ Claude (brief skill) ──writes──▶ Notion: Brief Days + Brief Items ◀�
 - **Quick asks** — under *Changes since the brief*: **Check email** and **Check hand-offs** open a Claude chat that runs the mail-check skill, a mail-only slice of the brief (logged sent mail, the CPA and Medicare labels, new mail since the last brief or check, hand-offs to Milli and Virgilio).
 - **Where you are** (in Sort settings) — **Your time** is Automatic by default (the phone's own zone). When that's wrong, as on ship Wi-Fi or a VPN, pick the place instead (Japan, Korea, Hawaii…): the whole app then runs on that zone (clock, today's date, the timeline, the start time). Oggi also checks the phone's clock against the server's and corrects "now" when it is more than a minute off (a hand-set clock on the wrong zone can be hours out); the focus and break timers keep the phone's own clock. **Remote Work mode** adds a home-base row (Hawaii by default) under each hour on the timeline. Kept on the device.
 - **Outbox** — its own tab on phone and desktop: the People and Partners rows whose **Push to** is set and **Pushed** is empty, grouped as TaxDome and Axcess, GHL ready, Partners → GHL, Waiting on information, and Email gaps (folded). Copy one or a batch, **Mark pushed** (writes today into Pushed; Undo clears it), or **Have Claude enter these**, which opens a chat carrying only the Notion row links. Each push is also logged to the day's Edits since brief.
+- **Medicare** (`/medicare`, linked from the nav) — Eric's Medicare marketing desk, its own page on the same sign-in. Tabs, each with its own link: **Overview** (tiles for new Pulse items, posts in progress, campaign leads and partners caught in the disruption; the next field days with **Post from the table** on a kiosk day), **Pulse** (Hawaii and national news and carrier moves, filtered by scope and carrier; Mark read, Done with it, Make a post, Archive; **Scan now** opens a Claude chat), **Carriers** (Devoted, UHC, Humana, HMSA: role, stance and their latest Pulse items), **Campaigns** (cost, leads, appointments, enrollments and cost a lead; cost, pieces and status edited in place; add a campaign; **Count from GHL**; field days), **Content** (a new post from a photo and a line, resized on the phone to a 2048px JPEG and uploaded to Notion; Claude writes thumbnail, IG and Facebook captions, summary, call to action and disclaimer; copy buttons; a post flagged *Needs carrier approval* can't be marked posted until a material ID is entered) and **Partners** (the Partners table with Networks, Disruption and Next step; Talked today; a talk-track chat). Claude's side runs through the `medicare-marketing` skill (scan, count, write, partner). Photos are proxied through `/api/medicare/img/:id` because Notion's file links expire.
 - Installable to the home screen; the last brief is cached so it opens on a weak signal.
 
 ## Notion
@@ -41,7 +42,11 @@ Claude (brief skill) ──writes──▶ Notion: Brief Days + Brief Items ◀�
 | Brief Days | `292f1929-9158-4c3f-8e80-80ad70cd4b13` | Claude: Name (date), Date, Pass, Shape, Headline, Map caption, Published, and a JSON code block in the page body (`acts`, `events`, `motifs`, `tomorrow`). App: Intentions, Log, Edits since brief. |
 | Brief Items | `56605421-1249-4338-9a43-4ac9edc3bddc` | Claude: Title, Key, Place, Map label, List, Status, Order, Sentence, Source phrase, Link, Task, Carries, First seen, Last seen, Orbits, Waiting on / Waiting since, Person, Amount. App: Invoice, Note, Decision, Decided at, Status (done) and Closed on, Title and Place when edited, Supernova and Cooled off. A Closed item with no Closed on (older rows, or one the brief closed) counts its Last seen as the day it was done. |
 | People | `47d42794-febb-4efb-9173-14a22ce848cb` | Outbox (read: Name, Push to, What changed, Pushed). App: Pushed only. |
-| Partners | `fe50f233-8c9a-4d3c-bce1-ceab5dd05653` | Outbox, same as People. |
+| Partners | `fe50f233-8c9a-4d3c-bce1-ceab5dd05653` | Outbox, same as People. The Medicare Partners tab reads it all and writes Next step, Disruption, Networks and Last contact. |
+| Medicare Pulse | `290fedaf-813c-421d-a310-f91bb7106d1f` | Claude: every field. App: Status (Read, Acted, Archived). |
+| Medicare Campaigns | `0415f919-2f07-4930-b8e6-477d807ae3c6` | Claude: Leads, Appointments, Enrollments, Counted on. App: new rows, Cost, Pieces, Status. |
+| Medicare Content | `16fd1657-cc30-405b-a388-20b6d62f67be` | App: new rows (Title, Kind, Brief, Photo, Campaign, Status Requested), Status, Post date, Material ID. Claude: Thumbnail, captions, Summary, Call to action, Disclaimer, Compliance, Status Draft. |
+| Medicare Field Days | `e11838f2-f914-45b1-b478-8dea9e96f56e` | Claude, from Google Calendar. App reads only. |
 | #QuickActions | `15f8f469-b674-81ae-bbef-000bb207a508` | App: new task per capture (Status To Do, due today); Due Date moved by Tomorrow / This week; a line appended on Let go — nothing is ever deleted. |
 
 The app shows the latest Brief Days row on or before today, with the Brief Items whose **Last seen** is that date.
@@ -50,7 +55,7 @@ The app shows the latest Brief Days row on or before today, with the Brief Items
 
 | Name | Value |
 | --- | --- |
-| `NOTION_TOKEN` | The internal integration secret for "oggi". The five tables above must be shared with that integration. |
+| `NOTION_TOKEN` | The internal integration secret for "oggi". The tables above must be shared with that integration (the four Medicare tables live under the **Medicare Marketing** page, so connecting that page once covers them). |
 | `SESSION_SECRET` | Any long random string. Changing it signs everyone out. |
 | `ALLOWED_EMAIL` | The address that may sign in (comma-separate more than one). |
 | `OGGI_USER` | Username for PIN sign-in (not case-sensitive). |

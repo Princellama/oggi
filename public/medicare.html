@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#F9F9F7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Oggi">
+  <title>Medicare · Oggi</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/icon-180.png">
+  <link rel="preload" href="/fonts/fraunces-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/medicare.css">
+</head>
+<body class="mc">
+  <header class="mc-top">
+    <div class="mc-wrap">
+      <div class="mc-bar">
+        <a class="mc-back" href="/">← Oggi</a>
+        <span class="mc-aep" id="aep"></span>
+      </div>
+      <h1 class="head mc-title">Medicare</h1>
+      <nav class="mc-tabs" id="tabs" aria-label="Sections">
+        <a href="/medicare" data-tab="overview">Overview</a>
+        <a href="/medicare/pulse" data-tab="pulse">Pulse</a>
+        <a href="/medicare/carriers" data-tab="carriers">Carriers</a>
+        <a href="/medicare/campaigns" data-tab="campaigns">Campaigns</a>
+        <a href="/medicare/content" data-tab="content">Content</a>
+        <a href="/medicare/partners" data-tab="partners">Partners</a>
+      </nav>
+    </div>
+  </header>
+  <main class="mc-wrap mc-main" id="main" aria-live="polite">
+    <p class="quiet">Loading…</p>
+  </main>
+  <script src="/medicare-app.js"></script>
+</body>
+</html>
