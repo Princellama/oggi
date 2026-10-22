@@ -1216,6 +1216,8 @@
   }
   // the window's jobs, from Notion (cached a few minutes)
   const H = { days: 0, items: null, at: 0, loading: false };
+  // Star History can show one area's galaxy at a time; it starts on All every time the app opens
+  let histArea = "all";
   const historyReady = () => !!(H.items && H.days === prefs().histDays && Date.now() - H.at < 10 * 60_000);
   async function loadHistory() {
     const days = prefs().histDays;
@@ -1234,6 +1236,7 @@
     const X = (iso) => 80 + (Math.max(dayN(iso), d0) - d0 + 0.5) * K;
     const jobs = stars.filter((st) => st.kind === "item").map((st) => ({ st, j: jobSpan(st.h || st.it) }))
       .filter(({ j }) => dayN(j.end) >= d0)
+      .filter(({ st }) => histArea === "all" || areaOf(st.h || st.it) === histArea)
       .sort((a, b) => a.j.start.localeCompare(b.j.start) || a.j.end.localeCompare(b.j.end));
     const laneEnd = [];
     for (const o of jobs) {
@@ -1271,9 +1274,9 @@
       const nx = X(today);
       g.append(s("line", { class: "tl-now", x1: nx, y1: 110, x2: nx, y2: axisY + 6 }));
       const done = jobs.filter((o) => o.j.state === "done").length;
-      g.append(s("text", { class: "h-sum", x: 80, y: 110 }, `${done} done · ${jobs.filter((o) => o.j.state === "open").length} open · last ${days === 7 ? "7 days" : days === 30 ? "month" : "3 months"}`));
+      g.append(s("text", { class: "h-sum", x: 80, y: 110 }, `${done} done · ${jobs.filter((o) => o.j.state === "open").length} open · last ${days === 7 ? "7 days" : days === 30 ? "month" : "3 months"}${histArea === "all" ? "" : " · " + histArea}`));
     });
-    const pts = jobs.flatMap((o) => [{ x: o.x0, y: o.y }, { x: o.x1 + 90, y: o.y }]).concat([{ x: 60, y: 100 }, { x: xEnd, y: axisY + 30 }]);
+    const pts = jobs.flatMap((o) => [{ x: o.x0, y: o.y }, { x: o.x1 + 90, y: o.y }]).concat([{ x: 60, y: 40 }, { x: xEnd, y: axisY + 30 }]);
     return { pos, draw, box: boxOf(pts, 60) };
   }
   const isoAdd = (iso, n) => { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
@@ -1620,7 +1623,9 @@
     const seg = sky && sky.el.querySelector(".sky-seg");
     if (!seg) return;
     const p = prefs();
-    seg.hidden = p.mode !== "history";
+    const wrap = sky.el.querySelector(".sky-hist");
+    if (wrap) wrap.hidden = p.mode !== "history";
+    sky.el.querySelectorAll(".sky-area button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.area === histArea)));
     seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.textContent === { 7: "7d", 30: "1m", 90: "3m" }[p.histDays])));
   }
   function sortControl() {
@@ -1645,7 +1650,8 @@
     box.append(btn, fullBtn(), findBtn(), menu, findPanel());
     {
       // always there; shown only in Star History (syncSeg), so a sort that just flies the stars keeps it right
-      const seg = h("div", { class: "sky-seg", role: "group", "aria-label": "How far back", hidden: p.mode !== "history" });
+      const wrap = h("div", { class: "sky-hist", hidden: p.mode !== "history" });
+      const seg = h("div", { class: "sky-seg", role: "group", "aria-label": "How far back" });
       for (const [d, label] of [[7, "7d"], [30, "1m"], [90, "3m"]]) {
         seg.append(h("button", { type: "button", "aria-pressed": String(p.histDays === d), text: label, onclick: (ev) => {
           ev.stopPropagation();
@@ -1655,7 +1661,25 @@
           loadHistory().then(() => { renderNow(); if (sky) { sky.el.classList.add("away"); cam = sortCam("history"); setView(); } });
         } }));
       }
-      box.append(seg);
+      // which galaxy: All, or just one area
+      const areaSeg = h("div", { class: "sky-seg sky-area", role: "group", "aria-label": "Which area" });
+      for (const a of ["all", ...AREA_ORDER]) {
+        const b = h("button", { type: "button", "data-area": a, "aria-pressed": String(histArea === a) });
+        if (a !== "all") b.append(h("i", { class: "sky-area-dot", style: `background:${STAR_TINT[a] || STAR_TINT.Personal}` }));
+        b.append(a === "all" ? "All" : a);
+        b.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          if (histArea === a) return;
+          histArea = a;
+          areaSeg.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+          if (!sky || prefs().mode !== "history") return;
+          applyLayout("history", true);
+          animateCam(sortCam("history"), 900);
+        });
+        areaSeg.append(b);
+      }
+      wrap.append(seg, areaSeg);
+      box.append(wrap);
     }
     return box;
   }

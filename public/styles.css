@@ -717,7 +717,9 @@ body.skyfull { overflow: hidden; }
 .sky .h-tail.done { opacity: .5; }
 .sky .h-tail.dropped { opacity: .25; }
 .sky .h-sum { font: 600 8.5px var(--sans); letter-spacing: 1.3px; fill: var(--starlight); fill-opacity: .55; text-transform: uppercase; }
-.sky-seg { position: absolute; left: 0; top: calc(100% + 8px); display: flex; border: 1px solid rgba(244, 239, 228, .22); border-radius: 999px; overflow: hidden; background: rgba(10, 14, 28, .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.sky-hist { position: absolute; left: 0; top: calc(100% + 8px); display: flex; flex-wrap: wrap; gap: 8px; width: max-content; max-width: calc(100vw - 48px); }
+.sky-hist[hidden] { display: none; }
+.sky-seg { display: flex; border: 1px solid rgba(244, 239, 228, .22); border-radius: 999px; overflow: hidden; background: rgba(10, 14, 28, .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .sky-seg[hidden] { display: none; }
 .sky-seg button { border: 0; background: transparent; color: var(--starlight); opacity: .6; font: 600 12px var(--sans); padding: 7px 11px; cursor: pointer; }
 .sky-seg button[aria-pressed="true"] { opacity: 1; background: rgba(244, 239, 228, .14); }
@@ -804,3 +806,6 @@ ol.items li.child { margin-left: 22px; padding-left: 12px; border-left: 1px dash
 /* an opened parent's own little orbit, and the thread back to its sun */
 .sky .fam-ring { stroke-opacity: .32; stroke-dasharray: 2 4; }
 .sky .fam-thread { stroke-width: .8; stroke-opacity: .3; stroke-dasharray: 1 4; }
+.sky-area button { display: inline-flex; align-items: center; gap: 5px; }
+.sky-area-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+@media (max-width: 560px) { .sky.m-history .sky-find { top: calc(100% + 92px); } }
