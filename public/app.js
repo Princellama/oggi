@@ -964,7 +964,7 @@
     // constellation lines inside each place
     const lines = s("g", { "aria-hidden": "true", class: "lay-drive" });
     for (const place of Object.keys(SKY_AT)) {
-      const ps = stars.filter((x) => x.kind === "item" && !x.histOnly && !x.parentSt && x.place === place);
+      const ps = stars.filter((x) => x.kind === "item" && !x.histOnly && !x.parentSt && !isParent(x.it) && x.place === place);
       for (const x of ps) { x.dx = x.x; x.dy = x.y; }
       for (let i = 1; i < ps.length; i++) lines.append(s("line", { class: "cline" + (ps[i].open && ps[i - 1].open ? "" : " faint"), x1: ps[i - 1].x.toFixed(1), y1: ps[i - 1].y.toFixed(1), x2: ps[i].x.toFixed(1), y2: ps[i].y.toFixed(1) }));
     }
@@ -1297,6 +1297,31 @@
     const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
     return { x0: Math.min(...xs) - pad, x1: Math.max(...xs) + pad, y0: Math.min(...ys) - pad * 0.6, y1: Math.max(...ys) + pad * 0.6 };
   }
+  // ---- an opened parent becomes its own little sun ----
+  // It leaves its place, glides down into empty sky below everything else, and its children
+  // circle it, so nothing it brings out lands on another planet or crosses another ray.
+  const famRingR = (n) => Math.max(96, (n * 92) / (2 * Math.PI));
+  function openFamilies(stars, pos) {
+    const o = openKids();
+    return stars.filter((st) => st.kind === "item" && !st.histOnly && !st.parentSt && o.has(st.it.key) && isParent(st.it) && pos.get(st) && pos.get(st).show);
+  }
+  // Seat each family's hub at (x, y) and ring its children round it (none straight above,
+  // where the thread back home runs). Returns the ring radius.
+  function seatFamily(f, x, y, stars, pos) {
+    const kids = stars.filter((k) => k.parentSt === f && !k.histOnly && !folded(k.it));
+    const R = famRingR(kids.length);
+    pos.set(f, { x, y, show: true, hub: true });
+    kids.forEach((k, i) => {
+      const a = -Math.PI / 2 + ((i + 0.5) * Math.PI * 2) / kids.length;
+      pos.set(k, { x: x + R * Math.cos(a), y: y + R * Math.sin(a) * 0.86, show: true });
+    });
+    return R;
+  }
+  const famDraw = (f, x, y, R, from) => (g) => {
+    const tint = tintOf(f);
+    if (from) g.append(s("line", { class: "fam-thread", x1: from.x, y1: from.y, x2: x, y2: y - 22, stroke: tint }));
+    g.append(s("ellipse", { class: "orb-ring fam-ring", cx: x, cy: y, rx: R, ry: R * 0.86, stroke: tint }));
+  };
   // Where every star goes in a layout, plus what to draw behind them.
   function layoutFor(mode, stars) {
     const pos = new Map();
@@ -1353,8 +1378,12 @@
       const areas = AREA_ORDER.filter((a) => stars.some((st) => st.open && st.kind === "item" && areaOf(st.it) === a));
       const suns = {}, rings = {};
       areas.forEach((a, i) => { suns[a] = { x: 220 + i * 440, y: 320 }; });
+      // opened parents and their children sit out of the orbits, below their sun
+      const o = openKids();
+      const hubs = stars.filter((st) => st.open && st.kind === "item" && !st.parentSt && o.has(st.it.key) && isParent(st.it));
+      const inFam = (st) => hubs.includes(st) || (st.parentSt && hubs.includes(st.parentSt));
       for (const a of areas) {
-        const list = stars.filter((st) => st.open && st.kind === "item" && areaOf(st.it) === a).sort((x, y) => x.seqIdx - y.seqIdx);
+        const list = stars.filter((st) => st.open && st.kind === "item" && areaOf(st.it) === a && !inFam(st)).sort((x, y) => x.seqIdx - y.seqIdx);
         const per = 7;
         list.forEach((st, k) => {
           const ring = Math.floor(k / per), n = Math.min(per, list.length - ring * per);
@@ -1364,11 +1393,30 @@
           (rings[a] ||= new Set()).add(r);
         });
       }
+      for (const a of areas) {
+        const fam = hubs.filter((f) => areaOf(f.it) === a);
+        if (!fam.length) continue;
+        const outer = Math.max(0, ...(rings[a] || []));
+        const below = suns[a].y + (outer ? outer * 0.86 + 34 : 80);   // under the last orbit and its labels
+        const Rs = fam.map((f) => famRingR(stars.filter((k) => k.parentSt === f).length));
+        const span = Rs.reduce((t, R) => t + 2 * R + 120, 0) - 120;
+        let x = suns[a].x - span / 2;
+        fam.forEach((f, i) => {
+          const R = Rs[i];
+          x += R;
+          const y = below + 60 + R * 0.86;
+          seatFamily(f, x, y, stars, pos);
+          draw.push(famDraw(f, x, y, R, { x: suns[a].x, y: suns[a].y + 48 }));
+          x += R + 120;
+        });
+      }
       let j = 0;
       for (const st of stars) {
         if (pos.has(st)) continue;
         if (st.kind === "event" && st.open) { pos.set(st, { x: 120 + j * 70, y: 120, show: true }); j++; continue; }
-        pos.set(st, { x: st.dx, y: st.dy, show: false });
+        // a folded child waits tucked behind its parent
+        const par = st.parentSt && pos.get(st.parentSt);
+        pos.set(st, par ? { x: par.x, y: par.y, show: false } : { x: st.dx, y: st.dy, show: false });
       }
       draw.push((g) => {
         for (const a of areas) {
@@ -1391,9 +1439,27 @@
       pos.set(st, tucked ? { x: st.parentSt.dx, y: st.parentSt.dy, show: false }
         : { x: st.dx, y: st.dy, show: !st.histOnly && (st.kind === "item" || st.open) });
     }
-    // let the camera reach children that fanned out past the usual edges
+    // opened parents drop below the whole sky, each its own sun with its children round it
+    const fams = openFamilies(stars, pos).sort((a, b) => a.dx - b.dx);
+    if (fams.length) {
+      const inFam = (st) => fams.includes(st) || (st.parentSt && fams.includes(st.parentSt));
+      let bottom = Math.max(...Object.values(SKY_AT).map(([, y]) => y + 70));   // the place names
+      for (const [st, p] of pos) if (p.show && !inFam(st)) bottom = Math.max(bottom, p.y + 40);
+      let right = -Infinity;
+      for (const f of fams) {
+        const R = famRingR(stars.filter((k) => k.parentSt === f).length);
+        const x = Math.max(f.dx, right + R + 110);
+        const y = bottom + 70 + R * 0.86;
+        seatFamily(f, x, y, stars, pos);
+        draw.push(famDraw(f, x, y, R, null));
+        right = x + R + 110;
+      }
+      // folded children of anything else stay tucked behind their own parent
+      for (const st of stars) if (st.parentSt && !fams.includes(st.parentSt) && folded(st.it)) pos.set(st, { ...pos.get(st.parentSt), show: false });
+    }
+    // let the camera reach the families below and any child out past the usual edges
     const box = { ...SKY_BOX };
-    for (const [st, p] of pos) if (p.show && st.parentSt) { box.x0 = Math.min(box.x0, p.x - 70); box.x1 = Math.max(box.x1, p.x + 70); box.y0 = Math.min(box.y0, p.y - 50); box.y1 = Math.max(box.y1, p.y + 60); }
+    for (const [st, p] of pos) if (p.show && (st.parentSt || p.hub)) { box.x0 = Math.min(box.x0, p.x - 90); box.x1 = Math.max(box.x1, p.x + 90); box.y0 = Math.min(box.y0, p.y - 50); box.y1 = Math.max(box.y1, p.y + 70); }
     return { pos, draw, box };
   }
   function placeStar(st) { st.el.setAttribute("transform", `translate(${st.x.toFixed(1)} ${st.y.toFixed(1)})`); }
@@ -1409,7 +1475,7 @@
     // faint threads between the shown stars that are about the same person
     if (mode === "drive") {
       const byP = new Map();
-      for (const st of sky.stars) { if (st.kind !== "item" || st.histOnly) continue; const p = personOf(st.it), q = L.pos.get(st); if (p && q && q.show && st.it.status !== "Closed") (byP.get(p) || byP.set(p, []).get(p)).push(q); }
+      for (const st of sky.stars) { if (st.kind !== "item" || st.histOnly) continue; const p = personOf(st.it), q = L.pos.get(st); const fam = q && (q.hub || (st.parentSt && (L.pos.get(st.parentSt) || {}).hub)); if (p && q && q.show && !fam && st.it.status !== "Closed") (byP.get(p) || byP.set(p, []).get(p)).push(q); }
       for (const pts of byP.values()) for (let i = 1; i < pts.length; i++) sky.layer.append(s("line", { class: "person-link", x1: pts[i - 1].x, y1: pts[i - 1].y, x2: pts[i].x, y2: pts[i].y }));
     }
     // the threads from a parent out to each child it has opened
@@ -1426,7 +1492,7 @@
       const p = L.pos.get(st);
       const was = !!st.gone;
       st.gone = !p.show;
-      if (mode === "drive" && st.parentSt && was !== st.gone) kidMove.set(st, st.gone ? "in" : "out");
+      if ((mode === "drive" || mode === "area") && st.parentSt && was !== st.gone) kidMove.set(st, st.gone ? "in" : "out");
       // a folding child stays visible while it swings home; it fades as it arrives
       if (!(animate && !reduceMotion() && kidMove.get(st) === "in")) st.el.classList.toggle("gone", st.gone);
       st.tx = p.x; st.ty = p.y;
@@ -1440,7 +1506,7 @@
     // children leave one after another, in their own order
     const kidRank = new Map();
     for (const [st, dir] of kidMove) { const sib = [...kidMove.keys()].filter((x) => x.parentSt === st.parentSt && kidMove.get(x) === dir); kidRank.set(st, sib.indexOf(st)); }
-    sky.stars.forEach((st, i) => { if (kidMove.has(st)) delay.set(i, (kidMove.get(st) === "out" ? 120 : 0) + kidRank.get(st) * (kidMove.get(st) === "out" ? 55 : 30)); });
+    sky.stars.forEach((st, i) => { if (kidMove.has(st)) delay.set(i, (kidMove.get(st) === "out" ? 420 : 0) + kidRank.get(st) * (kidMove.get(st) === "out" ? 55 : 30)); });
     const dur = 1050, kidDur = 760, t0 = performance.now();
     const backOut = (t) => { const c = 1.45; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
     const step = (now) => {
@@ -1488,7 +1554,7 @@
     fillCtl(); fillCard();
     sky.el.classList.remove("away");
     applyLayout(prefs().mode, true);
-    if (prefs().mode === "drive") animateCam(familyCam(st), 700);
+    if (prefs().mode === "drive" || prefs().mode === "area") animateCam(familyCam(st), 900);
     seeStar(st);
   }
   // After a sort, frame enough to read: a stretch of the day around the current planet,
@@ -2164,8 +2230,9 @@
   function restCam(st) { return { x: st.x, y: st.y + (prefs().mode === "timeline" ? 30 : 6), w: restW(sky.el) * (prefs().mode === "drive" ? 1 : 1.35) }; }
   // an opened parent: pull back just enough to see it and every child it sent out
   function familyCam(st) {
-    const c = restCam(st);
-    if (!openKids().has(st.it.key)) return c;
+    // folding: follow the parent back to where it lives (its sun, when sorted by area)
+    const c = { ...restCam(st), x: st.tx ?? st.x, y: (st.ty ?? st.y) + 6 };
+    if (!openKids().has(st.it.key)) return prefs().mode === "area" ? sortCam("area") : c;
     const pts = [{ x: st.tx ?? st.x, y: st.ty ?? st.y }].concat(sky.stars.filter((k) => k.parentSt === st && !k.gone).map((k) => ({ x: k.tx, y: k.ty })));
     if (pts.length < 2) return c;
     const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);

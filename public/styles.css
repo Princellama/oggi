@@ -801,3 +801,6 @@ body.skyfull { overflow: hidden; }
 ol.items li.child { margin-left: 22px; padding-left: 12px; border-left: 1px dashed rgba(46,44,39,.18); }
 .sky .person-link { stroke: var(--starlight, #F4EFE4); stroke-opacity: .16; stroke-width: .7; stroke-dasharray: 1 4; }
 @media (max-width: 440px) { .sky-find-l { display: none; } .sky-find-b { padding: 7px 10px; } }
+/* an opened parent's own little orbit, and the thread back to its sun */
+.sky .fam-ring { stroke-opacity: .32; stroke-dasharray: 2 4; }
+.sky .fam-thread { stroke-width: .8; stroke-opacity: .3; stroke-dasharray: 1 4; }
