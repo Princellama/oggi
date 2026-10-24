@@ -90,4 +90,26 @@ async function setPushed(id, date) {
   return { ...r };
 }
 
-module.exports = { getHistory, getOutbox, setPushed, getBrief, updateItem, updateDay, logEdit, applyDecisionToTask, createTask, getPage, toItem };
+// A spread of events across the calendars, dated from today, for the Events view.
+const at = (add, hm) => `${iso(add)}T${hm}:00-10:00`;
+const EVENTS = [
+  [0, "13:00", "14:00", "Lunch with Norman", "Practice", "Kalihi", true],
+  [1, "09:00", "10:00", "Romeo Valdez", "Practice", "Waimalu", true],
+  [1, null, null, "Chairman, weekend meeting", "Kalihi JW", "Kalihi", false],
+  [1, "12:00", "12:45", "Study with Zach", "Personal", "", true],
+  [2, "08:00", "12:00", "Kiosk · Salt Lake #9955", "Practice", "848 Ala Lilikoi St", true, "Last approved day this month"],
+  [4, "21:00", "21:50", "Italian lesson", "Personal", "Preply", true],
+  [6, null, null, "Attendant", "Kalihi JW", "Kalihi", false],
+  [9, "16:00", "17:00", "Ekahi Solutions, vote", "Practice", "Google Meet", true],
+  [14, "18:30", "20:30", "KAM IV dedication planning", "Field service", "Auditorium A", true],
+  [22, null, null, "Public talk at Kalihi", "Kalihi JW", "Kalihi", false],
+  [60, null, null, "Cebuano CO visit", "Kalihi JW", "", false, "Elders meeting probably that Saturday"],
+];
+async function getEvents() {
+  return EVENTS.map(([d, s, e, title, calendar, where, onCalendar, note], i) => ({
+    id: "ev-" + i, url: null, title, calendar, where, onCalendar, itemKey: null, note: note || "",
+    start: s ? at(d, s) : iso(d), end: e ? at(d, e) : null, allDay: !s,
+  }));
+}
+
+module.exports = { getEvents, getHistory, getOutbox, setPushed, getBrief, updateItem, updateDay, logEdit, applyDecisionToTask, createTask, getPage, toItem };

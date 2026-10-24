@@ -10,6 +10,7 @@ const DS = {
   tasks: process.env.NOTION_TASKS_DS || "15f8f469-b674-81ae-bbef-000bb207a508",
   people: process.env.NOTION_PEOPLE_DS || "47d42794-febb-4efb-9173-14a22ce848cb",
   partners: process.env.NOTION_PARTNERS_DS || "fe50f233-8c9a-4d3c-bce1-ceab5dd05653",
+  events: process.env.NOTION_EVENTS_DS || "a288323e-c3f0-447b-a638-afee934fb069",
 };
 
 async function call(method, path, body) {
@@ -343,4 +344,30 @@ async function setPushed(id, date) {
   return toOutbox(page, null);
 }
 
-module.exports = { getHistory, getOutbox, setPushed, getBrief, updateItem, updateDay, logEdit, applyDecisionToTask, createTask, getPage, toItem, _call: call, _read: read, _rich: rich, _plain: plain, _queryAll: queryAll, _queryDS: queryDS, API, VERSION };
+// ---- Events: the master list across every calendar (Claude syncs it; the app reads it) ----
+function toEvent(page) {
+  const p = page.properties;
+  const when = p["When"] && p["When"].date;
+  return {
+    id: page.id,
+    url: page.url,
+    title: read(p["Name"]),
+    start: when ? when.start : null,
+    end: when ? when.end : null,
+    allDay: !!when && !/T/.test(when.start || ""),
+    calendar: read(p["Calendar"]) || "Practice",
+    where: read(p["Where"]) || "",
+    onCalendar: !!(p["On calendar"] && p["On calendar"].checkbox),
+    itemKey: read(p["Item key"]) || null,
+    note: read(p["Note"]) || "",
+  };
+}
+async function getEvents(fromDate) {
+  const rows = await queryAll(DS.events, {
+    filter: { property: "When", date: { on_or_after: fromDate } },
+    sorts: [{ property: "When", direction: "ascending" }],
+  });
+  return rows.map(toEvent).filter((e) => e.start);
+}
+
+module.exports = { getEvents, getHistory, getOutbox, setPushed, getBrief, updateItem, updateDay, logEdit, applyDecisionToTask, createTask, getPage, toItem, _call: call, _read: read, _rich: rich, _plain: plain, _queryAll: queryAll, _queryDS: queryDS, API, VERSION };
