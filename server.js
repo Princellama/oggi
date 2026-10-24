@@ -255,6 +255,19 @@ app.post("/api/capture", requireAuth, wrap(async (req, res) => {
 }));
 
 // ---------- outbox ----------
+app.get("/api/events", requireAuth, wrap(async (req, res) => {
+  // from yesterday, so an event running across midnight in Hawaii is never dropped
+  const from = new Date(Date.now() - 36 * 3600 * 1000).toISOString().slice(0, 10);
+  try {
+    res.json({ events: await store.getEvents(from) });
+  } catch (e) {
+    if (e.status === 404 || /could not find|not shared|object_not_found/i.test(e.message || "")) {
+      return res.status(409).json({ error: "share" });
+    }
+    throw e;
+  }
+}));
+
 app.get("/api/outbox", requireAuth, wrap(async (req, res) => {
   try {
     res.json({ rows: await store.getOutbox() });

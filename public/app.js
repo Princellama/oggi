@@ -739,6 +739,12 @@
   }
   const kidsOf = (it) => (it && it.key ? B.items.filter((c) => c !== it && c.orbits === it.key && (c.list === "Needs attention" || c.list === "Resolved")) : []);
   const isParent = (it) => kidsOf(it).length > 0;
+  // ---- twins: one matter split across two areas (a bill under Money, its work under Medicare) ----
+  // Twin holds the other half's Key on both items. Each half closes on its own.
+  function twinOf(it) {
+    if (!it || !it.twin) return null;
+    return B.items.find((t) => t !== it && t.key === it.twin) || null;
+  }
   function folded(it) { const p = parentOf(it); return !!p && !openKids().has(p.key); }
   function toggleKids(it) {
     const o = openKids();
@@ -1480,6 +1486,26 @@
       const byP = new Map();
       for (const st of sky.stars) { if (st.kind !== "item" || st.histOnly) continue; const p = personOf(st.it), q = L.pos.get(st); const fam = q && (q.hub || (st.parentSt && (L.pos.get(st.parentSt) || {}).hub)); if (p && q && q.show && !fam && st.it.status !== "Closed") (byP.get(p) || byP.set(p, []).get(p)).push(q); }
       for (const pts of byP.values()) for (let i = 1; i < pts.length; i++) sky.layer.append(s("line", { class: "person-link", x1: pts[i - 1].x, y1: pts[i - 1].y, x2: pts[i].x, y2: pts[i].y }));
+    }
+    // a dashed thread between the two halves of a twinned matter; a half folded inside its
+    // parent is reached at the parent's star
+    if (mode === "drive" || mode === "area") {
+      const seen = new Set();
+      const shownPos = (st) => {
+        const q = L.pos.get(st);
+        if (q && q.show) return q;
+        const pq = st.parentSt && L.pos.get(st.parentSt);
+        return pq && pq.show ? pq : null;
+      };
+      for (const st of sky.stars) {
+        if (st.kind !== "item" || st.histOnly || !st.it.twin || seen.has(st)) continue;
+        const tw = sky.stars.find((o) => o !== st && o.kind === "item" && o.it.key === st.it.twin);
+        if (!tw) continue;
+        seen.add(st); seen.add(tw);
+        if (st.it.status === "Closed" && tw.it.status === "Closed") continue;
+        const a = shownPos(st), b = shownPos(tw);
+        if (a && b && (a.x !== b.x || a.y !== b.y)) sky.layer.append(s("line", { class: "twin-link", x1: a.x, y1: a.y, x2: b.x, y2: b.y }));
+      }
     }
     // the threads from a parent out to each child it has opened
     if (mode !== "history") for (const st of sky.stars) {
@@ -2410,6 +2436,13 @@
       if (isInvoice(it)) card.append(invoiceRow(it, () => renderAll()));
       const par = parentOf(it);
       if (par) card.append(h("p", { class: "now-carry", text: `Orbits ${par.title}.` }));
+      const tw = twinOf(it);
+      if (tw) {
+        const twSt = sky && sky.stars.find((x) => x.kind === "item" && x.it === tw);
+        const label = `Other half: ${tw.title} · ${areaOf(tw)}${tw.status === "Closed" ? " · done" : ""}`;
+        card.append(h("p", { class: "now-carry twin-line" }, twSt ? h("a", { href: "#", onclick: (e) => { e.preventDefault(); goToStar(twSt); }, text: label }) : label));
+        if (it.status === "Closed" && tw.status !== "Closed") card.append(h("p", { class: "now-carry quiet", text: `The ${areaOf(tw)} half is still open.` }));
+      }
     }
     const rec = recFor(cur);
     const open = h("div", { class: "now-open" }, h("button", { class: "btn", onclick: onOpen, text: "Open it" }));
@@ -2870,8 +2903,8 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
 
   function toggleFocus(on) {
     document.body.classList.toggle("focus", on);
-    if (on) document.body.classList.remove("outboxview");
-    if (isDesk()) markNav(on ? "now" : document.body.classList.contains("outboxview") ? "outbox" : "today");
+    if (on) { document.body.classList.remove("outboxview"); document.body.classList.remove("eventsview"); }
+    if (isDesk()) markNav(on ? "now" : document.body.classList.contains("outboxview") ? "outbox" : document.body.classList.contains("eventsview") ? "events" : "today");
     nowDrilled = false;
     if (on) { nowIdx = 0; const seq = nowSequence(); if (selKey) { const i = seq.findIndex((x) => x.kind === "item" && x.it.id === selKey); if (i >= 0) nowIdx = i; } renderNow(); }
   }
@@ -2881,9 +2914,10 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
     if (!isDesk() || !B || !B.day || sheetOpen || veilOpen()) return;
     const typing = ev.target.closest("input, textarea");
     if (ev.key === "Escape" && !typing && document.body.classList.contains("outboxview")) { document.body.classList.remove("outboxview"); markNav("today"); return; }
+    if (ev.key === "Escape" && !typing && document.body.classList.contains("eventsview")) { document.body.classList.remove("eventsview"); markNav("today"); return; }
     if (ev.key === "Escape") { if (typing) ev.target.blur(); else if (document.body.classList.contains("focus") && nowDrilled) surface(); else if (document.body.classList.contains("focus")) toggleFocus(false); else { selKey = null; renderAll(); } return; }
     if (typing || ev.metaKey || ev.ctrlKey || ev.altKey) return;
-    if (document.body.classList.contains("outboxview")) return;
+    if (document.body.classList.contains("outboxview") || document.body.classList.contains("eventsview")) return;
     if (ev.key === "/" && sky) { ev.preventDefault(); if (!document.body.classList.contains("focus")) toggleFocus(true); setTimeout(openFind, 30); return; }
     // in focus, the arrows travel the sky and Enter dives into the bright star
     if (document.body.classList.contains("focus") && sky) {
@@ -3091,6 +3125,153 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
   }
   function showOutbox() { if (!OB.rows || Date.now() - (OB.at || 0) > 5 * 60_000) loadOutbox(); else renderOutbox(); }
 
+  // ---------------- Events: every calendar in one list ----------------
+  // Claude keeps the Notion Events table in step with the four Google calendars and adds the
+  // dated items that live only in Oggi (Kalihi JW). Here they form one master list under a small
+  // sky: one sun per calendar. Tap a sun to sort the list into that calendar; tap it again, or
+  // ALL, to see everything. Which sun is chosen and the sort are kept on the device.
+  const EV_CALS = [
+    { name: "Practice", color: "#E8A15A", x: 18, y: 14, r: 15 },
+    { name: "Personal", color: "#E6C65A", x: 74, y: 12, r: 12 },
+    { name: "Kalihi JW", color: "#6FC3C0", x: 16, y: 70, r: 11 },
+    { name: "Field service", color: "#B9A3E3", x: 76, y: 72, r: 8 },
+    { name: "HWC", color: "#9A988F", x: 84, y: 40, r: 6, note: "free/busy only" },
+  ];
+  const EV = { rows: null, at: null, err: null, loading: false, cal: store.get("evCal") || null, mode: store.get("evMode") || "date" };
+  const evCal = (name) => EV_CALS.find((c) => c.name === name) || EV_CALS[0];
+  // Events carry their own wall-clock time (Hawaii); read it from the string, not the device zone.
+  const evDay = (e) => String(e.start).slice(0, 10);
+  function evClock(iso) {
+    const m = /T(\d\d):(\d\d)/.exec(iso || "");
+    if (!m) return "";
+    let hh = Number(m[1]); const mm = m[2], ap = hh >= 12 ? "PM" : "AM";
+    hh = hh % 12 || 12;
+    return mm === "00" ? `${hh} ${ap}` : `${hh}:${mm} ${ap}`;
+  }
+  function evWhen(e) {
+    if (e.allDay) return "";
+    const a = evClock(e.start), b = evClock(e.end);
+    if (!b) return a;
+    const sa = a.slice(-2), sb = b.slice(-2);
+    return `${sa === sb ? a.slice(0, -3) : a} – ${b}`;
+  }
+  const EV_WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const EV_MO = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function evDayLabel(d) {
+    const [y, m, dd] = d.split("-").map(Number);
+    const wd = EV_WD[new Date(Date.UTC(y, m - 1, dd)).getUTCDay()];
+    const today = localISO(), tmr = localISO(new Date(nowMs() + 86400000));
+    const rel = d === today ? "Today · " : d === tmr ? "Tomorrow · " : "";
+    return `${rel}${wd} ${EV_MO[m - 1]} ${dd}${y !== Number(today.slice(0, 4)) ? ", " + y : ""}`;
+  }
+  const evShort = (d) => { const [, m, dd] = d.split("-").map(Number); return `${EV_MO[m - 1]} ${dd}`; };
+
+  async function loadEvents() {
+    if (EV.loading) return;
+    EV.loading = true; EV.err = null; renderEvents();
+    try {
+      const r = await api("GET", "/api/events");
+      EV.rows = r.events || []; EV.at = Date.now();
+      store.set("events", { at: EV.at, rows: EV.rows });
+    } catch (e) {
+      if (e.message === "signin") { EV.loading = false; return; }
+      EV.err = e.message === "share"
+        ? "Oggi can't see the Events table yet. In Notion, open Events, choose ••• → Connections, and add the oggi connection. Then refresh."
+        : "Couldn't reach Notion" + (EV.rows ? " — showing the last copy." : ".");
+      if (!EV.rows) { const c = store.get("events"); if (c) { EV.rows = c.rows; EV.at = c.at; } }
+    }
+    EV.loading = false;
+    renderEvents();
+  }
+  function showEvents() { if (!EV.rows || Date.now() - (EV.at || 0) > 5 * 60_000) loadEvents(); else renderEvents(); }
+  function evSet(k, v) { EV[k] = v; store.set(k === "cal" ? "evCal" : "evMode", v); renderEvents(); }
+
+  function evSky(rows) {
+    const box = h("div", { class: "ev-sky", role: "group", "aria-label": "Calendars" });
+    const deco = s("svg", { class: "ev-sky-deco", viewBox: "0 0 100 100", preserveAspectRatio: "none", "aria-hidden": "true" });
+    for (const [x, y, r] of [[12, 30, .35], [88, 18, .4], [58, 88, .3], [27, 92, .3], [80, 58, .3], [42, 12, .25], [66, 40, .2]]) deco.append(s("circle", { cx: x, cy: y, r, class: "ev-mote" }));
+    deco.append(s("circle", { cx: 50, cy: 47, r: 15, class: "ev-ring" }), s("circle", { cx: 50, cy: 47, r: 32, class: "ev-ring" }));
+    box.append(deco);
+    const all = h("button", { type: "button", class: "ev-all" + (EV.cal ? "" : " on"), "aria-pressed": String(!EV.cal), onclick: () => { EV.mode = "date"; store.set("evMode", "date"); evSet("cal", null); } },
+      h("b", { text: "ALL" }), h("span", { text: String(rows.length) }));
+    box.append(all);
+    for (const c of EV_CALS) {
+      const n = rows.filter((e) => e.calendar === c.name).length;
+      if (!n && c.name === "HWC") continue;
+      const on = EV.cal === c.name, dim = EV.cal && !on;
+      const loose = rows.some((e) => e.calendar === c.name && !e.onCalendar) && rows.filter((e) => e.calendar === c.name).every((e) => !e.onCalendar);
+      const b = h("button", {
+        type: "button", class: "ev-sun" + (on ? " on" : "") + (dim ? " dim" : "") + (loose ? " loose" : ""),
+        style: `left:${c.x}%;top:${c.y}%;--c:${c.color};--r:${c.r * 2}px`,
+        "aria-pressed": String(on), "aria-label": `Sort into ${c.name}`,
+        onclick: () => { if (on) evSet("cal", null); else { EV.mode = "cal"; store.set("evMode", "cal"); evSet("cal", c.name); } },
+      }, h("span", { class: "ev-orb" }), h("span", { class: "ev-sun-l", text: c.name }), h("span", { class: "ev-sun-n", text: c.note || `${n} event${n === 1 ? "" : "s"}` }));
+      box.append(b);
+    }
+    return box;
+  }
+  function evRow(e, withDate) {
+    const c = evCal(e.calendar);
+    const meta = [e.where, EV.mode === "date" && !EV.cal ? e.calendar : null].filter(Boolean).join(" · ");
+    const when = withDate ? [evShort(evDay(e)), evWhen(e)].filter(Boolean).join(" · ") : evWhen(e) || "All day";
+    const li = h("li", { class: "ev-row" },
+      h("span", { class: "ev-dot" + (e.onCalendar ? "" : " loose"), style: `--c:${c.color}`, "aria-hidden": "true" }),
+      h("div", { class: "ev-body" },
+        h("span", { class: "ttl", text: e.title }),
+        meta ? h("span", { class: "ev-meta", text: meta }) : null,
+        e.note ? h("span", { class: "ev-note", text: e.note }) : null,
+        e.onCalendar ? null : h("span", { class: "ev-loose", text: "In Oggi only · not on a calendar yet" })),
+      h("span", { class: "ev-when", text: when }));
+    return li;
+  }
+  function renderEvents() {
+    const host = $("#paneEvents");
+    if (!host) return;
+    const y = host.scrollTop;
+    host.replaceChildren();
+    const w = h("div", { class: "wrap" });
+    host.append(w);
+    const rows = EV.rows || [];
+    const refresh = h("button", { class: "readaloud", text: EV.loading ? "Refreshing…" : "Refresh", disabled: EV.loading });
+    refresh.addEventListener("click", () => loadEvents());
+    w.append(h("div", { class: "toprow" }, h("p", { class: "daydate", text: "Events · every calendar" + (EV.at ? ` · ${fmtTime(new Date(EV.at))}` : "") }), refresh));
+    const sel = EV.cal ? evCal(EV.cal) : null;
+    w.append(h("h1", { class: "head" }, EV.rows ? (sel ? sel.name : "Everything ahead.") : "Loading your events."));
+    if (EV.err) w.append(h("p", { class: "ob-err", text: EV.err }));
+    if (!EV.rows) { host.scrollTop = y; return; }
+    w.append(evSky(rows));
+    const shown = rows.filter((e) => !EV.cal || e.calendar === EV.cal);
+    const tog = (mode, label) => h("button", { type: "button", class: "ev-tog" + (EV.mode === mode ? " on" : ""), "aria-pressed": String(EV.mode === mode), onclick: () => evSet("mode", mode), text: label });
+    w.append(h("div", { class: "ev-bar" },
+      h("div", { class: "ev-toggle", role: "group", "aria-label": "Sort" }, tog("date", "By date"), tog("cal", "By calendar")),
+      h("span", { class: "quiet", text: sel ? `${shown.length} in ${sel.name}` : `${rows.length} across ${new Set(rows.map((e) => e.calendar)).size} calendars` })));
+    if (!shown.length) w.append(h("p", { class: "quiet", text: "Nothing ahead here." }));
+    if (EV.mode === "date") {
+      let cur = null, ul = null;
+      for (const e of shown) {
+        if (evDay(e) !== cur) {
+          cur = evDay(e);
+          const sec = h("section", { class: "ev-group" }, h("h2", { class: "ev-h", text: evDayLabel(cur) }));
+          ul = h("ul", { class: "ev-list" }); sec.append(ul); w.append(sec);
+        }
+        ul.append(evRow(e, false));
+      }
+    } else {
+      for (const c of EV_CALS) {
+        if (EV.cal && c.name !== EV.cal) continue;
+        const list = shown.filter((e) => e.calendar === c.name);
+        if (!list.length) continue;
+        const sec = h("section", { class: "ev-group" },
+          h("h2", { class: "ev-h" }, h("span", { class: "ev-dot", style: `--c:${c.color}`, "aria-hidden": "true" }), c.name, h("span", { class: "quiet", text: ` ${list.length} upcoming` })));
+        const ul = h("ul", { class: "ev-list" });
+        list.forEach((e) => ul.append(evRow(e, true)));
+        sec.append(ul); w.append(sec);
+      }
+    }
+    w.append(h("p", { class: "quiet", style: "margin-top:18px", text: "Claude keeps this list in step with your calendars on each brief. A dashed dot is a date that lives only in Oggi so far." }));
+    host.scrollTop = y;
+  }
+
   // ---------------- nav (phone) ----------------
   const panes = $("#panes");
   function go(name, smooth = true) {
@@ -3099,6 +3280,7 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
     panes.scrollTo({ left: el.offsetLeft, behavior: smooth ? "smooth" : "auto" });
     markNav(name);
     if (name === "outbox") showOutbox();
+    if (name === "events") showEvents();
   }
   function markNav(name) { document.querySelectorAll(".nav button").forEach((b) => b.setAttribute("aria-current", String(b.dataset.go === name))); }
   $("#nav").addEventListener("click", (ev) => {
@@ -3108,17 +3290,20 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
     // desktop: Now = focus view, Today = the brief + editor, Capture = jump to the capture box, Outbox = its own page
     const name = b.dataset.go;
     document.body.classList.toggle("outboxview", name === "outbox");
+    document.body.classList.toggle("eventsview", name === "events");
     toggleFocus(name === "now");
     markNav(name);
     if (name === "outbox") showOutbox();
+    if (name === "events") showEvents();
     if (name === "capture") { const c = $("#deskCapture"); if (c) { c.scrollIntoView({ block: "center" }); c.focus(); } }
   });
   panes.addEventListener("scroll", debounce(() => {
     if (isDesk()) return;
     const i = Math.round(panes.scrollLeft / panes.clientWidth);
-    const name = ["now", "today", "capture", "outbox"][i] || "today";
+    const name = ["now", "today", "capture", "outbox", "events"][i] || "today";
     markNav(name);
     if (name === "outbox" && !OB.rows && !OB.loading) loadOutbox();
+    if (name === "events" && !EV.rows && !EV.loading) loadEvents();
   }, 60));
 
 
@@ -3279,6 +3464,7 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
     if (!isDesk()) go(p.get("view") || "today", false);
     if (isDesk() && p.get("view") === "now") toggleFocus(true);
     if (isDesk() && p.get("view") === "outbox") { document.body.classList.add("outboxview"); markNav("outbox"); showOutbox(); }
+    if (isDesk() && p.get("view") === "events") { document.body.classList.add("eventsview"); markNav("events"); showEvents(); }
     // refresh quietly when the app comes back to the foreground
     document.addEventListener("visibilitychange", async () => {
       if (document.visibilityState !== "visible") return;

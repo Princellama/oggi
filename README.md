@@ -40,13 +40,14 @@ Claude (brief skill) ──writes──▶ Notion: Brief Days + Brief Items ◀�
 | Table | Data source | Who writes what |
 | --- | --- | --- |
 | Brief Days | `292f1929-9158-4c3f-8e80-80ad70cd4b13` | Claude: Name (date), Date, Pass, Shape, Headline, Map caption, Published, and a JSON code block in the page body (`acts`, `events`, `motifs`, `tomorrow`). App: Intentions, Log, Edits since brief. |
-| Brief Items | `56605421-1249-4338-9a43-4ac9edc3bddc` | Claude: Title, Key, Place, Map label, List, Status, Order, Sentence, Source phrase, Link, Task, Carries, First seen, Last seen, Orbits, Waiting on / Waiting since, Person, Amount. App: Invoice, Note, Decision, Decided at, Status (done) and Closed on, Title and Place when edited, Supernova and Cooled off. A Closed item with no Closed on (older rows, or one the brief closed) counts its Last seen as the day it was done. |
+| Brief Items | `56605421-1249-4338-9a43-4ac9edc3bddc` | Claude: Title, Key, Place, Map label, List, Status, Order, Sentence, Source phrase, Link, Task, Carries, First seen, Last seen, Orbits, Twin (the other half's Key when one matter is split across two areas), Waiting on / Waiting since, Person, Amount. App: Invoice, Note, Decision, Decided at, Status (done) and Closed on, Title and Place when edited, Supernova and Cooled off. A Closed item with no Closed on (older rows, or one the brief closed) counts its Last seen as the day it was done. |
 | People | `47d42794-febb-4efb-9173-14a22ce848cb` | Outbox (read: Name, Push to, What changed, Pushed). App: Pushed only. |
 | Partners | `fe50f233-8c9a-4d3c-bce1-ceab5dd05653` | Outbox, same as People. The Medicare Partners tab reads it all and writes Next step, Disruption, Networks and Last contact. |
 | Medicare Pulse | `290fedaf-813c-421d-a310-f91bb7106d1f` | Claude: every field. App: Status (Read, Acted, Archived). |
 | Medicare Campaigns | `0415f919-2f07-4930-b8e6-477d807ae3c6` | Claude: Leads, Appointments, Enrollments, Counted on. App: new rows, Cost, Pieces, Status. |
 | Medicare Content | `16fd1657-cc30-405b-a388-20b6d62f67be` | App: new rows (Title, Kind, Brief, Photo, Campaign, Status Requested), Status, Post date, Material ID. Claude: Thumbnail, captions, Summary, Call to action, Disclaimer, Compliance, Status Draft. |
 | Medicare Field Days | `e11838f2-f914-45b1-b478-8dea9e96f56e` | Claude, from Google Calendar. App reads only. |
+| Events | `a288323e-c3f0-447b-a638-afee934fb069` | Claude: every field, synced from the four Google calendars (Practice, Personal, Field service, HWC) plus dated Kalihi JW items that live only in Oggi (On calendar unchecked). Calendar ID dedupes. App reads only: the **Events** tab, one sun per calendar over a master list, sorted by date or by calendar. |
 | #QuickActions | `15f8f469-b674-81ae-bbef-000bb207a508` | App: new task per capture (Status To Do, due today); Due Date moved by Tomorrow / This week; a line appended on Let go — nothing is ever deleted. |
 
 The app shows the latest Brief Days row on or before today, with the Brief Items whose **Last seen** is that date.

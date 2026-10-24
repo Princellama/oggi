@@ -85,7 +85,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .nav button[aria-current="true"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
 .nav .navlink { font-size: 14px; color: var(--grey); padding: 8px 2px; text-decoration: none; border-bottom: 1px solid transparent; }
 .nav .navlink:hover { color: var(--soft); }
-@media (max-width: 420px) { .nav { gap: clamp(16px, 5.5vw, 40px); } }
+@media (max-width: 420px) { .nav { gap: clamp(10px, 3.4vw, 40px); } .nav button, .nav .navlink { font-size: 13px; } }
 
 .wrap { max-width: 860px; margin: 0 auto; padding: 40px 28px 44px; }
 .band-top { background: var(--wash); border-bottom: 1px solid var(--edge); }
@@ -454,8 +454,50 @@ textarea.ob-fallback { display: block; width: 100%; margin-top: 10px; font: 13px
   .pane[data-pane="outbox"] { display: none; }
   body.outboxview .pane[data-pane="outbox"] { display: block; position: fixed; inset: 48px 0 0 0; z-index: 20; background: var(--bg); }
 }
-@media (max-width: 640px) {
-  .nav { gap: 26px; }
+/* ---------- EVENTS ---------- */
+.events .wrap { max-width: 760px; }
+.ev-sky { position: relative; height: 230px; margin: -8px 0 18px; border-radius: 18px; background: #14161C; overflow: hidden; }
+.ev-sky-deco { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ev-mote { fill: #F4EFE4; fill-opacity: .45; }
+.ev-ring { fill: none; stroke: #F4EFE4; stroke-opacity: .07; stroke-width: .3; stroke-dasharray: .8 2; vector-effect: non-scaling-stroke; }
+.ev-all, .ev-sun { font: inherit; cursor: pointer; transition: transform .25s ease, opacity .25s ease; }
+.ev-all { position: absolute; left: 50%; top: 47%; transform: translate(-50%, -50%); width: 60px; height: 60px; border-radius: 50%; border: 1px solid rgba(244,239,228,.32); background: rgba(244,239,228,.07); color: #F4EFE4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font-size: 11px; letter-spacing: .1em; }
+.ev-all span { opacity: .7; font-variant-numeric: tabular-nums; }
+.ev-all.on { box-shadow: 0 0 22px rgba(244,239,228,.22); }
+.ev-all:not(.on) { opacity: .55; }
+.ev-sun { position: absolute; transform: translate(-50%, -30%); min-width: 84px; min-height: 44px; padding: 4px; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 4px; color: #F4EFE4; }
+.ev-sun:hover { transform: translate(-50%, -30%) scale(1.05); }
+.ev-sun.dim { opacity: .35; }
+.ev-orb { display: block; width: var(--r); height: var(--r); border-radius: 50%; background: radial-gradient(circle at 35% 35%, #FFF8E8, var(--c) 55%); box-shadow: 0 0 18px color-mix(in srgb, var(--c) 45%, transparent); }
+.ev-sun.loose .ev-orb { background: color-mix(in srgb, var(--c) 18%, transparent); border: 2px dashed var(--c); }
+.ev-sun.on .ev-orb { box-shadow: 0 0 0 6px color-mix(in srgb, var(--c) 22%, transparent), 0 0 28px var(--c); }
+.ev-sun-l { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.ev-sun-n { font-size: 10.5px; color: rgba(244,239,228,.62); font-variant-numeric: tabular-nums; }
+.ev-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 14px; margin: 0 0 6px; }
+.ev-toggle { display: inline-flex; border: 1px solid var(--hair); border-radius: 999px; padding: 3px; }
+.ev-tog { font: inherit; font-size: 13px; border: 0; border-radius: 999px; padding: 7px 13px; min-height: 34px; background: transparent; color: var(--soft); cursor: pointer; }
+.ev-tog.on { background: var(--ink); color: var(--bg); font-weight: 600; }
+.ev-group { padding-top: 16px; }
+.ev-h { display: flex; align-items: center; gap: 8px; margin: 0 0 2px; padding-bottom: 6px; border-bottom: 1px solid var(--hair); font: 600 13px var(--sans); color: var(--ink); letter-spacing: .02em; }
+.ev-h .quiet { font-weight: 400; }
+ul.ev-list { list-style: none; margin: 0; padding: 0; }
+.ev-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--hair); }
+.ev-dot { flex: none; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c); margin-top: 6px; }
+.ev-h .ev-dot { margin-top: 0; }
+.ev-dot.loose { background: transparent; border: 1.5px dashed var(--c); }
+.ev-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ev-body .ttl { margin: 0; font-size: 15px; }
+.ev-meta, .ev-note { font-size: 13px; color: var(--soft); }
+.ev-note { font-style: normal; color: var(--clay-h); }
+.ev-loose { align-self: flex-start; margin-top: 3px; font-size: 11px; color: #3F6E6B; border: 1px dashed #6FC3C0; border-radius: 999px; padding: 1px 8px; }
+.ev-when { flex: none; font-size: 12.5px; color: var(--soft); white-space: nowrap; padding-top: 2px; font-variant-numeric: tabular-nums; }
+.ev-sun:focus-visible, .ev-all:focus-visible, .ev-tog:focus-visible { outline: 2px solid var(--grey); outline-offset: 2px; }
+@media (min-width: 980px) {
+  .pane[data-pane="events"] { display: none; }
+  body.eventsview .pane[data-pane="events"] { display: block; position: fixed; inset: 48px 0 0 0; z-index: 20; background: var(--bg); }
+}
+@media (max-width: 640px) and (min-width: 421px) {
+  .nav { gap: 22px; }
 }
 
 /* ---------- NOW: sorting the sky ---------- */
@@ -801,6 +843,8 @@ body.skyfull { overflow: hidden; }
 .kids-toggle { margin-top: 8px; font-size: 13px; color: var(--soft); background: none; border: 0; padding: 0; cursor: pointer; }
 .kids-toggle:hover { color: var(--ink); }
 ol.items li.child { margin-left: 22px; padding-left: 12px; border-left: 1px dashed rgba(46,44,39,.18); }
+.sky .twin-link { stroke: var(--starlight, #F4EFE4); stroke-opacity: .32; stroke-width: .8; stroke-dasharray: 5 4; }
+.twin-line a { color: inherit; text-decoration: underline; text-underline-offset: 2px; text-decoration-color: rgba(127,127,127,.5); }
 .sky .person-link { stroke: var(--starlight, #F4EFE4); stroke-opacity: .16; stroke-width: .7; stroke-dasharray: 1 4; }
 @media (max-width: 440px) { .sky-find-l { display: none; } .sky-find-b { padding: 7px 10px; } }
 /* an opened parent's own little orbit, and the thread back to its sun */

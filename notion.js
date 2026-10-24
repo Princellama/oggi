@@ -10,6 +10,7 @@ const DS = {
   tasks: process.env.NOTION_TASKS_DS || "15f8f469-b674-81ae-bbef-000bb207a508",
   people: process.env.NOTION_PEOPLE_DS || "47d42794-febb-4efb-9173-14a22ce848cb",
   partners: process.env.NOTION_PARTNERS_DS || "fe50f233-8c9a-4d3c-bce1-ceab5dd05653",
+  events: process.env.NOTION_EVENTS_DS || "a288323e-c3f0-447b-a638-afee934fb069",
 };
 
 async function call(method, path, body) {
@@ -80,6 +81,8 @@ function toItem(page) {
     delegatedTo: read(p["Delegated to"]),
     // the Key of the parent item this one revolves around; empty when it stands alone
     orbits: read(p["Orbits"]) || null,
+    // the Key of the other half when one matter is split across two areas (a bill and its work)
+    twin: read(p["Twin"]) || null,
     // the ball is with someone outside (a client, a CFP): who, and since when
     waitingOn: read(p["Waiting on"]) || null,
     waitingSince: read(p["Waiting since"]),
@@ -216,6 +219,7 @@ async function updateItem(id, fields) {
     props["Waiting on"] = { rich_text: rich(fields.waitingOn || "") };
     props["Waiting since"] = fields.waitingOn ? { date: { start: fields.waitingSince } } : { date: null };
   }
+  if ("twin" in fields) props["Twin"] = { rich_text: rich(fields.twin || "") };
   if ("closedOn" in fields) props["Closed on"] = fields.closedOn ? { date: { start: fields.closedOn } } : { date: null };
   if ("novaStart" in fields) props["Supernova"] = fields.novaStart ? { date: { start: fields.novaStart } } : { date: null };
   if ("novaCooled" in fields) props["Cooled off"] = fields.novaCooled ? { date: { start: fields.novaCooled } } : { date: null };
@@ -340,4 +344,30 @@ async function setPushed(id, date) {
   return toOutbox(page, null);
 }
 
-module.exports = { getHistory, getOutbox, setPushed, getBrief, updateItem, updateDay, logEdit, applyDecisionToTask, createTask, getPage, toItem, _call: call, _read: read, _rich: rich, _plain: plain, _queryAll: queryAll, _queryDS: queryDS, API, VERSION };
+// ---- Events: the master list across every calendar (Claude syncs it; the app reads it) ----
+function toEvent(page) {
+  const p = page.properties;
+  const when = p["When"] && p["When"].date;
+  return {
+    id: page.id,
+    url: page.url,
+    title: read(p["Name"]),
+    start: when ? when.start : null,
+    end: when ? when.end : null,
+    allDay: !!when && !/T/.test(when.start || ""),
+    calendar: read(p["Calendar"]) || "Practice",
+    where: read(p["Where"]) || "",
+    onCalendar: !!(p["On calendar"] && p["On calendar"].checkbox),
+    itemKey: read(p["Item key"]) || null,
+    note: read(p["Note"]) || "",
+  };
+}
+async function getEvents(fromDate) {
+  const rows = await queryAll(DS.events, {
+    filter: { property: "When", date: { on_or_after: fromDate } },
+    sorts: [{ property: "When", direction: "ascending" }],
+  });
+  return rows.map(toEvent).filter((e) => e.start);
+}
+
+module.exports = { getEvents, getHistory, getOutbox, setPushed, getBrief, updateItem, updateDay, logEdit, applyDecisionToTask, createTask, getPage, toItem, _call: call, _read: read, _rich: rich, _plain: plain, _queryAll: queryAll, _queryDS: queryDS, API, VERSION };
