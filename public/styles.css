@@ -801,6 +801,8 @@ body.skyfull { overflow: hidden; }
 .kids-toggle { margin-top: 8px; font-size: 13px; color: var(--soft); background: none; border: 0; padding: 0; cursor: pointer; }
 .kids-toggle:hover { color: var(--ink); }
 ol.items li.child { margin-left: 22px; padding-left: 12px; border-left: 1px dashed rgba(46,44,39,.18); }
+.sky .twin-link { stroke: var(--starlight, #F4EFE4); stroke-opacity: .32; stroke-width: .8; stroke-dasharray: 5 4; }
+.twin-line a { color: inherit; text-decoration: underline; text-underline-offset: 2px; text-decoration-color: rgba(127,127,127,.5); }
 .sky .person-link { stroke: var(--starlight, #F4EFE4); stroke-opacity: .16; stroke-width: .7; stroke-dasharray: 1 4; }
 @media (max-width: 440px) { .sky-find-l { display: none; } .sky-find-b { padding: 7px 10px; } }
 /* an opened parent's own little orbit, and the thread back to its sun */

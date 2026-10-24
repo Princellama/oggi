@@ -739,6 +739,12 @@
   }
   const kidsOf = (it) => (it && it.key ? B.items.filter((c) => c !== it && c.orbits === it.key && (c.list === "Needs attention" || c.list === "Resolved")) : []);
   const isParent = (it) => kidsOf(it).length > 0;
+  // ---- twins: one matter split across two areas (a bill under Money, its work under Medicare) ----
+  // Twin holds the other half's Key on both items. Each half closes on its own.
+  function twinOf(it) {
+    if (!it || !it.twin) return null;
+    return B.items.find((t) => t !== it && t.key === it.twin) || null;
+  }
   function folded(it) { const p = parentOf(it); return !!p && !openKids().has(p.key); }
   function toggleKids(it) {
     const o = openKids();
@@ -1480,6 +1486,26 @@
       const byP = new Map();
       for (const st of sky.stars) { if (st.kind !== "item" || st.histOnly) continue; const p = personOf(st.it), q = L.pos.get(st); const fam = q && (q.hub || (st.parentSt && (L.pos.get(st.parentSt) || {}).hub)); if (p && q && q.show && !fam && st.it.status !== "Closed") (byP.get(p) || byP.set(p, []).get(p)).push(q); }
       for (const pts of byP.values()) for (let i = 1; i < pts.length; i++) sky.layer.append(s("line", { class: "person-link", x1: pts[i - 1].x, y1: pts[i - 1].y, x2: pts[i].x, y2: pts[i].y }));
+    }
+    // a dashed thread between the two halves of a twinned matter; a half folded inside its
+    // parent is reached at the parent's star
+    if (mode === "drive" || mode === "area") {
+      const seen = new Set();
+      const shownPos = (st) => {
+        const q = L.pos.get(st);
+        if (q && q.show) return q;
+        const pq = st.parentSt && L.pos.get(st.parentSt);
+        return pq && pq.show ? pq : null;
+      };
+      for (const st of sky.stars) {
+        if (st.kind !== "item" || st.histOnly || !st.it.twin || seen.has(st)) continue;
+        const tw = sky.stars.find((o) => o !== st && o.kind === "item" && o.it.key === st.it.twin);
+        if (!tw) continue;
+        seen.add(st); seen.add(tw);
+        if (st.it.status === "Closed" && tw.it.status === "Closed") continue;
+        const a = shownPos(st), b = shownPos(tw);
+        if (a && b && (a.x !== b.x || a.y !== b.y)) sky.layer.append(s("line", { class: "twin-link", x1: a.x, y1: a.y, x2: b.x, y2: b.y }));
+      }
     }
     // the threads from a parent out to each child it has opened
     if (mode !== "history") for (const st of sky.stars) {
@@ -2410,6 +2436,13 @@
       if (isInvoice(it)) card.append(invoiceRow(it, () => renderAll()));
       const par = parentOf(it);
       if (par) card.append(h("p", { class: "now-carry", text: `Orbits ${par.title}.` }));
+      const tw = twinOf(it);
+      if (tw) {
+        const twSt = sky && sky.stars.find((x) => x.kind === "item" && x.it === tw);
+        const label = `Other half: ${tw.title} · ${areaOf(tw)}${tw.status === "Closed" ? " · done" : ""}`;
+        card.append(h("p", { class: "now-carry twin-line" }, twSt ? h("a", { href: "#", onclick: (e) => { e.preventDefault(); goToStar(twSt); }, text: label }) : label));
+        if (it.status === "Closed" && tw.status !== "Closed") card.append(h("p", { class: "now-carry quiet", text: `The ${areaOf(tw)} half is still open.` }));
+      }
     }
     const rec = recFor(cur);
     const open = h("div", { class: "now-open" }, h("button", { class: "btn", onclick: onOpen, text: "Open it" }));

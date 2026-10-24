@@ -80,6 +80,8 @@ function toItem(page) {
     delegatedTo: read(p["Delegated to"]),
     // the Key of the parent item this one revolves around; empty when it stands alone
     orbits: read(p["Orbits"]) || null,
+    // the Key of the other half when one matter is split across two areas (a bill and its work)
+    twin: read(p["Twin"]) || null,
     // the ball is with someone outside (a client, a CFP): who, and since when
     waitingOn: read(p["Waiting on"]) || null,
     waitingSince: read(p["Waiting since"]),
@@ -216,6 +218,7 @@ async function updateItem(id, fields) {
     props["Waiting on"] = { rich_text: rich(fields.waitingOn || "") };
     props["Waiting since"] = fields.waitingOn ? { date: { start: fields.waitingSince } } : { date: null };
   }
+  if ("twin" in fields) props["Twin"] = { rich_text: rich(fields.twin || "") };
   if ("closedOn" in fields) props["Closed on"] = fields.closedOn ? { date: { start: fields.closedOn } } : { date: null };
   if ("novaStart" in fields) props["Supernova"] = fields.novaStart ? { date: { start: fields.novaStart } } : { date: null };
   if ("novaCooled" in fields) props["Cooled off"] = fields.novaCooled ? { date: { start: fields.novaCooled } } : { date: null };

@@ -33,6 +33,9 @@ for (const [key, f] of [
   ["invoice-mori", { person: "Mori", amount: 400, invoice: "Sent" }],
   ["kikuyo-return", { person: "Kaylee" }],
   ["louis-adjustment", { person: "Rona", carries: 23 }],
+  // a twinned pair: one matter split across two areas, so the demo shows the thread between them
+  ["aep-at-sea", { twin: "gws-declined" }],
+  ["gws-declined", { twin: "aep-at-sea" }],
 ]) { const it = state.items.find((i) => i.key === key); if (it) Object.assign(it, f); }
 
 async function getBrief() {
