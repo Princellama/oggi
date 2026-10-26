@@ -146,6 +146,15 @@ details.form:not([open]) { padding-bottom: 0; }
 .copy.done { color: var(--ok); text-decoration: none; }
 .waiting { font-size: 13.5px; color: var(--soft); margin: 0 0 10px; }
 
+/* carrier portals */
+.portals .portal-link { color: var(--ink); text-decoration: none; }
+.portals .portal-link:hover { text-decoration: underline; text-decoration-color: var(--hair); text-underline-offset: 3px; }
+.portals .portal-what { font-size: 13.5px; color: var(--soft); margin: 0 0 4px; max-width: 64ch; }
+.portals .portal-l { flex: none; width: 70px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--grey); }
+.portals .next { margin-top: 6px; }
+.portals .portal-note { font-size: 13px; color: var(--ink); margin: 8px 0 0; padding: 8px 10px; background: var(--wash); border-radius: 8px; max-width: 64ch; }
+.portals .saved-flag { color: var(--ok); }
+
 /* partners */
 .partners { list-style: none; margin: 0; padding: 0; }
 .partners > li { padding: 18px 0; border-bottom: 1px solid var(--hair); }

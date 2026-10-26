@@ -11,6 +11,7 @@ const DS = {
   content: process.env.NOTION_CONTENT_DS || "16fd1657-cc30-405b-a388-20b6d62f67be",
   field: process.env.NOTION_FIELD_DS || "e11838f2-f914-45b1-b478-8dea9e96f56e",
   partners: process.env.NOTION_PARTNERS_DS || "fe50f233-8c9a-4d3c-bce1-ceab5dd05653",
+  portals: process.env.NOTION_PORTALS_DS || "e94d3fc0-0caa-461a-b01a-8974241c9c40",
 };
 
 function read(p) {
@@ -73,6 +74,18 @@ function toField(pg) {
   };
 }
 
+// Carrier Portals: the sites Eric signs in to. Login is the email or username only; Password hint
+// says where the password lives. The password itself never goes in Notion or through this app.
+function toPortal(pg) {
+  const p = pg.properties;
+  return {
+    id: pg.id, url: pg.url, name: read(p["Name"]), carrier: read(p["Carrier"]), what: read(p["What it does"]) || "",
+    kinds: read(p["Kind"]) || [], website: read(p["Website"]), login: read(p["Login"]) || "", hint: read(p["Password hint"]) || "",
+    emailsTo: read(p["Emails go to"]), rts: read(p["RTS 2027"]), lastChecked: read(p["Last checked"]),
+    support: read(p["Support"]) || "", notes: read(p["Notes"]) || "",
+  };
+}
+
 const isoDay = (s, add) => { const d = new Date(s + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + add); return d.toISOString().slice(0, 10); };
 
 // Each table loads on its own, so one table not yet shared with the integration doesn't blank the page.
@@ -84,7 +97,7 @@ async function part(fn) {
 }
 
 async function getAll(today) {
-  const [pulse, campaigns, content, partners, field] = await Promise.all([
+  const [pulse, campaigns, content, partners, field, portals] = await Promise.all([
     part(async () => (await queryAll(DS.pulse, {
       filter: { property: "Status", select: { does_not_equal: "Archived" } },
       sorts: [{ property: "Date", direction: "descending" }],
@@ -96,8 +109,9 @@ async function getAll(today) {
       filter: { property: "When", date: { on_or_after: isoDay(today, -14) } },
       sorts: [{ property: "When", direction: "ascending" }],
     })).map(toField)),
+    part(async () => (await queryAll(DS.portals, {})).map(toPortal)),
   ]);
-  return { pulse, campaigns, content, partners, field };
+  return { pulse, campaigns, content, partners, field, portals };
 }
 
 // ---------- writes ----------
@@ -183,6 +197,17 @@ async function updatePartner(id, f) {
   return toPartner(await call("PATCH", `/pages/${id}`, { properties: props }));
 }
 
+async function updatePortal(id, f) {
+  const props = {};
+  if ("rts" in f) props["RTS 2027"] = sel(f.rts);
+  if ("lastChecked" in f) props["Last checked"] = day(f.lastChecked);
+  for (const [k, name] of [["login", "Login"], ["hint", "Password hint"], ["notes", "Notes"], ["support", "Support"]]) {
+    if (k in f) props[name] = { rich_text: rich(f[k]) };
+  }
+  if ("website" in f) props["Website"] = { url: f.website || null };
+  return toPortal(await call("PATCH", `/pages/${id}`, { properties: props }));
+}
+
 // A photo or thumbnail's signed URL (they expire after an hour, so the server fetches it fresh).
 const urlCache = new Map();
 async function fileUrl(id, prop, i) {
@@ -197,4 +222,4 @@ async function fileUrl(id, prop, i) {
   return url;
 }
 
-module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, fileUrl, DS };
+module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, updatePortal, fileUrl, DS };

@@ -47,6 +47,15 @@ const state = {
   ].map((r) => ({ id: id(), peopleMet: null, notes: "", campaign: null, ...r })),
 };
 
+state.portals = [
+  { name: "UHC Jarvis", carrier: "UHC", what: "UHC's agent portal: certifications, Ready to Sell, JarvisEnroll, commissions.", kinds: ["Certification", "Quote & enroll", "Commissions"], website: "https://www.uhcjarvis.com", rts: "Action needed", lastChecked: iso(0), notes: "Not showing as appointed in Sunfire. Check Learning Lab." },
+  { name: "Sircon (Vertafore)", carrier: "Industry", what: "Contracting and appointment paperwork.", kinds: ["Contracting & appointments"], website: "https://www.sircon.com", emailsTo: "eric@barayugacpa.com", rts: "n/a", lastChecked: iso(0), notes: "Hawaii license active to 31 Jan 2027." },
+  { name: "Sunfire", carrier: "IFG", what: "Quote and enroll across carriers. Login through IFG.", kinds: ["Quote & enroll"], rts: "n/a", lastChecked: iso(0) },
+  { name: "Humana Vantage / MarketPoint", carrier: "Humana", what: "Recertification, Ready to Sell, commissions.", kinds: ["Certification", "Training", "Commissions"], emailsTo: "48sigma@gmail.com", rts: "Pending", notes: "Recert done 29 Jul 2026." },
+  { name: "Devoted agent portal", carrier: "Devoted", what: "Ready to Sell, member lookups, materials.", kinds: ["Certification", "Book of business"], website: "https://agent.devoted.com", login: "48sigma@gmail.com", hint: "Google Password Manager", rts: "Ready to sell" },
+  { name: "AHIP", carrier: "Industry", what: "Annual AHIP Medicare + FWA training.", kinds: ["Certification", "Training"], website: "https://www.ahipmedicaretraining.com", rts: "n/a" },
+].map((r) => ({ id: id(), url: null, kinds: [], website: null, login: "", hint: "", emailsTo: null, lastChecked: null, support: "", notes: "", ...r }));
+
 const copy = (x) => JSON.parse(JSON.stringify(x));
 async function getAll() {
   return {
@@ -55,6 +64,7 @@ async function getAll() {
     content: { rows: copy(state.content) },
     partners: { rows: copy(state.partners) },
     field: { rows: copy(state.field) },
+    portals: { rows: copy(state.portals) },
   };
 }
 const find = (t, i) => { const r = state[t].find((x) => x.id === i); if (!r) throw Object.assign(new Error("not found"), { status: 404 }); return r; };
@@ -67,6 +77,7 @@ async function createContent({ title, kind, brief, campaign, image }) {
   state.content.unshift(r); return copy(r);
 }
 async function updatePartner(i, f) { return copy(Object.assign(find("partners", i), f)); }
+async function updatePortal(i, f) { return copy(Object.assign(find("portals", i), f)); }
 async function fileUrl() { return null; }
 
-module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, fileUrl };
+module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, updatePortal, fileUrl };

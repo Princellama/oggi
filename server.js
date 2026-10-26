@@ -366,6 +366,17 @@ app.patch("/api/medicare/partner/:id", requireAuth, wrap(async (req, res) => {
   res.json(await mstore.updatePartner(req.params.id, f));
 }));
 
+// Carrier Portals: Ready to Sell, "checked today", and the login (email or username) and where
+// the password lives. Never the password itself.
+app.patch("/api/medicare/portal/:id", requireAuth, wrap(async (req, res) => {
+  const b = req.body, f = {};
+  if ("rts" in b) { if (b.rts !== null && !["Ready to sell", "Action needed", "Pending", "n/a"].includes(b.rts)) return res.status(400).json({ error: "rts" }); f.rts = b.rts; }
+  if ("checked" in b && b.checked) f.lastChecked = localDate(req);
+  for (const k of ["login", "hint", "notes", "support"]) if (k in b) f[k] = String(b[k] || "").slice(0, 500);
+  if ("website" in b) { const u = String(b.website || "").trim(); if (u && !/^https:\/\/[^\s]+$/i.test(u)) return res.status(400).json({ error: "website" }); f.website = u || null; }
+  res.json(await mstore.updatePortal(req.params.id, f));
+}));
+
 // Photos and thumbnails are private Notion files with short-lived URLs, so they come through here.
 const PLACEHOLDER = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#EDECE6"/><path d="M30 64 L44 48 L54 58 L62 50 L72 64 Z" fill="#D6D5CC"/><circle cx="62" cy="38" r="5" fill="#D6D5CC"/></svg>');
 app.get("/api/medicare/img/:id", requireAuth, wrap(async (req, res) => {

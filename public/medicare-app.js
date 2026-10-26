@@ -261,8 +261,11 @@
     const grid = h("div", { class: "car-grid" });
     for (const c of CARRIERS) {
       const items = rows("pulse").filter((r) => (r.carriers || []).includes(c.k)).slice(0, 4);
+      const rts = rows("portals").find((p) => p.carrier === c.k && p.rts && p.rts !== "n/a");
       const card = h("article", { class: `car k-${c.k}` + (c.k === "Devoted" ? " focus" : "") },
-        h("h3", { text: c.k }), h("p", { class: "role", text: c.role }), h("p", { class: "stance", text: c.stance }));
+        h("h3", { text: c.k }), h("p", { class: "role", text: c.role }),
+        rts ? h("div", { class: "chips", style: "margin:-4px 0 12px" }, rtsChip(rts.rts)) : null,
+        h("p", { class: "stance", text: c.stance }));
       const ul = h("ul");
       if (!items.length) ul.append(h("li", { class: "quiet", text: "No news on file yet." }));
       for (const r of items) {
@@ -274,6 +277,63 @@
       grid.append(card);
     }
     main.append(grid);
+    portals(main);
+  }
+
+  // ---------------- carrier portals: the sites you sign in to ----------------
+  // Login is the email or username only, and Password hint says where the password lives
+  // (a password manager). The password itself never goes in Notion or this page.
+  const RTS = ["Ready to sell", "Action needed", "Pending", "n/a"];
+  const rtsChip = (v) => (v && v !== "n/a" ? chip("2027 · " + v, v === "Ready to sell" ? "ok" : v === "Action needed" ? "warn" : "") : null);
+  const PORTAL_ORDER = ["Devoted", "UHC", "Humana", "IFG", "Industry"];
+  async function savePortal(p, fields, flag) {
+    try {
+      Object.assign(p, await api("PATCH", "/api/medicare/portal/" + p.id, { ...fields, d: todayISO() }));
+      S.msg = null;
+      if (flag) { flag.textContent = "Saved"; setTimeout(() => (flag.textContent = ""), 1500); return; }
+    } catch { S.msg = "Couldn't save that to Notion."; }
+    render();
+  }
+  function portals(main) {
+    main.append(h("div", { class: "mc-head", style: "margin-top:34px" }, h("h2", { class: "sec", text: "Portals and logins" })));
+    main.append(h("p", { class: "mc-lede", text: "Every site you sign in to for Medicare: what it's for, the email you log in with, and where the password is kept. Passwords stay in your password manager, never here." }));
+    const list = rows("portals").slice().sort((a, b) => {
+      const ra = PORTAL_ORDER.indexOf(a.carrier), rb = PORTAL_ORDER.indexOf(b.carrier);
+      return (ra < 0 ? 9 : ra) - (rb < 0 ? 9 : rb) || String(a.name).localeCompare(String(b.name));
+    });
+    const ul = h("ul", { class: "partners portals" });
+    if (!list.length) ul.append(h("li", { class: "quiet", text: "No portals on file yet. They live in the Carrier Portals table under Medicare Marketing in Notion." }));
+    const today = todayISO();
+    for (const p of list) {
+      const web = safeUrl(p.website);
+      const flag = h("span", { class: "quiet saved-flag" });
+      const login = h("input", { placeholder: "Login email or username", value: p.login || "", "aria-label": `${p.name} login`, autocomplete: "off", spellcheck: "false" });
+      login.addEventListener("change", () => savePortal(p, { login: login.value.trim() }, flag));
+      const hint = h("input", { placeholder: "Where the password lives, e.g. Google Password Manager", value: p.hint || "", "aria-label": `${p.name} password hint`, autocomplete: "off" });
+      hint.addEventListener("change", () => savePortal(p, { hint: hint.value.trim() }, flag));
+      const rts = h("select", { class: "copy", "aria-label": "Ready to Sell 2027", style: "border:0;background:transparent" },
+        h("option", { value: "", text: "Ready to Sell: not set" }),
+        ...RTS.map((o) => h("option", { value: o, text: o === "n/a" ? "Ready to Sell: n/a" : "2027: " + o, selected: o === p.rts })));
+      rts.addEventListener("change", () => savePortal(p, { rts: rts.value || null }));
+      const c = p.lastChecked ? dayDiff(today, p.lastChecked.slice(0, 10)) : null;
+      ul.append(h("li", {},
+        h("div", { class: "chips" }, p.carrier ? chip(p.carrier, "c-" + p.carrier) : null, rtsChip(p.rts), ...(p.kinds || []).slice(0, 3).map((k) => chip(k))),
+        h("p", { class: "name", style: "margin-top:8px" }, web ? ext(h("a", { class: "portal-link", href: web, text: p.name + " ↗" })) : p.name),
+        p.what ? h("p", { class: "portal-what", text: p.what }) : null,
+        h("div", { class: "next" }, h("span", { class: "portal-l", text: "Login" }), login, copyBtn(() => login.value.trim())),
+        h("div", { class: "next" }, h("span", { class: "portal-l", text: "Password" }), hint),
+        h("p", { class: "meta", style: "margin-top:10px" },
+          p.emailsTo ? h("span", { text: "Notices go to " + p.emailsTo }) : null,
+          p.support ? h("span", { text: "Help: " + p.support }) : null,
+          h("span", { class: c != null && c > 30 ? "mc-stale" : "", text: "Last checked " + ago(p.lastChecked) }),
+          flag),
+        p.notes ? h("p", { class: "portal-note", text: p.notes }) : null,
+        h("div", { class: "mc-acts" },
+          h("button", { class: "textlink", type: "button", text: "Mark checked today", onclick: () => savePortal(p, { checked: true }) }),
+          rts,
+          safeUrl(p.url) ? ext(h("a", { class: "textlink", href: p.url, text: "Open in Notion" })) : null)));
+    }
+    main.append(ul);
   }
 
   // ---------------- campaigns ----------------
