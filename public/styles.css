@@ -627,6 +627,30 @@ body.skyfull { overflow: hidden; }
 }
 @media (prefers-reduced-motion: reduce) { .sky-modal { transition: none; } }
 
+/* ---------- NOW: a sun's own card (By area) ---------- */
+.sky .sun.tap { pointer-events: auto; cursor: pointer; outline: none; }
+.sky .sun.tap .sun-glow { transition: opacity .3s; }
+.sky .sun.tap:hover .sun-glow, .sky .sun.tap:focus-visible .sun-glow { opacity: .14; }
+.sky .sun.tap:focus-visible .sun-core { stroke: var(--starlight); stroke-width: 2; }
+.sky .sun.scoped .sun-glow { opacity: .2; }
+.sky .sun.scoped .sun-n { fill-opacity: .9; }
+.sky.sun-scope .sun.tap:not(.scoped) { opacity: .4; }
+.sky.sun-scope .star { transition: opacity .4s; }
+.sky.sun-scope .star.out-scope:not(.gone) { opacity: .18; }
+.sun-head { display: flex; align-items: center; gap: 7px; margin: 0 0 10px; padding-right: 30px; font: 600 11px var(--sans); letter-spacing: 1.2px; text-transform: uppercase; color: var(--ink); }
+.sun-head .quiet { font-weight: 500; letter-spacing: .4px; text-transform: none; }
+.sun-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; margin-top: 14px; }
+.sun-acts .choices { gap: 18px; }
+.sun-list { list-style: none; margin: 16px 0 0; padding: 12px 0 0; border-top: 1px solid var(--hair); display: grid; gap: 2px; }
+.sun-list li { min-width: 0; }
+.sun-list button { box-sizing: border-box; min-width: 0; display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left; padding: 6px 8px; border-radius: 8px; font-size: 13.5px; color: var(--soft); }
+.sun-list button:hover { background: rgba(46, 44, 39, .05); color: var(--ink); }
+.sun-list li.on button { background: rgba(46, 44, 39, .08); color: var(--ink); font-weight: 600; }
+.sun-list-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sun-list-s { flex: none; font-size: 11px; color: var(--grey); font-weight: 500; }
+.sun-list-s.new { color: var(--clay, #C6613F); }
+.sun-all { margin-top: 10px; font-size: 12.5px; }
+
 /* ---------- NOW: Breathe, Break and the focus timer, top right ---------- */
 .sky-tools { position: absolute; right: 12px; top: 10px; z-index: 2; display: flex; align-items: flex-start; gap: 10px; }
 .sky-tool { display: flex; flex-direction: column; align-items: center; gap: 1px; opacity: .45; transition: opacity .3s; }

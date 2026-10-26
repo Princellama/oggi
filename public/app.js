@@ -992,6 +992,9 @@
     // the timeline axis or the suns, redrawn whenever the sky is sorted
     const layer = s("g", { class: "lay-mode", "aria-hidden": "true" });
     svg.append(layer);
+    // By area's suns: tap one to float a card that steps through that area alone
+    const sunLayer = s("g", { class: "sun-layer" });
+    svg.append(sunLayer);
     const trails = s("g", { "aria-hidden": "true" });
     svg.append(trails);
 
@@ -1049,6 +1052,8 @@
     // tap a dim neighbour to travel to it; tap the bright one to dive in
     let swiped = false, sx = null, sy = null;
     const pick = (ev) => {
+      const sun = ev.target.closest(".sun[data-area]");
+      if (sun) { if (!swiped) openSun(sun.dataset.area); return; }
       const g = ev.target.closest(".star");
       if (!g && skyFull && !swiped && ev.type === "click") { closeModal(); return; }
       if (!g || swiped) return;
@@ -1153,7 +1158,7 @@
       seenW = el.clientWidth;
       setView();
     }).observe(el);
-    return { el, svg, seq, stars, trails, layer, hist: !!(H.items && H.days === prefs().histDays) };
+    return { el, svg, seq, stars, trails, layer, sunLayer, hist: !!(H.items && H.days === prefs().histDays) };
   }
 
   // ---- Supernova ----
@@ -1431,14 +1436,10 @@
         for (const a of areas) {
           const c = suns[a], tint = STAR_TINT[a] || STAR_TINT.Personal;
           for (const r of rings[a] || []) g.append(s("ellipse", { class: "orb-ring", cx: c.x, cy: c.y, rx: r, ry: r * 0.86, stroke: tint }));
-          const n = stars.filter((st) => st.open && st.kind === "item" && areaOf(st.it) === a).length;
-          const sun = s("g", { class: "sun", transform: `translate(${c.x} ${c.y})` });
-          sun.append(s("circle", { class: "sun-glow", r: 74, fill: tint }), s("circle", { class: "sun-halo", r: 44, fill: tint }), s("circle", { class: "sun-core", r: 33, fill: tint }));
-          sun.append(s("text", { class: "sun-l", y: 4 }, a.toUpperCase()));
-          sun.append(s("text", { class: "sun-n", y: 56 }, `${n} open`));
-          g.append(sun);
         }
       });
+      // the suns themselves are drawn by applyLayout into their own layer, so they can be tapped
+      for (const a of areas) suns[a].n = stars.filter((st) => st.open && st.kind === "item" && areaOf(st.it) === a).length;
       return { pos, draw, suns, box: boxOf([...pos.values()].filter((p) => p.show), 160) };
     }
     if (mode === "history") return historyLayout(stars);
@@ -1481,6 +1482,7 @@
     sky.el.classList.add("m-" + mode);
     sky.layer.replaceChildren();
     for (const d of L.draw) d(sky.layer);
+    drawSuns(L.suns);
     // faint threads between the shown stars that are about the same person
     if (mode === "drive") {
       const byP = new Map();
@@ -1628,6 +1630,7 @@
       return;
     }
     setPrefs({ mode });
+    if (sunScope && mode !== "area") { sunScope = null; sunMadeFull = false; syncScope(); }
     const curKey = sky.seq[nowIdx] ? seqKey(sky.seq[nowIdx]) : null;
     const seq = nowSequence();
     sky.seq = seq;
@@ -2224,8 +2227,98 @@
     syncFullBtn();
     requestAnimationFrame(() => { if (!sky) return; if (!sky.el.classList.contains("away")) { const st = starFor(nowIdx); if (st) cam = restCam(st); } setView(); fillCard(); fillCtl(); });
   }
+  // ---- a sun's own card: tap Medicare (or CPA, Money, Personal) when sorted By area ----
+  // The floating card opens on that area's first planet; Back / Next and the arrow keys then
+  // step through that area alone, and the card lists everything orbiting it with Done and
+  // Tomorrow / This week / Let go to hand. The other areas dim. Closing the card (×, Esc, a tap
+  // on empty sky) lets the sun go; if tapping the sun brought the sky full screen, closing the
+  // card brings the sky back too.
+  let sunScope = null, sunMadeFull = false;
+  const inScope = (x, area = sunScope) => !!x && x.kind === "item" && areaOf(x.it) === area;
+  const scopeIdxs = (area = sunScope) => (sky && area ? sky.seq.map((x, i) => (inScope(x, area) ? i : -1)).filter((i) => i >= 0) : []);
+  // the next planet that way: inside the sun while one is open, otherwise across the whole sky
+  function stepIdx(dir) {
+    if (!sunScope) return nowIdx + dir;
+    const L = scopeIdxs(), at = L.indexOf(nowIdx);
+    if (at < 0) return L.length ? L[dir > 0 ? 0 : L.length - 1] : -1;
+    return L[at + dir] ?? -1;
+  }
+  const canStep = (dir) => { const i = stepIdx(dir); return !!sky && i >= 0 && i < sky.seq.length && i !== nowIdx; };
+  function drawSuns(suns) {
+    if (!sky || !sky.sunLayer) return;
+    sky.sunLayer.replaceChildren();
+    for (const [a, c] of Object.entries(suns || {})) {
+      const tint = STAR_TINT[a] || STAR_TINT.Personal;
+      const sun = s("g", { class: "sun tap", "data-area": a, transform: `translate(${c.x} ${c.y})`, role: "button", tabindex: "0", "aria-label": `${a}, ${c.n} open. Open its card and step through just these.` });
+      sun.append(s("title", null, `${a} · ${c.n} open. Tap to step through just these.`));
+      sun.append(s("circle", { class: "sun-glow", r: 74, fill: tint }), s("circle", { class: "sun-halo", r: 44, fill: tint }), s("circle", { class: "sun-core", r: 33, fill: tint }));
+      sun.append(s("text", { class: "sun-l", y: 4 }, a.toUpperCase()));
+      sun.append(s("text", { class: "sun-n", y: 56 }, `${c.n} open`));
+      sky.sunLayer.append(sun);
+    }
+    syncScope();
+  }
+  function syncScope() {
+    if (!sky) return;
+    sky.el.classList.toggle("sun-scope", !!sunScope);
+    if (sky.sunLayer) for (const g of sky.sunLayer.querySelectorAll(".sun")) g.classList.toggle("scoped", g.dataset.area === sunScope);
+    for (const st of sky.stars) if (st.el) st.el.classList.toggle("out-scope", !!sunScope && !(st.kind === "item" && areaOf(st.it) === sunScope));
+  }
+  function openSun(area) {
+    if (!sky) return;
+    const L = scopeIdxs(area);
+    if (!L.length) { leaveSun(); return; }
+    sunScope = area;
+    syncScope();
+    const i = L.includes(nowIdx) ? nowIdx : L[0];
+    const go = () => {
+      if (!sky) return;
+      if (i === nowIdx) { sky.el.classList.remove("away"); markStar(i); fillCard(); fillCtl(); openModal(); seeStar(starFor(i)); }
+      else flyTo(i, true);
+    };
+    if (!skyFull) { sunMadeFull = true; enterFull(); requestAnimationFrame(() => requestAnimationFrame(go)); }
+    else go();
+  }
+  // let the sun go: Back / Next cover the whole sky again
+  function leaveSun() {
+    if (!sunScope && !sunMadeFull) return;
+    const wasFull = sunMadeFull;
+    sunScope = null; sunMadeFull = false;
+    syncScope();
+    if (wasFull && skyFull) { exitFull(); return; }
+    if (sky && sky.ctl) fillCtl();
+    const m = modalEl(); if (m && !m.hidden) fillModal(m);
+  }
+  // the card's own actions inside a sun: Done, and where it goes
+  function sunActions(it) {
+    const row = h("div", { class: "sun-acts" });
+    const done = h("button", { class: "btn", type: "button", text: "Done" });
+    done.addEventListener("click", async () => {
+      done.disabled = true;
+      try { await patchItem(it, { status: "Closed" }); } catch { done.disabled = false; return; }
+      renderAll();   // the sky is rebuilt; renderNow opens the sun again on its next planet
+    });
+    row.append(done);
+    if (!longCarried(it)) row.append(choiceRow(it));   // a long-carried one already shows it in its card
+    return row;
+  }
+  // everything orbiting the sun, the current one marked; tap one to fly there
+  function sunList(L) {
+    const ol = h("ol", { class: "sun-list", "aria-label": `Everything in ${sunScope}` });
+    for (const i of L) {
+      const it = sky.seq[i].it, on = i === nowIdx;
+      const n = kidsOf(it).filter((c) => c.status !== "Closed").length;
+      const b = h("button", { type: "button", "aria-current": on ? "true" : null, onclick: () => flyTo(i, true) },
+        h("span", { class: "sun-list-t", text: it.title }),
+        n ? h("span", { class: "sun-list-s", text: `${n} in orbit` }) : null,
+        isUnread(it) ? h("span", { class: "sun-list-s new", text: "new" }) : null);
+      ol.append(h("li", { class: on ? "on" : null }, b));
+    }
+    return ol;
+  }
+
   const modalEl = () => sky && sky.el.querySelector(".sky-modal");
-  function closeModal() { const m = modalEl(); if (m) { m.classList.remove("in"); m.hidden = true; } }
+  function closeModal() { const m = modalEl(); if (m) { m.classList.remove("in"); m.hidden = true; } leaveSun(); }
   function openModal() {
     if (!sky) return;
     let m = modalEl();
@@ -2246,21 +2339,31 @@
     m.replaceChildren();
     const cur = sky.seq[nowIdx];
     if (!cur) return;
-    m.setAttribute("aria-label", cur.kind === "event" ? cur.ev.title : cur.it.title);
+    const scoped = !!sunScope && inScope(cur);
+    const L = scoped ? scopeIdxs() : null;
+    m.classList.toggle("scoped", scoped);
+    m.setAttribute("aria-label", cur.kind === "event" ? cur.ev.title : scoped ? `${sunScope}: ${cur.it.title}` : cur.it.title);
     m.append(h("button", { class: "sky-modal-x", type: "button", "aria-label": "Close", onclick: closeModal, text: "×" }));
+    if (scoped) m.append(h("p", { class: "sun-head" }, h("i", { class: "sky-area-dot", style: `background:${STAR_TINT[sunScope] || STAR_TINT.Personal}` }), h("b", { text: sunScope }), h("span", { class: "quiet", text: ` · ${L.indexOf(nowIdx) + 1} of ${L.length}` })));
     m.append(...cardBits(cur, () => { exitFull(); dive(); }));
+    if (scoped) m.append(sunActions(cur.it));
     const nav = h("div", { class: "now-ctl sky-modal-nav" });
-    nav.append(h("button", { type: "button", text: "← Back", disabled: nowIdx === 0 ? true : null, onclick: () => flyTo(nowIdx - 1) }));
-    nav.append(h("button", { type: "button", text: "Next →", disabled: nowIdx >= sky.seq.length - 1 ? true : null, onclick: () => flyTo(nowIdx + 1) }));
-    nav.append(h("span", { class: "pos", text: `${nowIdx + 1} of ${sky.seq.length}` }));
+    nav.append(h("button", { type: "button", text: "← Back", "aria-keyshortcuts": "ArrowLeft", disabled: canStep(-1) ? null : true, onclick: () => flyTo(stepIdx(-1)) }));
+    nav.append(h("button", { type: "button", text: "Next →", "aria-keyshortcuts": "ArrowRight", disabled: canStep(1) ? null : true, onclick: () => flyTo(stepIdx(1)) }));
+    nav.append(h("span", { class: "pos", text: scoped ? `${L.indexOf(nowIdx) + 1} of ${L.length} in ${sunScope}` : `${nowIdx + 1} of ${sky.seq.length}` }));
     m.append(nav);
+    if (scoped) {
+      m.append(sunList(L));
+      // back to stepping through the whole sky, card still open
+      m.append(h("button", { class: "textlink sun-all", type: "button", text: "Step through every area", onclick: () => { sunScope = null; sunMadeFull = false; syncScope(); fillCtl(); fillModal(m); } }));
+    }
   }
   document.addEventListener("keydown", (ev) => {
     if (!skyFull || sheetOpen || veilOpen()) return;
     if (ev.target.closest && ev.target.closest("input, textarea, select")) return;
     if (ev.key === "Escape") { ev.stopImmediatePropagation(); const m = modalEl(); if (m && !m.hidden) closeModal(); else exitFull(); return; }
-    if (ev.key === "ArrowRight" || ev.key === "ArrowLeft") { ev.stopImmediatePropagation(); ev.preventDefault(); flyTo(nowIdx + (ev.key === "ArrowRight" ? 1 : -1)); }
-    if (ev.key === "Enter" && !ev.target.closest("button, a")) { ev.stopImmediatePropagation(); openModal(); }
+    if (ev.key === "ArrowRight" || ev.key === "ArrowLeft") { ev.stopImmediatePropagation(); ev.preventDefault(); flyTo(stepIdx(ev.key === "ArrowRight" ? 1 : -1)); }
+    if (ev.key === "Enter" && !ev.target.closest("button, a, .sun[data-area]")) { ev.stopImmediatePropagation(); openModal(); }
   }, true);
 
   const starFor = (i) => sky && sky.stars.find((x) => x.seqIdx === i);
@@ -2346,6 +2449,8 @@
 
   function flyTo(i, showCard) {
     if (!sky || i < 0 || i >= sky.seq.length || i === nowIdx) return;
+    // going to a planet of another area lets the open sun go (the sky stays as it is)
+    if (sunScope && !inScope(sky.seq[i])) { sunScope = null; sunMadeFull = false; syncScope(); }
     const m = skyFull ? modalEl() : null;
     const withCard = skyFull && (showCard || (m && !m.hidden));
     if (m && !m.hidden) m.classList.add("swap");
@@ -2460,8 +2565,8 @@
   function fillCtl() {
     const ctl = sky.ctl;
     ctl.replaceChildren();
-    ctl.append(h("button", { text: "← Back", disabled: nowIdx === 0 ? true : null, onclick: () => flyTo(nowIdx - 1) }));
-    ctl.append(h("button", { text: "Next →", disabled: nowIdx >= sky.seq.length - 1 ? true : null, onclick: () => flyTo(nowIdx + 1) }));
+    ctl.append(h("button", { text: "← Back", disabled: canStep(-1) ? null : true, onclick: () => flyTo(stepIdx(-1)) }));
+    ctl.append(h("button", { text: "Next →", disabled: canStep(1) ? null : true, onclick: () => flyTo(stepIdx(1)) }));
     const cur = sky.seq[nowIdx];
     const mode = prefs().mode;
     const where = !cur ? "" : cur.at ? " · " + fmtTime(new Date(cur.at)) : cur.kind === "item" ? " · " + (mode === "area" ? areaOf(cur.it) : cur.it.place) : "";
@@ -2488,6 +2593,7 @@
     const seq = nowSequence();
     if (!seq.length) {
       nowDrilled = false;
+      sunScope = null; sunMadeFull = false;
       w.append(h("p", { class: "now-empty", text: "Nothing is waiting on you. The rest of today is yours." }));
       const top = renderRecommendation(topRec());
       if (top) { box.classList.add("has-rec"); pane.append(top); }
@@ -2510,6 +2616,11 @@
     fillCtl();
     syncFreshPill();
     if (keepFull && !surfacing) enterFull();
+    // a sun was open (Done was pressed, or the day refreshed): open it again on what is left
+    if (sunScope) {
+      if (skyFull && prefs().mode === "area") { const a = sunScope; requestAnimationFrame(() => requestAnimationFrame(() => openSun(a))); }
+      else { sunScope = null; sunMadeFull = false; }
+    }
     const st = starFor(nowIdx);
     if (!st) return;
     if (surfacing) {
@@ -2921,9 +3032,9 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
     if (ev.key === "/" && sky) { ev.preventDefault(); if (!document.body.classList.contains("focus")) toggleFocus(true); setTimeout(openFind, 30); return; }
     // in focus, the arrows travel the sky and Enter dives into the bright star
     if (document.body.classList.contains("focus") && sky) {
-      if (ev.key === "ArrowRight" || ev.key === "l") { ev.preventDefault(); flyTo(nowIdx + 1); return; }
-      if (ev.key === "ArrowLeft" || ev.key === "h") { ev.preventDefault(); flyTo(nowIdx - 1); return; }
-      if (ev.key === "Enter" && !ev.target.closest("button, a, .star")) { ev.preventDefault(); dive(); return; }
+      if (ev.key === "ArrowRight" || ev.key === "l") { ev.preventDefault(); flyTo(stepIdx(1)); return; }
+      if (ev.key === "ArrowLeft" || ev.key === "h") { ev.preventDefault(); flyTo(stepIdx(-1)); return; }
+      if (ev.key === "Enter" && !ev.target.closest("button, a, .star, .sun")) { ev.preventDefault(); dive(); return; }
     }
     const list = passOf() === "Evening" ? openNeeds() : needs();
     const i = list.findIndex((x) => x.id === selKey);
