@@ -2748,8 +2748,15 @@
     }
 
     const ctl = h("div", { class: "now-ctl" });
-    if (cur.kind === "item") ctl.append(h("button", { class: "btn", text: "Done", onclick: async () => { await patchItem(cur.it, { status: "Closed" }); nowDrilled = false; surfacing = true; renderAll(); } }));
-    ctl.append(h("button", { text: "Back to the sky", onclick: surface }));
+    // Handed off: the big button goes back to the sky (the hand-off saves itself); closing the
+    // item is the quieter "Mark done", so it isn't mistaken for "done handing off".
+    const handed = cur.kind === "item" && cur.it.delegatedTo && cur.it.status !== "Closed";
+    const closeIt = async () => { await patchItem(cur.it, { status: "Closed" }); nowDrilled = false; surfacing = true; renderAll(); };
+    if (handed) ctl.append(h("button", { class: "btn", text: "Back to the sky", onclick: surface }), h("button", { text: "Mark done", title: "The work itself is finished: close the item", onclick: closeIt }));
+    else {
+      if (cur.kind === "item") ctl.append(h("button", { class: "btn", text: "Done", onclick: closeIt }));
+      ctl.append(h("button", { text: "Back to the sky", onclick: surface }));
+    }
     if (isDesk()) ctl.append(h("button", { text: "Close", onclick: () => toggleFocus(false) }));
     w.append(ctl);
   }
