@@ -349,15 +349,29 @@
   }
   // Handed off: who has it, and for how long.
   const HANDS = ["Milli", "Virgilio", "Someone else"];
+  const EMAILS = ["Milli", "Virgilio"];   // the people the delegate skill can email
   function delegChip(it) {
     if (!it.delegatedTo) return null;
     const who = it.delegatedTo === "Someone else" ? "someone" : it.delegatedTo;
     const on = it.delegatedOn && String(it.delegatedOn).slice(0, 10);
     const days = on ? Math.max(0, Math.round((new Date(localISO() + "T12:00:00") - new Date(on + "T12:00:00")) / 86400000)) : null;
     const late = days != null && days >= 3;
-    const mailed = it.handoffEmailed ? ` · ✉ ${new Date(it.handoffEmailed).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : it.handoffEmailPending ? " · ✉ sending" : "";
-    const tip = (late ? `With ${who} for ${days} days. Worth a check-in.` : `Handed to ${who}`) + (it.handoffEmailed ? ` · emailed ${new Date(it.handoffEmailed).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}` : "");
-    return h("span", { class: "deleg-chip" + (late ? " late" : "") + (it.handoffEmailed ? " mailed" : ""), title: tip }, `→ ${who}${days ? ` · ${days}d` : ""}${mailed}`);
+    const st = handoffState(it);
+    const tip = (late ? `With ${who} for ${days} days. Worth a check-in.` : `Handed to ${who}`) + (st.tip ? ` · ${st.tip}` : "");
+    return h("span", { class: "deleg-chip" + (late ? " late" : "") + (st.cls ? " " + st.cls : ""), title: tip }, `→ ${who}${days ? ` · ${days}d` : ""}${st.chip ? " · " + st.chip : ""}`);
+  }
+  // Where a hand-off stands, in Eric's words. The delegate skill moves it along; Oggi only queues.
+  const shortWhen = (d) => new Date(d).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" });
+  function handoffState(it) {
+    const who = it.delegatedTo, step = it.handoffStep;
+    if (!who || !EMAILS.includes(who)) return {};
+    if (step === "Queued") return { chip: "queued", cls: "queued", tip: "Claude emails it from your Gmail within the hour", line: `Queued. Claude emails ${who} from your Gmail within the hour: your notes as a short email with a checklist${isMail(it.link) ? ", and the original email forwarded underneath with its attachments" : ""}. Keep adding notes until it goes.` };
+    if (step === "Ask status") return { chip: "asking", cls: "queued", tip: "Claude asks for a status within the hour", line: `Claude will ask ${who} for a status within the hour, in the same email thread.` };
+    if (step === "Status asked") return { chip: "asked", cls: "mailed", tip: it.statusAsked ? `asked for status ${shortWhen(it.statusAsked)}` : "asked for status", line: `Asked ${who} for a status${it.statusAsked ? " " + shortWhen(it.statusAsked) : ""}. Waiting on her reply.`.replace("her reply", who === "Milli" ? "her reply" : "his reply") };
+    if (step === "Replied") return { chip: "replied", cls: "replied", tip: it.handoffReply || "replied", line: `${who} replied: ${it.handoffReply || "see the thread"}` };
+    if (step === "Done") return { chip: "done", cls: "mailed", tip: "says it's done", line: `${who} says it's done.` };
+    if (step === "Sent" || it.handoffEmailed) return { chip: it.handoffEmailed ? "✉ " + new Date(it.handoffEmailed).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "✉", cls: "mailed", tip: it.handoffEmailed ? `emailed ${shortWhen(it.handoffEmailed)}` : "emailed", line: `Emailed ${who}${it.handoffEmailed ? " " + shortWhen(it.handoffEmailed) : ""}. She'll reply in the thread when it's done.`.replace("She'll", who === "Milli" ? "She'll" : "He'll") };
+    return {};
   }
   function personChip(it) {
     const p = personOf(it);
@@ -408,30 +422,68 @@
     return row;
   }
   function handoffRow(it, after) {
+    const wrap = h("div", { class: "handoff-wrap" });
     const row = h("div", { class: "choices handoff", role: "group", "aria-label": "Hand it off" });
+    const done = () => { if (after) after(); else rerenderListOnly(); };
     for (const who of HANDS) {
       const b = h("button", { "aria-pressed": String(it.delegatedTo === who), text: who });
       b.addEventListener("click", async () => {
         const next = it.delegatedTo === who ? null : who;
         row.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x.textContent === next)));
-        try {
-          const upd = await patchItem(it, { delegatedTo: next });
-          if (!next) it.handoffEmailed = null;
-          if (upd && upd.handoffEmailPending) {
-            it.handoffEmailPending = true;
-            note.textContent = `Emailing ${next} in a few seconds. Tap ${next} again to take it back.`;
-            note.hidden = false;
-            // pick up "emailed" once the server has sent it
-            setTimeout(async () => { if (await load().catch(() => false)) { noteFresh(); renderAll(); } }, 22_000);
-          } else note.hidden = true;
-        } catch { b.setAttribute("aria-pressed", "false"); }
-        if (after) after(); else rerenderListOnly();
+        try { await patchItem(it, { delegatedTo: next }); if (!next) it.handoffEmailed = null; }
+        catch { b.setAttribute("aria-pressed", "false"); }
+        paint();
+        done();
       });
       row.append(b);
     }
-    const note = h("p", { class: "handoff-note", hidden: true });
-    if (it.handoffEmailed && it.delegatedTo) { note.textContent = `Emailed ${it.delegatedTo} ${new Date(it.handoffEmailed).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}.`; note.hidden = false; }
-    return h("div", { class: "handoff-wrap" }, row, note);
+    const panel = h("div", { class: "handoff-panel" });
+    wrap.append(row, panel);
+    // the notes, what Claude sent, and the status buttons
+    function paint() {
+      panel.replaceChildren();
+      const who = it.delegatedTo;
+      if (!who || !EMAILS.includes(who)) { panel.hidden = true; return; }
+      panel.hidden = false;
+      const st = handoffState(it);
+      if (st.line) panel.append(h("p", { class: "handoff-note", text: st.line }));
+      const sent = it.handoffStep && it.handoffStep !== "Queued";
+      if (it.handoffChecklist) {
+        const ul = h("ul", { class: "handoff-check" });
+        for (const l of it.handoffChecklist.split("\n").map((x) => x.replace(/^[-•*\d.)\s\[\]]+/, "").trim()).filter(Boolean)) ul.append(h("li", { text: l }));
+        panel.append(h("p", { class: "ed-label", text: `Checklist ${who} got` }), ul);
+      }
+      const lab = sent ? `Anything to add for ${who}? It rides along with the next status ask.` : `Notes for ${who}: think out loud. Claude turns them into the email and a checklist.`;
+      const ta = h("textarea", { class: "handoff-notes", rows: 3, placeholder: lab, "aria-label": lab });
+      ta.value = it.handoffNotes || "";
+      const saved = h("span", { class: "quiet handoff-saved", text: "" });
+      let t = null;
+      const save = async () => {
+        clearTimeout(t); t = null;
+        if (ta.value === (it.handoffNotes || "")) return;
+        saved.textContent = "Saving…";
+        try { await patchItem(it, { handoffNotes: ta.value }); saved.textContent = "Saved"; } catch { saved.textContent = "Not saved, try again"; }
+      };
+      ta.addEventListener("input", () => { grow(ta); saved.textContent = ""; clearTimeout(t); t = setTimeout(save, 900); });
+      ta.addEventListener("blur", save);
+      panel.append(ta);
+      const acts = h("div", { class: "handoff-acts" }, saved);
+      const prompt = () => `Run the delegate skill now for the Brief Item with Key ${it.key} (handed to ${who}). It's ${localISO()}.`;
+      if (it.handoffStep === "Queued" || it.handoffStep === "Ask status") {
+        const a = ext(h("a", { class: "textlink", href: "#", text: "Send now in Claude", title: "Opens Claude to send it right away instead of within the hour" }));
+        a.addEventListener("click", async () => { await save(); a.href = "https://claude.ai/new?q=" + encodeURIComponent(prompt()); });
+        a.href = "https://claude.ai/new?q=" + encodeURIComponent(prompt());
+        acts.append(a);
+      } else if (sent || it.handoffEmailed) {
+        acts.append(h("button", { class: "textlink", type: "button", text: "Ask for status", onclick: async () => { await save(); await patchItem(it, { handoffStep: "Ask status" }); paint(); done(); } }));
+      }
+      if (it.handoffThread) acts.append(ext(h("a", { class: "textlink", href: `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(it.handoffThread)}`, text: "Open the thread" })));
+      if (it.status !== "Closed") acts.append(h("button", { class: "textlink", type: "button", text: "Mark done", onclick: async () => { await save(); await patchItem(it, { status: "Closed" }); renderAll(); } }));
+      panel.append(acts);
+      requestAnimationFrame(() => grow(ta));
+    }
+    paint();
+    return wrap;
   }
   function titleEl(it) {
     const url = safeUrl(it.link);
@@ -1047,6 +1099,15 @@
           s("circle", { class: "fresh-ring", r: 9, fill: "none", stroke: tint, "aria-hidden": "true" }),
           s("circle", { class: "fresh-ring r2", r: 9, fill: "none", stroke: tint, "aria-hidden": "true" }),
           at);
+      }
+      // handed off: a small moon circles the star while someone else has it, with their initial
+      if (st.kind === "item" && st.it.delegatedTo && st.it.status !== "Closed") {
+        const hs = handoffState(st.it);
+        g.classList.add("handed");
+        if (hs.cls) g.classList.add("h-" + hs.cls);
+        const orbit = s("g", { class: "moon-orbit", "aria-hidden": "true" });
+        orbit.append(s("circle", { class: "moon-path", r: 12, fill: "none" }), s("circle", { class: "moon", cx: 12, cy: 0, r: 2.6 }));
+        g.append(orbit, s("text", { class: "star-who", x: 0, y: -18, "aria-hidden": "true" }, `${st.it.delegatedTo === "Someone else" ? "→ someone" : "→ " + st.it.delegatedTo}${hs.chip && hs.chip !== "queued" ? " · " + hs.chip.replace(/^✉.*/, "✉") : hs.chip === "queued" ? " · queued" : ""}`));
       }
       g.append(s("text", { class: "star-l", y: 17 }, st.kind === "event" ? fmtTime(st.ev.s) : shortLabel(st.it)));
       g.append(s("text", { class: "star-t", y: 28 }));
@@ -2549,6 +2610,7 @@
       card.append(h("h1", { class: "now-title", onclick: onOpen }, it.title));
       if (it.sentence) card.append(h("p", { class: "now-gist", text: firstSentence(it.sentence) }));
       if (it.carries > 1) card.append(h("p", { class: "now-carry", text: `Carried ${it.carries} days.` }));
+      if (it.delegatedTo && it.status !== "Closed") { const hs = handoffState(it); card.append(h("p", { class: "now-carry handoff-note", text: hs.line || `${it.delegatedTo === "Someone else" ? "Someone else" : it.delegatedTo} has this one.` })); }
       const kids = kidsOf(it).filter((c) => c.status !== "Closed");
       if (kids.length) { const owed = owedIn(it); card.append(h("p", { class: "now-carry", text: `${kids.length} in orbit${owed ? ` · ${money(owed)} outstanding` : ""} · tap its star to ${openKids().has(it.key) ? "fold them away" : "show them"}.` })); }
       const dr = decideRow(it); if (dr) card.append(dr);
@@ -3440,7 +3502,7 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
   // never count. Each mark lasts a day, or until he goes to that planet or opens the item.
   const FRESH_MS = 24 * 3600 * 1000;
   const itemKey = (it) => it.key || it.id;
-  const itemSig = (it) => [it.title, it.sentence, it.status, it.list, it.link, it.delegatedTo].map((x) => x || "").join("␞");
+  const itemSig = (it) => [it.title, it.sentence, it.status, it.list, it.link, it.delegatedTo, it.handoffStep].map((x) => x || "").join("␞");
   const passKey = () => (B && B.day ? `${B.day.date}|${B.day.published || ""}` : "");
   function readFresh() {
     const f = store.get("freshKeys") || {};

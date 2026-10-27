@@ -91,6 +91,13 @@ function toItem(page) {
     invoice: read(p["Invoice"]),
     delegatedOn: read(p["Delegated on"]),
     handoffEmailed: read(p["Handoff emailed"]),
+    // the delegate flow: Eric's notes, where it stands, what Claude sent, and what came back
+    handoffNotes: read(p["Handoff notes"]) || "",
+    handoffStep: read(p["Handoff step"]) || null,
+    handoffChecklist: read(p["Handoff checklist"]) || "",
+    handoffThread: read(p["Handoff thread"]) || null,
+    handoffReply: read(p["Handoff reply"]) || "",
+    statusAsked: read(p["Status asked"]),
     novaStart: read(p["Supernova"]),
     novaCooled: read(p["Cooled off"]),
     // The day it was finished. Older rows (and rows the brief closed) have no Closed on;
@@ -216,6 +223,8 @@ async function updateItem(id, fields) {
     props["Delegated on"] = fields.delegatedTo ? { date: { start: fields.delegatedOn } } : { date: null };
     if (!fields.delegatedTo) props["Handoff emailed"] = { date: null };
   }
+  if ("handoffNotes" in fields) props["Handoff notes"] = { rich_text: rich(fields.handoffNotes || "") };
+  if ("handoffStep" in fields) props["Handoff step"] = fields.handoffStep ? { select: { name: fields.handoffStep } } : { select: null };
   if ("handoffEmailed" in fields) props["Handoff emailed"] = fields.handoffEmailed ? { date: { start: fields.handoffEmailed } } : { date: null };
   if ("invoice" in fields) props["Invoice"] = fields.invoice ? { select: { name: fields.invoice } } : { select: null };
   if ("waitingOn" in fields) {

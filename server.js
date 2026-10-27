@@ -187,52 +187,16 @@ app.get("/api/history", requireAuth, wrap(async (req, res) => {
   res.json({ days, items: await store.getHistory(localDate(req), days) });
 }));
 
-// ---------- hand-off email ----------
-// Handing an item to Milli in the app emails her straight away (Eric, 27 Oct 2026: no confirmation needed).
-// A short grace period lets a mis-tap be taken back: if the item is no longer hers when it runs, nothing goes.
-const HANDOFF_TO = { Milli: process.env.MILLI_EMAIL || "sosillymilli@gmail.com" };
-const ERIC_EMAIL = process.env.ERIC_EMAIL || "eric@barayugacpa.com";
-const HANDOFF_GRACE_MS = 15_000;
-const handoffTimers = new Map();
-function handoffText(it, who) {
-  const lines = [`Hi ${who},`, "", "Could you take care of this one for me?", "", it.title || ""];
-  if (it.sentence) lines.push("", "Where it stands, from my daily list (\u201cyou\u201d there means me):", it.sentence);
-  if (it.note) lines.push("", "My note: " + it.note);
-  const link = String(it.link || "");
-  if (/mail\.google\.com/.test(link)) lines.push("", "It came in by email; I'll forward you the thread if you don't already have it.");
-  else if (/^https:\/\//.test(link) && !/notion\.(so|com)/.test(link)) lines.push("", link);
-  lines.push("", "Reply here if you have questions or when it's done.", "", "Mahalo,", "Eric");
-  return lines.join("\n");
-}
-function scheduleHandoffEmail(itemId, who, dayId) {
-  const to = HANDOFF_TO[who];
-  if (!to || !process.env.RESEND_API_KEY) return false;
-  clearTimeout(handoffTimers.get(itemId));
-  handoffTimers.set(itemId, setTimeout(async () => {
-    handoffTimers.delete(itemId);
-    try {
-      const it = store.toItem(await store.getPage(itemId));
-      if (it.delegatedTo !== who || it.status === "Closed") return; // taken back or done during the grace period
-      const r = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: process.env.HANDOFF_FROM || "Eric Barayuga <oggi@princellama.com>",
-          to: [to], cc: [ERIC_EMAIL], reply_to: ERIC_EMAIL,
-          subject: `From Eric: ${it.title}`.slice(0, 160),
-          text: handoffText(it, who),
-        }),
-      });
-      if (!r.ok) throw new Error(`Resend ${r.status} ${await r.text()}`);
-      await store.updateItem(itemId, { handoffEmailed: new Date().toISOString() });
-      if (dayId) await store.logEdit(dayId, `${stamp()} ${it.title} → emailed ${who}`);
-    } catch (e) { console.error("handoff email", e.message); }
-  }, HANDOFF_GRACE_MS));
-  return true;
-}
+// ---------- hand-offs ----------
+// Handing an item to Milli or Virgilio queues it for Claude (the delegate skill). Claude sends from
+// Eric's own Gmail: his notes turned into a short email with a checklist, and when the item came in
+// by email, the original forwarded underneath with its attachments. Chosen by Eric on 27 Oct 2026
+// over an instant email from Oggi, because only a forward carries the attachments.
+// Oggi only sets Handoff step to Queued or Ask status; the skill writes Sent, Status asked, Replied, Done.
+const EMAILED_TO = ["Milli", "Virgilio"];
 
 app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
-  const allowed = ["title", "note", "place", "area", "order", "decision", "status", "delegatedTo", "waitingOn", "invoice", "novaStart", "novaCooled"];
+  const allowed = ["handoffNotes", "handoffStep", "title", "note", "place", "area", "order", "decision", "status", "delegatedTo", "waitingOn", "invoice", "novaStart", "novaCooled"];
   const fields = {};
   for (const k of allowed) if (k in req.body) fields[k] = req.body[k];
   if (fields.place && !["Skyline", "Airport", "Kalihi", "Kakaako", "Kahala", "Hawaii Kai", "Home"].includes(fields.place)) return res.status(400).json({ error: "place" });
@@ -243,7 +207,11 @@ app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
   if ("delegatedTo" in fields) {
     if (fields.delegatedTo !== null && !["Milli", "Virgilio", "Someone else"].includes(fields.delegatedTo)) return res.status(400).json({ error: "delegatedTo" });
     fields.delegatedOn = fields.delegatedTo ? localDate(req) : null;
+    // a new hand-off to someone with email goes in the queue; taking it back empties the queue
+    if (!("handoffStep" in fields)) fields.handoffStep = EMAILED_TO.includes(fields.delegatedTo) ? "Queued" : null;
   }
+  if ("handoffStep" in fields && fields.handoffStep !== null && !["Queued", "Ask status"].includes(fields.handoffStep)) return res.status(400).json({ error: "handoffStep" });
+  if ("handoffNotes" in fields) fields.handoffNotes = String(fields.handoffNotes || "").slice(0, 1900);
   if ("invoice" in fields) {
     if (fields.invoice !== null && !["To send", "Sent", "Paid"].includes(fields.invoice)) return res.status(400).json({ error: "invoice" });
     // paid closes the invoice; moving it back reopens it
@@ -273,13 +241,11 @@ app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
   else if ("invoice" in fields) line = `${t} → invoice ${String(fields.invoice || "cleared").toLowerCase()}`;
   else if ("waitingOn" in fields) line = fields.waitingOn ? `${t} → waiting on ${fields.waitingOn}` : `${t} → they answered (no longer waiting)`;
   else if ("note" in fields && fields.note) line = `Note on ${t}: ${fields.note}`;
+  else if ("handoffStep" in fields && fields.handoffStep === "Ask status") line = `${t} → asked ${item.delegatedTo || "them"} for a status`;
+  else if ("handoffNotes" in fields && fields.handoffNotes) line = `Hand-off notes on ${t}: ${fields.handoffNotes}`;
   else if ("novaCooled" in fields && fields.novaCooled) line = `${t} → supernova cooling off`;
   else if ("novaStart" in fields && fields.novaStart) line = `${t} → supernova lit (grows every hour until it's done)`;
-  if ("delegatedTo" in fields) {
-    if (fields.delegatedTo && HANDOFF_TO[fields.delegatedTo]) item.handoffEmailPending = scheduleHandoffEmail(item.id, fields.delegatedTo, dayId);
-    else { clearTimeout(handoffTimers.get(item.id)); handoffTimers.delete(item.id); }
-  }
-  const mergeKey = "note" in fields ? `Note on ${t}:` : ("decision" in fields ? `${t} → ` : null);
+  const mergeKey = "note" in fields ? `Note on ${t}:` : "handoffNotes" in fields ? `Hand-off notes on ${t}:` : ("decision" in fields ? `${t} → ` : null);
   if (line && dayId) await store.logEdit(dayId, `${stamp()} ${line}`, mergeKey);
   res.json(item);
 }));
