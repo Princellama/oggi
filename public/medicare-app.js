@@ -63,7 +63,7 @@
 
   // ---------------- state ----------------
   const S = { data: null, err: null, msg: null, tab: "overview", pulseScope: "All", pulseCarrier: "All", partnerFilter: "All", draft: { kind: "In the field" } };
-  const TABS = ["overview", "pulse", "carriers", "campaigns", "content", "partners"];
+  const TABS = ["overview", "pulse", "carriers", "veterans", "campaigns", "content", "partners", "log"];
   const PROMPTS = {
     scan: "/medicare-marketing scan — scan Hawaii and national Medicare news and the four carriers (Devoted, UHC, Humana, HMSA), and add what's new to Medicare Pulse.",
     count: "/medicare-marketing count — count leads, appointments and enrollments in GHL for each running campaign in Medicare Campaigns, and sync my kiosk and event schedule from Google Calendar into Medicare Field Days.",
@@ -73,13 +73,18 @@
   };
 
   // ---------------- routing ----------------
-  function tabFromPath() {
-    const t = location.pathname.replace(/^\/medicare\/?/, "").split("/")[0];
+  // /medicare/carriers/2027[/Devoted] is the 2027 Plans page, shown under the Carriers tab.
+  function routeFromPath() {
+    const [t, sub, c] = location.pathname.replace(/^\/medicare\/?/, "").split("/");
+    S.sub = t === "carriers" && sub === "2027" ? "plans" : null;
+    if (S.sub) S.planCarrier = decodeURIComponent(c || "") || S.planCarrier || "Devoted";
     return TABS.includes(t) ? t : "overview";
   }
-  function go(tab, push = true) {
-    S.tab = tab; S.msg = null;
-    if (push) history.pushState({}, "", tab === "overview" ? "/medicare" : "/medicare/" + tab);
+  const tabFromPath = routeFromPath;
+  function go(tab, push = true, sub = null) {
+    S.tab = tab; S.msg = null; S.sub = sub;
+    const path = tab === "overview" ? "/medicare" : "/medicare/" + tab + (sub === "plans" ? "/2027/" + encodeURIComponent(S.planCarrier || "Devoted") : "");
+    if (push) history.pushState({}, "", path);
     render();
     window.scrollTo(0, 0);
   }
@@ -88,7 +93,7 @@
     if (!a || e.metaKey || e.ctrlKey) return;
     e.preventDefault(); go(a.dataset.tab);
   });
-  window.addEventListener("popstate", () => go(tabFromPath(), false));
+  window.addEventListener("popstate", () => { const t = routeFromPath(); go(t, false, S.sub); });
 
   // ---------------- load ----------------
   async function load() {
@@ -135,7 +140,8 @@
     }
     for (const [k, v] of otherErrors()) main.append(h("p", { class: "mc-err", text: `${k}: ${v.error}` }));
     if (S.msg) main.append(h("p", { class: "mc-msg", text: S.msg }));
-    ({ overview, pulse, carriers, campaigns, content, partners })[S.tab](main);
+    if (S.tab === "carriers" && S.sub === "plans") return plans2027(main);
+    ({ overview, pulse, carriers, veterans, campaigns, content, partners, log })[S.tab](main);
   }
 
   // ---------------- overview ----------------
@@ -257,6 +263,11 @@
     { k: "HMSA", role: "Not in your lineup · largest local carrier", stance: "Its plan changes drive this AEP's disruption. Members who must choose are the people to help." },
   ];
   function carriers(main) {
+    main.append(h("a", { class: "pin2027", href: "/medicare/carriers/2027/Devoted", onclick: (e) => { e.preventDefault(); S.planCarrier = "Devoted"; go("carriers", true, "plans"); } },
+      h("span", { class: "pin-k", text: "📌 Pinned" }),
+      h("span", { class: "pin-t", text: "2027 Plans" }),
+      h("span", { class: "pin-s", text: "Cheat sheet and kiosk presentation: every plan, what changed, what's new" }),
+      h("span", { class: "pin-go", text: "→" })));
     main.append(h("p", { class: "mc-lede", text: "Each carrier's news from the Pulse, newest first. What you say still has to fit each client; this is where the market is moving." }));
     const grid = h("div", { class: "car-grid" });
     for (const c of CARRIERS) {
@@ -569,6 +580,333 @@
     }
     if (!list.length) ul.append(h("li", { class: "quiet", text: "No one matches this filter." }));
     main.append(ul);
+  }
+
+  // ---------------- shared: full screen ----------------
+  // Real full screen where the browser allows it (iPhone Safari doesn't for divs), otherwise a fixed overlay.
+  function openFull(el, onClose) {
+    el.classList.add("mc-full");
+    document.body.classList.add("mc-noscroll");
+    const close = () => {
+      el.classList.remove("mc-full");
+      document.body.classList.remove("mc-noscroll");
+      document.removeEventListener("keydown", key);
+      document.removeEventListener("fullscreenchange", fsc);
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      if (onClose) onClose();
+    };
+    const key = (e) => { if (e.key === "Escape") close(); };
+    const fsc = () => { if (!document.fullscreenElement && el.classList.contains("mc-full")) close(); };
+    document.addEventListener("keydown", key);
+    if (el.requestFullscreen) el.requestFullscreen().then(() => document.addEventListener("fullscreenchange", fsc)).catch(() => {});
+    return close;
+  }
+
+  // ---------------- veterans ----------------
+  const SVGNS = "http://www.w3.org/2000/svg";
+  function s(tag, attrs, ...kids) {
+    const el = document.createElementNS(SVGNS, tag);
+    for (const [k, v] of Object.entries(attrs || {})) if (v != null) el.setAttribute(k, v);
+    for (const kid of kids.flat()) if (kid != null) el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+    return el;
+  }
+  // Text that wraps inside a box (SVG has no wrapping): split by words to a max width in characters.
+  function wrapLines(text, max) {
+    const out = []; let line = "";
+    for (const w of String(text).split(" ")) {
+      if ((line + " " + w).trim().length > max && line) { out.push(line); line = w; } else line = (line + " " + w).trim();
+    }
+    if (line) out.push(line);
+    return out;
+  }
+  function box(x, y, w, hgt, tone, title, sub) {
+    const g = s("g", { class: "vd-box vd-" + tone });
+    g.append(s("rect", { x, y, width: w, height: hgt, rx: 10 }));
+    const tl = wrapLines(title, Math.floor(w / 8.4)), sl = sub ? wrapLines(sub, Math.floor(w / 6.6)) : [];
+    const total = tl.length * 18 + (sl.length ? 6 + sl.length * 15 : 0);
+    let ty = y + (hgt - total) / 2 + 13;
+    for (const l of tl) { g.append(s("text", { x: x + w / 2, y: ty, class: "vd-t", "text-anchor": "middle" }, l)); ty += 18; }
+    ty += sl.length ? 4 : 0;
+    for (const l of sl) { g.append(s("text", { x: x + w / 2, y: ty, class: "vd-s", "text-anchor": "middle" }, l)); ty += 15; }
+    return g;
+  }
+  function arrow(x1, x2, y) {
+    return s("g", { class: "vd-arrow" }, s("line", { x1, y1: y, x2: x2 - 7, y2: y }), s("path", { d: `M${x2 - 8} ${y - 5} L${x2} ${y} L${x2 - 8} ${y + 5} Z` }));
+  }
+  function vetDiagram() {
+    const W = 960, laneH = 146, top = 56;
+    const lanes = [
+      { t: "Civilian doctor or hospital (in the plan's network)", boxes: [["You get care", "", "you"], ["Medicare Advantage plan pays first", "No drug coverage, $0 premium", "plan"], ["TRICARE For Life pays second", "If it doesn't arrive on its own, file with WPS: 866-773-0404", "tfl"], ["You owe little or nothing", "", "ok"]] },
+      { t: "VA facility: service-connected condition", boxes: [["You get care at the VA", "", "you"], ["VA covers it", "Nothing goes to the plan or TRICARE", "va"], ["$0, nothing to file", "", "ok"]] },
+      { t: "VA facility: not service-connected", boxes: [["You get care at the VA", "", "you"], ["Medicare and the plan pay nothing", "Medicare can't pay a VA facility", "no"], ["TFL pays at most 20%", "Of TRICARE's allowed amount; ask VA billing", "tfl"], ["You may owe the rest", "Usually better: a civilian doctor in the plan", "warn"]] },
+      { t: "Prescriptions", boxes: [["You fill a prescription", "", "you"], ["TRICARE pharmacy or VA pharmacy", "Same as today", "tfl"], ["No Part D needed", "TRICARE and VA drug coverage count as creditable: no late penalty", "ok"]] },
+    ];
+    const H = top + lanes.length * laneH + 24;
+    const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, class: "vd", role: "img", "aria-label": "How VA care, TRICARE For Life and a Medicare Advantage plan without drug coverage work together" });
+    svg.append(s("text", { x: 0, y: 26, class: "vd-h" }, "Who pays, and where"));
+    svg.append(s("text", { x: 0, y: 46, class: "vd-s vd-left" }, "The VA, TRICARE For Life and the Medicare Advantage plan run in separate lanes; none replaces the others."));
+    lanes.forEach((lane, i) => {
+      const y = top + i * laneH + 14;
+      svg.append(s("rect", { x: 0, y: y - 6, width: W, height: laneH - 14, rx: 12, class: "vd-lane" }));
+      svg.append(s("text", { x: 14, y: y + 14, class: "vd-l" }, lane.t));
+      const n = lane.boxes.length, gap = 34, bw = (W - 28 - gap * (n - 1)) / n, by = y + 26, bh = laneH - 52;
+      lane.boxes.forEach(([t, sub, tone], j) => {
+        const bx = 14 + j * (bw + gap);
+        svg.append(box(bx, by, bw, bh, tone, t, sub));
+        if (j < n - 1) svg.append(arrow(bx + bw + 3, bx + bw + gap - 3, by + bh / 2));
+      });
+    });
+    return svg;
+  }
+  function vetEmail(planSpecific) {
+    const V = MC_DATA.veterans;
+    const lines = ["Hi [Name],", ""];
+    if (!planSpecific) {
+      lines.push(
+        "Thank you for your service, and thanks for stopping by. Here's the information I mentioned about how Medicare works with VA care and TRICARE For Life.",
+        "",
+        "The short version: some Medicare Advantage plans are built for veterans and don't include drug coverage, because you already have drug coverage through TRICARE or the VA. Joining one doesn't affect your VA care, and TRICARE For Life still pays second.",
+        "",
+        "Straight from the source:");
+      for (const l of V.links) lines.push(`- ${l.t}: ${l.u}`);
+      lines.push("",
+        "If you'd like to see the plans available in your area side by side, I'm happy to sit down with you. Open enrollment runs through December 7.",
+        "", "Mahalo,", "Eric Barayuga", "(808) 256-6736");
+    } else {
+      lines.push(
+        "Thank you for meeting with me. As promised, here are the 2027 Medicare Advantage plans on Oahu that have no drug coverage, so you keep your TRICARE pharmacy benefit:", "");
+      for (const p of V.plans) lines.push(`- ${p.carrier === "UHC" ? "UnitedHealthcare" : p.carrier} ${p.name} (${p.type}): ${p.premium} premium, $${p.giveback} a month back on your Part B premium ($${(p.giveback * 12).toLocaleString("en-US")} a year).`);
+      lines.push("",
+        "With any of them, TRICARE For Life still pays second, and your VA care stays exactly the same. Sometimes a TRICARE claim needs to be sent in by hand after an MA plan pays; I'll show you how.",
+        "", "Worth reading:");
+      for (const l of [...V.links, ...V.planLinks]) lines.push(`- ${l.t}: ${l.u}`);
+      lines.push("",
+        "The giveback only applies if you pay your own Part B premium, and it can take a few months to show up in your check. Benefits vary by plan, so let's check your doctors before you choose. Open enrollment runs through December 7.",
+        "", "Mahalo,", "Eric Barayuga", "(808) 256-6736", "", MC_DATA.disclaimer);
+    }
+    return lines.join("\n");
+  }
+  function veterans(main) {
+    const V = MC_DATA.veterans;
+    main.append(h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Veterans" }), h("span", { class: "quiet", text: `${V.area} · 2027` })));
+    main.append(h("p", { class: "mc-lede", text: "For veterans with TRICARE For Life or VA care: Medicare Advantage plans with no drug coverage, how they fit with the VA, and what to say. Show the plans only after a signed Scope." }));
+    main.append(h("nav", { class: "vet-jump" }, ...[["vet-options", "Options"], ["vet-diagram", "Diagram"], ["vet-faq", "FAQ"], ["vet-script", "Script"], ["vet-email", "Email"]].map(([id, t]) =>
+      h("a", { href: "#" + id, text: t, onclick: (e) => { e.preventDefault(); document.getElementById(id).scrollIntoView({ behavior: "smooth", block: "start" }); } }))));
+
+    // Options
+    const opt = h("section", { class: "mc-sec", id: "vet-options" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "2027 options · no drug coverage" })));
+    const plans = V.plans.slice().sort((a, b) => b.giveback - a.giveback);
+    const grid = h("div", { class: "vet-plans" });
+    for (const p of plans) {
+      grid.append(h("article", { class: `vplan k-${p.carrier}` + (p.best ? " best" : "") },
+        h("div", { class: "chips" }, chip(p.carrier, "c-" + p.carrier), chip(p.type), p.best ? chip("Highest giveback", "new") : null),
+        h("h3", { text: p.name }),
+        h("div", { class: "vgive" }, h("b", { text: "$" + p.giveback }), h("span", { text: "/mo back" }), h("small", { text: `$${(p.giveback * 12).toLocaleString("en-US")} a year on the Part B premium` })),
+        h("dl", {}, ...[["Premium", p.premium], ["Primary care", p.pcp], ["Specialist", p.specialist], ["Dental", p.dental], ["Eyewear", p.eyewear], ["Hearing", p.hearing], ["Drugs", "None: keep TRICARE pharmacy"]]
+          .flatMap(([k, v]) => [h("dt", { text: k }), h("dd", { text: v })])),
+        h("p", { class: "quiet", text: p.id })));
+    }
+    opt.append(grid);
+    if (V.checks && V.checks.length) opt.append(h("ul", { class: "vet-checks" }, ...V.checks.map((c) => h("li", { text: c }))));
+    main.append(opt);
+
+    // Diagram
+    const dsec = h("section", { class: "mc-sec", id: "vet-diagram" });
+    const frame = h("div", { class: "vd-frame" });
+    const closeBtn = h("button", { class: "vd-close", type: "button", "aria-label": "Close full screen", text: "×" });
+    frame.append(closeBtn, vetDiagram());
+    let closeFull = null;
+    closeBtn.addEventListener("click", () => closeFull && closeFull());
+    dsec.append(h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "How VA, TRICARE and the plan fit" }),
+      h("button", { class: "btn small ghost", type: "button", text: "⤢ Full screen", onclick: () => { closeFull = openFull(frame, () => (closeFull = null)); } })), frame);
+    main.append(dsec);
+
+    // FAQ
+    const fsec = h("section", { class: "mc-sec", id: "vet-faq" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "FAQ" })));
+    for (const f of V.faq) fsec.append(h("details", { class: "faq" }, h("summary", { text: f.q }), h("p", { text: f.a })));
+    main.append(fsec);
+
+    // Script
+    const scr = h("section", { class: "mc-sec", id: "vet-script" });
+    scr.append(h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "In the field" }), copyBtn(() => V.script.join("\n\n"), "Copy script")));
+    scr.append(h("p", { class: "mc-lede", text: "Say it, don't read it. No plan names until they've signed a Scope." }));
+    scr.append(h("ol", { class: "script" }, ...V.script.map((l) => h("li", { text: l }))));
+    main.append(scr);
+
+    // Email
+    const em = h("section", { class: "mc-sec", id: "vet-email" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Email" })));
+    em.append(filterBar(["Educational", "After a Scope"], S.vetEmail || "Educational", (v) => (S.vetEmail = v)));
+    const specific = S.vetEmail === "After a Scope";
+    em.append(h("p", { class: "mc-lede", text: specific
+      ? "Names the plans and the giveback, so it's marketing: send only to someone who has signed a Scope for Medicare Advantage. The disclaimer is already at the bottom."
+      : "Safe to send to anyone: explains how it works and links the official TRICARE, VA and Medicare pages. No plan names or amounts." }));
+    const text = vetEmail(specific);
+    const subject = specific ? "Your 2027 Medicare options with TRICARE For Life" : "How Medicare works with your VA and TRICARE For Life";
+    em.append(h("div", { class: "cap" }, h("div", { class: "lab" }, h("span", { text: "Subject" }), copyBtn(() => subject)), h("p", { class: "txt", text: subject })));
+    em.append(h("div", { class: "cap" }, h("div", { class: "lab" }, h("span", { text: "Body" }), copyBtn(() => text)), h("p", { class: "txt email-body", text })));
+    em.append(h("div", { class: "mc-acts" },
+      h("a", { class: "btn small", href: "mailto:?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(text), text: "Open in Mail" }),
+      copyBtn(() => subject + "\n\n" + text, "Copy all")));
+    main.append(em);
+  }
+
+  // ---------------- 2027 plans (cheat sheet + presentation) ----------------
+  const fmtGive = (g) => (g == null ? "—" : "$" + (Number.isInteger(g) ? g : g.toFixed(2)) + "/mo");
+  const PLAN_ROWS = [
+    ["Premium", (p) => p.premium], ["Giveback", (p) => fmtGive(p.giveback)], ["Medical deductible", (p) => p.deductible],
+    ["Specialist", (p) => p.specialist], ["Hospital", (p) => p.inpatient], ["Out-of-pocket max", (p) => p.moop],
+    ["Dental / yr", (p) => p.dental], ["Eyewear / yr", (p) => p.eyewear], ["OTC", (p) => p.otc], ["Food & Home Card", (p) => p.food],
+    ["Drug coverage", (p) => (p.partD ? "Yes (Part D)" : "None")], ["Drug deductible", (p) => p.rxDed], ["Drug tiers 1–5", (p) => p.tiers],
+  ];
+  const PLAN_FILTERS = {
+    All: () => true, "Devoted's picks": (p) => p.featured, Giveback: (p) => p.giveback != null,
+    "No drugs": (p) => !p.partD, "Chronic (C-SNP)": (p) => /C-SNP/.test(p.type), PPO: (p) => /PPO/.test(p.type), "New for 2027": (p) => p.isNew,
+  };
+  function plans2027(main) {
+    const D = MC_DATA.plans2027, c = D[S.planCarrier] ? S.planCarrier : "Devoted", C = D[c];
+    main.append(h("a", { class: "textlink", href: "/medicare/carriers", text: "← Carriers", onclick: (e) => { e.preventDefault(); go("carriers"); } }));
+    main.append(h("div", { class: "mc-head", style: "margin-top:14px" }, h("h2", { class: "head", style: "font-size:30px;margin:0", text: "2027 Plans" }),
+      C.status === "ready" ? h("button", { class: "btn small", type: "button", text: "▶ Present", onclick: () => present(c, C) }) : null));
+    main.append(h("div", { class: "filters" }, ...D.order.map((k) => h("button", { type: "button", "aria-pressed": String(k === c),
+      text: k + (D[k].status === "ready" ? "" : " · coming"), onclick: () => { S.planCarrier = k; go("carriers", true, "plans"); } }))));
+    if (C.status !== "ready") {
+      main.append(h("div", { class: "mc-share" }, h("p", { text: `${c}'s 2027 cheat sheet isn't built yet.` }),
+        h("p", { text: "Send Claude the carrier's 2027 plan list or your cheat sheet and it'll be added here in the same layout." }),
+        h("p", {}, ext(h("a", { class: "textlink", href: claude(`Add ${c}'s 2027 Honolulu County plans to the 2027 Plans page in Oggi /medicare (public/medicare-data.js, plans2027.${c}), in the same layout as Devoted: plans, what changed from 2026, what's new.`), text: "Ask Claude to build it" })))));
+      return;
+    }
+    main.append(h("p", { class: "mc-lede", text: `${C.area} · ${C.plans.length} plans · updated ${fmtDay(C.updated)}. Tap ▶ Present to show someone at the kiosk.` }));
+
+    const ch = h("section", { class: "mc-sec" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "What changed for 2027" })));
+    ch.append(h("ul", { class: "changes" }, ...C.changes.map((t) => h("li", { text: t }))));
+    main.append(ch);
+
+    const sec = h("section", { class: "mc-sec" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "The plans" })));
+    sec.append(filterBar(Object.keys(PLAN_FILTERS), S.planFilter || "All", (v) => (S.planFilter = v)));
+    const list = C.plans.filter(PLAN_FILTERS[S.planFilter || "All"]);
+    const cards = h("div", { class: "pcards" });
+    for (const p of list) {
+      cards.append(h("article", { class: "pcard" },
+        h("div", { class: "chips" }, chip(p.type), p.featured ? chip("Devoted's pick", "ok") : null, p.isNew ? chip("New for 2027", "new") : null, !p.partD ? chip("No drugs") : null),
+        h("h3", {}, p.name, p.nick ? h("span", { class: "nick", text: " · " + p.nick }) : null),
+        h("p", { class: "who", text: p.who }),
+        h("dl", {}, ...PLAN_ROWS.filter(([, f]) => f(p) != null).flatMap(([k, f]) => [h("dt", { text: k }), h("dd", { class: k === "Giveback" && p.giveback ? "give" : "", text: f(p) })])),
+        h("p", { class: "quiet", text: p.id })));
+    }
+    if (!list.length) cards.append(h("p", { class: "quiet", text: "No plans match this filter." }));
+    sec.append(cards);
+    main.append(sec);
+    main.append(h("p", { class: "fine", text: `Source: ${C.source} Nicknames are yours and never show in Present. Check the Summary of Benefits before quoting a number; show plans only after a signed Scope.` }));
+  }
+
+  // Full-screen slides: an overview, one slide per plan, then what's new. ← → or swipe; Esc closes.
+  function present(cname, C) {
+    const slides = [];
+    const plans = C.plans;
+    slides.push(() => h("div", { class: "sl" },
+      h("p", { class: "sl-k", text: `2027 · ${C.area}` }), h("h2", { text: `${cname} Medicare Advantage plans` }),
+      h("div", { class: "sl-grid" }, ...plans.map((p, i) => h("button", { type: "button", class: "sl-tile", onclick: () => show(i + 1) },
+        h("b", { text: p.name }), h("span", { text: p.type }),
+        h("em", { text: p.giveback ? fmtGive(p.giveback) + " back" : !p.partD ? "No drug coverage" : p.premium + " premium" }))))));
+    for (const p of plans) slides.push(() => h("div", { class: "sl" },
+      h("p", { class: "sl-k", text: `${cname} · ${p.type}` + (p.isNew ? " · New for 2027" : "") }),
+      h("h2", { text: p.name }),
+      h("p", { class: "sl-who", text: p.who.replace(/ ?Full QUEST members only; ask the MedQUEST level first\./, "").replace(/ and the plan Devoted's trainers point SLMB members to/, "") }),
+      h("div", { class: "sl-big" },
+        h("div", {}, h("b", { text: p.premium }), h("span", { text: "monthly premium" })),
+        p.giveback ? h("div", { class: "g" }, h("b", { text: fmtGive(p.giveback) }), h("span", { text: "back on your Part B premium" })) : null,
+        h("div", {}, h("b", { text: p.dental }), h("span", { text: "dental a year" }))),
+      h("dl", {}, ...PLAN_ROWS.filter(([k, f]) => !["Premium", "Giveback", "Dental / yr"].includes(k) && f(p) != null).flatMap(([k, f]) => [h("dt", { text: k }), h("dd", { text: f(p) })]))));
+    slides.push(() => h("div", { class: "sl" }, h("p", { class: "sl-k", text: `${cname} · 2027` }), h("h2", { text: "What's new this year" }),
+      h("ul", { class: "sl-list" }, ...C.changes.filter((t) => !/D-SNP|MedQUEST/.test(t)).map((t) => h("li", { text: t })))));
+
+    let i = 0;
+    const stage = h("div", { class: "sl-stage" });
+    const count = h("span", { class: "sl-n" });
+    const prev = h("button", { type: "button", class: "sl-nav", "aria-label": "Previous", text: "←", onclick: () => show(i - 1) });
+    const next = h("button", { type: "button", class: "sl-nav", "aria-label": "Next", text: "→", onclick: () => show(i + 1) });
+    const x = h("button", { type: "button", class: "sl-x", "aria-label": "Close", text: "×" });
+    const deck = h("div", { class: "deck" }, x, stage,
+      h("div", { class: "sl-foot" }, prev, count, next),
+      h("p", { class: "sl-disc", text: MC_DATA.disclaimer + " Benefits summarized from 2027 plan information; see the Summary of Benefits for full details." }));
+    function show(n) {
+      i = Math.max(0, Math.min(slides.length - 1, n));
+      stage.textContent = ""; stage.append(slides[i]());
+      count.textContent = `${i + 1} / ${slides.length}`;
+      prev.disabled = i === 0; next.disabled = i === slides.length - 1;
+    }
+    const key = (e) => { if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); show(i + 1); } if (e.key === "ArrowLeft") show(i - 1); };
+    let sx = null;
+    deck.addEventListener("touchstart", (e) => { sx = e.touches[0].clientX; }, { passive: true });
+    deck.addEventListener("touchend", (e) => { if (sx == null) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 50) show(i + (dx < 0 ? 1 : -1)); sx = null; });
+    document.body.append(deck);
+    document.addEventListener("keydown", key);
+    const close = openFull(deck, () => { document.removeEventListener("keydown", key); deck.remove(); });
+    x.addEventListener("click", close);
+    show(0);
+  }
+
+  // ---------------- activity log ----------------
+  const LOG_KINDS = ["All", "Prospects", "Clients", "Email", "GHL", "Forms", "Other"];
+  const kindGroup = (k) => k === "Prospect met" ? "Prospects" : k === "Client review" || k === "Plan comparison" || k === "Phone call" ? "Clients" : k === "Email" ? "Email" : k === "GHL push" ? "GHL" : k === "Form filled" ? "Forms" : "Other";
+  const GHL_CHIP = { "In GHL": "ok", "In Outbox": "warn", "Not in GHL": "" };
+  function log(main) {
+    const all = rows("log");
+    main.append(h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Activity Log" }), h("span", { class: "quiet", text: `${all.length} since AEP opened` })));
+    main.append(h("p", { class: "mc-lede", text: "Everything Medicare that Claude did for you: people you met, clients you reviewed, GHL pushes, emails it read, forms it filled. GHL status is read live from People, so it's current." }));
+    const search = h("input", { class: "field log-q", type: "search", placeholder: "Search a name, tag or word", value: S.logQ || "" });
+    search.addEventListener("input", () => { S.logQ = search.value; drawList(); });
+    main.append(search);
+    main.append(filterBar(LOG_KINDS, S.logKind || "All", (v) => (S.logKind = v)));
+    main.append(filterBar(["Any GHL status", "Not in GHL", "In Outbox", "In GHL"], S.logGhl || "Any GHL status", (v) => (S.logGhl = v)));
+    const tags = [...new Set(all.flatMap((r) => r.tags || []))].sort();
+    if (tags.length) main.append(filterBar(["Any tag", ...tags], S.logTag || "Any tag", (v) => (S.logTag = v)));
+    const sortSel = h("select", { class: "copy", "aria-label": "Sort", style: "border:0;background:transparent;margin:0 0 14px" },
+      ...["Newest first", "Oldest first", "By person"].map((o) => h("option", { text: o, selected: o === (S.logSort || "Newest first") })));
+    sortSel.addEventListener("change", () => { S.logSort = sortSel.value; drawList(); });
+    main.append(sortSel);
+    const holder = h("div");
+    main.append(holder);
+
+    function drawList() {
+      const q = (S.logQ || "").trim().toLowerCase();
+      let list = all.filter((r) =>
+        (!S.logKind || S.logKind === "All" || kindGroup(r.kind) === S.logKind) &&
+        (!S.logGhl || S.logGhl === "Any GHL status" || r.ghl === S.logGhl) &&
+        (!S.logTag || S.logTag === "Any tag" || (r.tags || []).includes(S.logTag)) &&
+        (!q || [r.summary, r.who, r.personName, r.kind, r.source, ...(r.tags || [])].join(" ").toLowerCase().includes(q)));
+      const srt = S.logSort || "Newest first";
+      list.sort((a, b) => srt === "By person" ? String(a.personName || a.who).localeCompare(String(b.personName || b.who)) || String(b.when).localeCompare(String(a.when))
+        : srt === "Oldest first" ? String(a.when).localeCompare(String(b.when)) : String(b.when).localeCompare(String(a.when)));
+      holder.textContent = "";
+      if (!list.length) { holder.append(h("p", { class: "quiet", text: all.length ? "Nothing matches these filters." : "Nothing logged yet." })); return; }
+      const ul = h("ul", { class: "logl" });
+      let lastDay = null;
+      for (const r of list) {
+        const d = r.when ? (r.when.length > 10 ? localDay(r.when) : r.when) : "";
+        if (srt !== "By person" && d !== lastDay) { ul.append(h("li", { class: "log-day", text: d ? `${fmtWeekday(d + "T12:00:00-10:00")} ${fmtDay(d)}` : "Undated" })); lastDay = d; }
+        const det = h("div", { class: "log-det", hidden: true });
+        if (r.details) det.append(h("p", { class: "txt", text: r.details }));
+        const links = [
+          safeUrl(r.notionUrl) ? ext(h("a", { class: "textlink", href: r.notionUrl, text: "Notion row" })) : null,
+          safeUrl(r.personUrl) ? ext(h("a", { class: "textlink", href: r.personUrl, text: "People" })) : null,
+          safeUrl(r.gmail) ? ext(h("a", { class: "textlink", href: r.gmail, text: "Email thread" })) : null,
+          r.ghlContact ? h("span", { class: "quiet", text: "GHL contact " + r.ghlContact }) : null,
+          safeUrl(r.url) ? ext(h("a", { class: "textlink", href: r.url, text: "Log row" })) : null,
+        ].filter(Boolean);
+        if (links.length) det.append(h("div", { class: "mc-acts" }, ...links));
+        const toggle = h("button", { class: "textlink", type: "button", text: "Details", "aria-expanded": "false" });
+        toggle.addEventListener("click", () => { det.hidden = !det.hidden; toggle.setAttribute("aria-expanded", String(!det.hidden)); toggle.textContent = det.hidden ? "Details" : "Hide details"; });
+        ul.append(h("li", {},
+          h("div", { class: "chips" }, chip(r.kind || "Note"), r.ghl ? chip(r.ghl, GHL_CHIP[r.ghl]) : null, ...(r.tags || []).slice(0, 4).map((t) => chip(t, "c-" + t))),
+          h("p", { class: "name", style: "margin:8px 0 4px", text: r.personName || r.who || "—" }),
+          h("p", { class: "log-sum", text: r.summary }),
+          h("div", { class: "meta" }, r.when && r.when.length > 10 ? h("span", { text: fmtClock(r.when) }) : null, r.source ? h("span", { text: "From " + r.source }) : null, toggle),
+          det));
+      }
+      holder.append(ul);
+    }
+    drawList();
   }
 
   // ---------------- start ----------------

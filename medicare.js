@@ -12,6 +12,8 @@ const DS = {
   field: process.env.NOTION_FIELD_DS || "e11838f2-f914-45b1-b478-8dea9e96f56e",
   partners: process.env.NOTION_PARTNERS_DS || "fe50f233-8c9a-4d3c-bce1-ceab5dd05653",
   portals: process.env.NOTION_PORTALS_DS || "e94d3fc0-0caa-461a-b01a-8974241c9c40",
+  log: process.env.NOTION_ACTIVITY_DS || "4239afa2-8b29-47a7-99a7-1dd1ffa76284",
+  people: process.env.NOTION_PEOPLE_DS || "47d42794-febb-4efb-9173-14a22ce848cb",
 };
 
 function read(p) {
@@ -86,6 +88,44 @@ function toPortal(pg) {
   };
 }
 
+// Medicare Activity Log: one row per thing Claude did. GHL status is not stored on the row; it is
+// worked out from the person's People row each time, so a push made later shows straight away.
+function toLog(pg) {
+  const p = pg.properties;
+  return {
+    id: pg.id, url: pg.url, summary: read(p["Summary"]) || "", when: read(p["When"]), kind: read(p["Kind"]),
+    person: (read(p["Person"]) || [])[0] || null, who: read(p["Who"]) || "", tags: read(p["Tags"]) || [],
+    source: read(p["Source"]), details: read(p["Details"]) || "", notionUrl: read(p["Notion link"]),
+    ghlContact: read(p["GHL contact ID"]) || "", gmail: read(p["Gmail thread"]),
+  };
+}
+// In Outbox: People says GHL is owed and not yet pushed. In GHL: pushed, created in GHL, or a contact id
+// on file. Not in GHL: a person we met with none of those. Emails and notes about no one get no status.
+function ghlStatus(row, person) {
+  if (person) {
+    const owed = (person.pushTo || []).includes("GHL");
+    if (owed && !person.pushed) return "In Outbox";
+    if (person.pushed || /created in ghl|ghl contact/i.test(person.changed || "") || row.ghlContact) return "In GHL";
+    return "Not in GHL";
+  }
+  if (row.ghlContact) return "In GHL";
+  return ["Prospect met", "Client review", "Phone call", "Plan comparison"].includes(row.kind) ? "Not in GHL" : null;
+}
+async function getLog() {
+  const [logRows, people] = await Promise.all([
+    queryAll(DS.log, { sorts: [{ property: "When", direction: "descending" }] }),
+    queryAll(DS.people, {}).catch(() => []),
+  ]);
+  const byId = new Map(people.map((pg) => {
+    const p = pg.properties;
+    return [pg.id, { name: read(p["Name"]), url: pg.url, pushTo: read(p["Push to"]) || [], pushed: read(p["Pushed"]), changed: read(p["What changed"]) || "" }];
+  }));
+  return logRows.slice(0, 400).map(toLog).map((r) => {
+    const person = r.person ? byId.get(r.person) : null;
+    return { ...r, personName: person ? person.name : "", personUrl: person ? person.url : null, ghl: ghlStatus(r, person) };
+  });
+}
+
 const isoDay = (s, add) => { const d = new Date(s + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + add); return d.toISOString().slice(0, 10); };
 
 // Each table loads on its own, so one table not yet shared with the integration doesn't blank the page.
@@ -97,7 +137,7 @@ async function part(fn) {
 }
 
 async function getAll(today) {
-  const [pulse, campaigns, content, partners, field, portals] = await Promise.all([
+  const [pulse, campaigns, content, partners, field, portals, log] = await Promise.all([
     part(async () => (await queryAll(DS.pulse, {
       filter: { property: "Status", select: { does_not_equal: "Archived" } },
       sorts: [{ property: "Date", direction: "descending" }],
@@ -110,8 +150,9 @@ async function getAll(today) {
       sorts: [{ property: "When", direction: "ascending" }],
     })).map(toField)),
     part(async () => (await queryAll(DS.portals, {})).map(toPortal)),
+    part(getLog),
   ]);
-  return { pulse, campaigns, content, partners, field, portals };
+  return { pulse, campaigns, content, partners, field, portals, log };
 }
 
 // ---------- writes ----------

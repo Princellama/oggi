@@ -20,22 +20,37 @@
     <div class="mc-wrap">
       <div class="mc-bar">
         <a class="mc-back" href="/">← Oggi</a>
-        <span class="mc-aep" id="aep"></span>
+        <div class="mc-right">
+          <span class="mc-aep" id="aep"></span>
+          <div class="mc-quick" aria-label="Quick links">
+            <a class="mc-qbtn" href="https://www.sunfirematrix.com/app/agent/ifg" target="_blank" rel="noopener noreferrer" title="Sunfire (IFG) — quote plans">
+              <svg class="qi qi-flame" viewBox="0 0 16 16" aria-hidden="true"><path d="M8.6 1.2c.3 2-.9 3.1-2 4.3C5.4 6.8 4 8.1 4 10.2 4 12.9 5.9 15 8 15s4-2 4-4.6c0-1.7-.8-3-1.7-3.9.1 1.1-.4 2-1.2 2.4.4-2.6-.3-5.4-.5-7.7z"/><path class="qi-core" d="M8.1 9.2c-.9.8-1.6 1.5-1.6 2.6 0 1 .7 1.8 1.5 1.8s1.5-.8 1.5-1.8c0-1.2-.7-1.8-1.4-2.6z"/></svg>
+              Quote
+            </a>
+            <a class="mc-qbtn" href="https://retireflo.com/hawaii" target="_blank" rel="noopener noreferrer" title="RetireFlo — create a Scope of Appointment">
+              <svg class="qi qi-wave" viewBox="0 0 16 16" aria-hidden="true"><path d="M1 9.2c1.6-2.6 3.4-2.6 5 0s3.4 2.6 5 0 2.6-2.8 4-1.6" /><path d="M1 12.6c1.6-2.2 3.4-2.2 5 0s3.4 2.2 5 0 2.6-2.4 4-1.4" opacity=".55"/></svg>
+              Scope
+            </a>
+          </div>
+        </div>
       </div>
       <h1 class="head mc-title">Medicare</h1>
       <nav class="mc-tabs" id="tabs" aria-label="Sections">
         <a href="/medicare" data-tab="overview">Overview</a>
         <a href="/medicare/pulse" data-tab="pulse">Pulse</a>
         <a href="/medicare/carriers" data-tab="carriers">Carriers</a>
+        <a href="/medicare/veterans" data-tab="veterans">Veterans</a>
         <a href="/medicare/campaigns" data-tab="campaigns">Campaigns</a>
         <a href="/medicare/content" data-tab="content">Content</a>
         <a href="/medicare/partners" data-tab="partners">Partners</a>
+        <a href="/medicare/log" data-tab="log">Activity Log</a>
       </nav>
     </div>
   </header>
   <main class="mc-wrap mc-main" id="main" aria-live="polite">
     <p class="quiet">Loading…</p>
   </main>
+  <script src="/medicare-data.js"></script>
   <script src="/medicare-app.js"></script>
 </body>
 </html>

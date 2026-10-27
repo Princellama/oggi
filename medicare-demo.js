@@ -56,6 +56,14 @@ state.portals = [
   { name: "AHIP", carrier: "Industry", what: "Annual AHIP Medicare + FWA training.", kinds: ["Certification", "Training"], website: "https://www.ahipmedicaretraining.com", rts: "n/a" },
 ].map((r) => ({ id: id(), url: null, kinds: [], website: null, login: "", hint: "", emailsTo: null, lastChecked: null, support: "", notes: "", ...r }));
 
+state.log = [
+  { summary: "Met at Romeo Valdez's: on Med-QUEST through Kaiser, no Medicare yet. Emailed her the Med-QUEST number on the spot.", when: at(-1, 11), kind: "Prospect met", personName: "Cristobal, Remedios", who: "Remedios Cristobal", tags: ["AEP 2027", "MedQUEST", "Plaud", "Follow-up owed"], source: "Plaud", ghl: "In GHL", ghlContact: "rqv5hwjWs5uQHIcIuNRu",
+    details: "Notion People: Encounters (meeting, 25 Oct). QuickAction: email her the UHC dual plan benefits, due 28 Oct.\nGHL: nothing new this time (contact created 25 Oct)." },
+  { summary: "Parents on the UHC dual plan; gave her the Devoted C-SNP information for her father.", when: at(-3, 12), kind: "Prospect met", who: "Joanne (Longs Drugs, Kam)", tags: ["Kiosk", "Devoted", "Plaud"], source: "Plaud", ghl: "Not in GHL", details: "Notion: Encounter and a follow-up QuickAction. First name only, so no People row." },
+  { summary: "Asked what changes for Humana members next year.", when: at(-2, 9), kind: "Email", who: "Onoye", tags: ["Humana"], source: "Email", ghl: null, gmail: "https://mail.google.com/mail/u/0/#inbox" },
+  { summary: "Kiosk review of his Devoted plan for 2027; staying put.", when: at(0, 9), kind: "Client review", personName: "Baqui Jr., Steven", tags: ["Kiosk", "Devoted", "AEP 2027"], source: "Kiosk dictation", ghl: "In Outbox", details: "Notion People: Last contact, AEP 2027 = Staying put.\nOutbox: GHL owed the stage change." },
+].map((r) => ({ id: id(), url: null, person: null, personUrl: null, notionUrl: null, gmail: null, ghlContact: "", details: "", ...r }));
+
 const copy = (x) => JSON.parse(JSON.stringify(x));
 async function getAll() {
   return {
@@ -65,6 +73,7 @@ async function getAll() {
     partners: { rows: copy(state.partners) },
     field: { rows: copy(state.field) },
     portals: { rows: copy(state.portals) },
+    log: { rows: copy(state.log) },
   };
 }
 const find = (t, i) => { const r = state[t].find((x) => x.id === i); if (!r) throw Object.assign(new Error("not found"), { status: 404 }); return r; };
