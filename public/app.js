@@ -355,7 +355,9 @@
     const on = it.delegatedOn && String(it.delegatedOn).slice(0, 10);
     const days = on ? Math.max(0, Math.round((new Date(localISO() + "T12:00:00") - new Date(on + "T12:00:00")) / 86400000)) : null;
     const late = days != null && days >= 3;
-    return h("span", { class: "deleg-chip" + (late ? " late" : ""), title: late ? `With ${who} for ${days} days. Worth a check-in.` : `Handed to ${who}` }, `→ ${who}${days ? ` · ${days}d` : ""}`);
+    const mailed = it.handoffEmailed ? ` · ✉ ${new Date(it.handoffEmailed).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : it.handoffEmailPending ? " · ✉ sending" : "";
+    const tip = (late ? `With ${who} for ${days} days. Worth a check-in.` : `Handed to ${who}`) + (it.handoffEmailed ? ` · emailed ${new Date(it.handoffEmailed).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}` : "");
+    return h("span", { class: "deleg-chip" + (late ? " late" : "") + (it.handoffEmailed ? " mailed" : ""), title: tip }, `→ ${who}${days ? ` · ${days}d` : ""}${mailed}`);
   }
   function personChip(it) {
     const p = personOf(it);
@@ -412,12 +414,24 @@
       b.addEventListener("click", async () => {
         const next = it.delegatedTo === who ? null : who;
         row.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x.textContent === next)));
-        try { await patchItem(it, { delegatedTo: next }); } catch { b.setAttribute("aria-pressed", "false"); }
+        try {
+          const upd = await patchItem(it, { delegatedTo: next });
+          if (!next) it.handoffEmailed = null;
+          if (upd && upd.handoffEmailPending) {
+            it.handoffEmailPending = true;
+            note.textContent = `Emailing ${next} in a few seconds. Tap ${next} again to take it back.`;
+            note.hidden = false;
+            // pick up "emailed" once the server has sent it
+            setTimeout(async () => { if (await load().catch(() => false)) { noteFresh(); renderAll(); } }, 22_000);
+          } else note.hidden = true;
+        } catch { b.setAttribute("aria-pressed", "false"); }
         if (after) after(); else rerenderListOnly();
       });
       row.append(b);
     }
-    return row;
+    const note = h("p", { class: "handoff-note", hidden: true });
+    if (it.handoffEmailed && it.delegatedTo) { note.textContent = `Emailed ${it.delegatedTo} ${new Date(it.handoffEmailed).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}.`; note.hidden = false; }
+    return h("div", { class: "handoff-wrap" }, row, note);
   }
   function titleEl(it) {
     const url = safeUrl(it.link);
@@ -596,7 +610,7 @@
     });
     const handBtn = h("button", { text: it.delegatedTo ? "Handed off" : "Hand off" });
     handBtn.addEventListener("click", () => {
-      const open = body.querySelector(".handoff");
+      const open = body.querySelector(".handoff-wrap");
       if (open) { open.remove(); return; }
       row.after(handoffRow(it));
     });

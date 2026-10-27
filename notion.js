@@ -90,6 +90,7 @@ function toItem(page) {
     amount: read(p["Amount"]),
     invoice: read(p["Invoice"]),
     delegatedOn: read(p["Delegated on"]),
+    handoffEmailed: read(p["Handoff emailed"]),
     novaStart: read(p["Supernova"]),
     novaCooled: read(p["Cooled off"]),
     // The day it was finished. Older rows (and rows the brief closed) have no Closed on;
@@ -213,7 +214,9 @@ async function updateItem(id, fields) {
   if ("delegatedTo" in fields) {
     props["Delegated to"] = fields.delegatedTo ? { select: { name: fields.delegatedTo } } : { select: null };
     props["Delegated on"] = fields.delegatedTo ? { date: { start: fields.delegatedOn } } : { date: null };
+    if (!fields.delegatedTo) props["Handoff emailed"] = { date: null };
   }
+  if ("handoffEmailed" in fields) props["Handoff emailed"] = fields.handoffEmailed ? { date: { start: fields.handoffEmailed } } : { date: null };
   if ("invoice" in fields) props["Invoice"] = fields.invoice ? { select: { name: fields.invoice } } : { select: null };
   if ("waitingOn" in fields) {
     props["Waiting on"] = { rich_text: rich(fields.waitingOn || "") };
