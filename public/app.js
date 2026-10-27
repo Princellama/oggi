@@ -477,7 +477,7 @@
       } else if (sent || it.handoffEmailed) {
         acts.append(h("button", { class: "textlink", type: "button", text: "Ask for status", onclick: async () => { await save(); await patchItem(it, { handoffStep: "Ask status" }); paint(); done(); } }));
       }
-      if (it.handoffThread) acts.append(ext(h("a", { class: "textlink", href: `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(it.handoffThread)}`, text: "Open the thread" })));
+      if (it.handoffThread) acts.append(ext(h("a", { class: "textlink", href: `https://mail.google.com/mail/${(String(it.link || "").match(/[?&]authuser=[^#&]+/) || ["u/0/"])[0].replace(/^&/, "?")}#all/${encodeURIComponent(it.handoffThread)}`, text: "Open the thread" })));
       if (it.status !== "Closed") acts.append(h("button", { class: "textlink", type: "button", text: "Mark done", onclick: async () => { await save(); await patchItem(it, { status: "Closed" }); renderAll(); } }));
       panel.append(acts);
       requestAnimationFrame(() => grow(ta));
