@@ -1,7 +1,7 @@
 // Cache the app shell so the brief opens with a weak signal.
 // The brief data itself is cached by the page (last good copy), never here.
-const SHELL = "oggi-shell-v35";
-const FILES = ["/", "/index.html", "/styles.css", "/app.js", "/fonts/fraunces-latin-600-normal.woff2", "/icons/icon.svg", "/manifest.webmanifest", "/medicare", "/medicare.css", "/medicare-app.js", "/medicare-data.js"];
+const SHELL = "oggi-shell-v37";
+const FILES = ["/", "/index.html", "/styles.css", "/app.js", "/fonts/fraunces-latin-600-normal.woff2", "/icons/icon.svg", "/manifest.webmanifest", "/medicare", "/medicare.css", "/medicare-app.js", "/medicare-data.js", "/flown", "/flown.css", "/flown-app.js"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(SHELL).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
@@ -20,6 +20,6 @@ self.addEventListener("fetch", (e) => {
         if (res.ok) { const copy = res.clone(); caches.open(SHELL).then((c) => c.put(e.request, copy)); }
         return res;
       })
-      .catch(() => caches.match(e.request).then((r) => r || caches.match(url.pathname.startsWith("/medicare") ? "/medicare" : "/index.html")))
+      .catch(() => caches.match(e.request).then((r) => r || caches.match(url.pathname.startsWith("/medicare") ? "/medicare" : url.pathname.startsWith("/flown") ? "/flown" : "/index.html")))
   );
 });

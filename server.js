@@ -15,6 +15,7 @@ if (!DEMO && !process.env.NOTION_TOKEN) {
 }
 const store = DEMO ? require("./demo") : require("./notion");
 const mstore = DEMO ? require("./medicare-demo") : require("./medicare");
+const fstore = DEMO ? require("./flown-demo") : require("./flown");
 
 const PORT = process.env.PORT || 8080;
 const SECRET = process.env.SESSION_SECRET || (DEMO ? "demo-secret" : null);
@@ -176,8 +177,10 @@ const stamp = () => new Date().toISOString().slice(11, 16) + "Z";
 app.get("/api/time", (req, res) => { res.set("Cache-Control", "no-store"); res.json({ t: Date.now() }); });
 
 app.get("/api/brief", requireAuth, wrap(async (req, res) => {
-  const b = await store.getBrief(localDate(req));
+  const date = localDate(req);
+  const [b, flown] = await Promise.all([store.getBrief(date), fstore.getDay(date).catch((e) => { console.error("flown day", e.message); return []; })]);
   if (!b) return res.json({ day: null, items: [] });
+  b.day.flown = flown;   // today's FLOWN sessions, for the sky's Timeline
   res.json(b);
 }));
 
@@ -404,6 +407,51 @@ app.get("/api/medicare/img/:id", requireAuth, wrap(async (req, res) => {
   res.set("Cache-Control", "private, max-age=1800");
   res.send(Buffer.from(await r.arrayBuffer()));
 }));
+
+// ---------- /flown ----------
+// Eric's FLOWN focus sessions (Tim's community): the ritual, the blocks, the tasks he pulls in from
+// the brief, and the members' words. Private to him like the rest of Oggi.
+const isTime = (v) => v === null || v === undefined || (typeof v === "string" && !isNaN(Date.parse(v)));
+function sessionFields(b) {
+  const f = {};
+  for (const k of ["title", "host", "word", "intention", "gratitude"]) if (k in b) f[k] = String(b[k] || "").slice(0, k === "gratitude" || k === "intention" ? 1500 : 120);
+  if ("join" in b) f.join = /^https:\/\//.test(String(b.join || "")) ? String(b.join).slice(0, 500) : null;
+  if ("start" in b && isTime(b.start)) { f.start = b.start || null; if ("end" in b && isTime(b.end)) f.end = b.end || null; }
+  if ("breathwork" in b) f.breathwork = !!b.breathwork;
+  if ("blocks" in b && Array.isArray(b.blocks)) f.blocks = b.blocks;
+  if ("status" in b && ["Planned", "Done", "Skipped"].includes(b.status)) f.status = b.status;
+  if ("calendarId" in b) f.calendarId = b.calendarId ? String(b.calendarId).slice(0, 200) : null;
+  return f;
+}
+function memberFields(b) {
+  const f = {};
+  for (const k of ["name", "word", "meaning", "note"]) if (k in b) f[k] = String(b[k] || "").slice(0, k === "note" ? 600 : 120);
+  if ("role" in b && ["Me", "Host", "Member"].includes(b.role)) f.role = b.role;
+  if ("since" in b && isDay(b.since || null)) f.since = b.since || null;
+  return f;
+}
+app.get("/api/flown", requireAuth, wrap(async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json(await fstore.getAll(localDate(req)));
+}));
+app.post("/api/flown/session", requireAuth, wrap(async (req, res) => {
+  const f = sessionFields(req.body);
+  if (!f.title || !f.start) return res.status(400).json({ error: "title and start" });
+  res.json(await fstore.createSession(f));
+}));
+app.patch("/api/flown/session/:id", requireAuth, wrap(async (req, res) => res.json(await fstore.updateSession(req.params.id, sessionFields(req.body)))));
+app.delete("/api/flown/session/:id", requireAuth, wrap(async (req, res) => res.json(await fstore.removeSession(req.params.id))));
+app.post("/api/flown/member", requireAuth, wrap(async (req, res) => {
+  const f = memberFields(req.body);
+  if (!f.name) return res.status(400).json({ error: "name" });
+  res.json(await fstore.createMember(f));
+}));
+app.patch("/api/flown/member/:id", requireAuth, wrap(async (req, res) => res.json(await fstore.updateMember(req.params.id, memberFields(req.body)))));
+app.delete("/api/flown/member/:id", requireAuth, wrap(async (req, res) => res.json(await fstore.removeMember(req.params.id))));
+app.get("/flown", (req, res) => {
+  res.set("Cache-Control", "no-cache");
+  res.sendFile(path.join(__dirname, "public", "flown.html"));
+});
 
 app.get(["/medicare", "/medicare/*"], (req, res) => {
   res.set("Cache-Control", "no-cache");

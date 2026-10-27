@@ -199,6 +199,30 @@
     return [...m.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   }
   const events = () => ((B.day && B.day.events) || []).map((e) => ({ ...e, s: new Date(e.start), e: new Date(e.end) })).filter((e) => !isNaN(e.s));
+  // Today's FLOWN focus blocks (from /flown), for the Timeline. Done blocks drop out.
+  function flownBlocks() {
+    const out = [];
+    for (const x of (B && B.day && B.day.flown) || []) {
+      if (x.status === "Skipped") continue;
+      for (const b of x.blocks || []) {
+        if (b.done || !b.start) continue;
+        const s0 = new Date(b.start), e0 = new Date(s0.getTime() + b.min * 60000);
+        if (isNaN(s0) || localISO(s0) !== B.day.date) continue;
+        const title = `FLOWN · ${b.deep ? "deep work" : b.min + " min focus"}${b.intention ? " · " + b.intention : ""}`;
+        out.push({ s: s0, e: e0, items: b.items || [], deep: !!b.deep, session: x.title, ev: { title, s: s0, e: e0, start: b.start, end: e0.toISOString(), where: x.host ? "with " + x.host : "", flown: true } });
+      }
+    }
+    return out.sort((a, b) => a.s - b.s);
+  }
+  // the block a task was pulled into today, if any
+  function flownOf(it) {
+    return flownBlocks().find((b) => b.items.some((x) => x.id === it.id || (x.key && x.key === it.key))) || null;
+  }
+  function flownChip(it) {
+    const b = it.status !== "Closed" && flownOf(it);
+    if (!b) return null;
+    return ext(h("a", { class: "flown-chip" + (b.deep ? " deep" : ""), href: "/flown", title: `In your FLOWN block at ${fmtTime(b.s)} (${b.session})` }, `◎ FLOWN ${fmtTime(b.s)}`));
+  }
 
   // ---------------- sign in ----------------
   function showSignin(msg) {
@@ -617,7 +641,7 @@
       const li = h("li", { "data-id": it.id, class: (closed ? "closed " : "") + (selKey === it.id ? "sel" : "") });
       li.append(h("span", { class: "num", text: String((items.numbers ? items.numbers[idx] : idx) + 1) }));
       if (parentOf(it)) li.classList.add("child");
-      const body = h("div", { class: "body" }, h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), personChip(it), invoiceChip(it), mailChip(it), delegChip(it), waitChip(it), newBadge(it)), titleEl(it), sentence(it));
+      const body = h("div", { class: "body" }, h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), personChip(it), invoiceChip(it), mailChip(it), delegChip(it), flownChip(it), waitChip(it), newBadge(it)), titleEl(it), sentence(it));
       if (it.note) body.append(h("p", { class: "mynote", text: it.note }));
       if (live && !closed && isParent(it)) {
         const open = kidsOf(it).filter((c) => c.status !== "Closed").length, owed = owedIn(it);
@@ -691,7 +715,7 @@
       const li = h("li", { "data-id": it.id, class: selKey === it.id ? "sel" : "" });
       li.append(h("span", { class: "num", text: String(i + 1) }));
       const body = h("div", { class: "body" });
-      body.append(h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), mailChip(it), delegChip(it), waitChip(it), newBadge(it)));
+      body.append(h("p", { class: "itemmeta" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: it.place }), mailChip(it), delegChip(it), flownChip(it), waitChip(it), newBadge(it)));
       body.append(h("span", { class: "ttl", text: it.title }));
       const carried = it.carries > 0 ? `Carried ${it.carries} day${it.carries === 1 ? "" : "s"}.` : "New today.";
       body.append(h("p", { class: "carry", text: `${carried} ${firstSentence(it.sentence)}` }));
@@ -863,10 +887,21 @@
     const evs = events().filter((e) => e.e.getTime() > t).sort((a, b) => a.s - b.s);
     const open = needsMe().filter((i) => !folded(i));
     if (p.mode === "timeline") {
-      const fixed = evs.filter(blocksTime);
-      const slots = schedule(orderItems(open, p.order, p), fixed, p).map((x) => ({ kind: "item", ...x }));
-      const evSlots = fixed.map((ev) => ({ kind: "event", ev, at: ev.s.getTime(), end: ev.e.getTime() }));
-      return evSlots.concat(slots).sort((a, b) => a.at - b.at);
+      // FLOWN blocks hold their time; a task pulled into a block sits inside it, an empty block shows as itself
+      const fl = flownBlocks().filter((b) => b.e.getTime() > t);
+      const pulled = new Map();
+      const flSlots = [];
+      for (const b of fl) {
+        const its = b.items.map((x) => open.find((i) => i.id === x.id || (x.key && i.key === x.key))).filter(Boolean).filter((i) => !pulled.has(i.id));
+        if (!its.length) { flSlots.push({ kind: "event", ev: b.ev, at: b.s.getTime(), end: b.e.getTime() }); continue; }
+        const each = (b.e - b.s) / its.length;
+        its.forEach((i, k) => { pulled.set(i.id, b); flSlots.push({ kind: "item", it: i, at: b.s.getTime() + k * each, end: b.s.getTime() + (k + 1) * each, flown: b }); });
+      }
+      const fixed = evs.filter(blocksTime).concat(fl.map((b) => ({ s: b.s, e: b.e })));
+      const rest = open.filter((i) => !pulled.has(i.id));
+      const slots = schedule(orderItems(rest, p.order, p), fixed, p).map((x) => ({ kind: "item", ...x }));
+      const evSlots = evs.filter(blocksTime).map((ev) => ({ kind: "event", ev, at: ev.s.getTime(), end: ev.e.getTime() }));
+      return evSlots.concat(flSlots, slots).sort((a, b) => a.at - b.at);
     }
     const seq = [];
     if (evs[0]) seq.push({ kind: "event", ev: evs[0] });
@@ -994,6 +1029,11 @@
       const x = EVENT_AT[0] + j * 64, y = EVENT_AT[1] - j * 18;
       stars.push({ kind: "event", ev, key: evKey(ev), open: false, seqIdx: -1, dx: x, dy: y, x, y });
     });
+    // empty FLOWN blocks are on the Timeline as their own gold stars (only there: they live in the sequence)
+    seq.filter((x) => x.kind === "event" && x.ev.flown).forEach((x, j) => {
+      const px = EVENT_AT[0] - 80 - j * 64, py = EVENT_AT[1] + 40 + j * 14;
+      stars.push({ kind: "event", ev: x.ev, key: evKey(x.ev), open: false, seqIdx: -1, dx: px, dy: py, x: px, y: py });
+    });
     remapStars(stars, seq);
     return { stars, reach };
   }
@@ -1007,7 +1047,7 @@
       st.slot = st.open ? seq[st.seqIdx] : null;
     }
   }
-  const tintOf = (st) => (st.kind === "event" ? EVENT_TINT : STAR_TINT[areaOf(st.it)] || STAR_TINT.Personal);
+  const tintOf = (st) => (st.kind === "event" ? (st.ev.flown ? "#E7B75C" : EVENT_TINT) : STAR_TINT[areaOf(st.it)] || STAR_TINT.Personal);
 
   function buildSky(seq) {
     const { stars, reach } = skyStars(seq);
@@ -1109,7 +1149,7 @@
         orbit.append(s("circle", { class: "moon-path", r: 12, fill: "none" }), s("circle", { class: "moon", cx: 12, cy: 0, r: 2.6 }));
         g.append(orbit, s("text", { class: "star-who", x: 0, y: -18, "aria-hidden": "true" }, `${st.it.delegatedTo === "Someone else" ? "→ someone" : "→ " + st.it.delegatedTo}${hs.chip && hs.chip !== "queued" ? " · " + hs.chip.replace(/^✉.*/, "✉") : hs.chip === "queued" ? " · queued" : ""}`));
       }
-      g.append(s("text", { class: "star-l", y: 17 }, st.kind === "event" ? fmtTime(st.ev.s) : shortLabel(st.it)));
+      g.append(s("text", { class: "star-l", y: 17 }, st.kind === "event" ? (st.ev.flown ? (/deep work/.test(st.ev.title) ? "FLOWN · deep" : "FLOWN") : fmtTime(st.ev.s)) : shortLabel(st.it)));
       g.append(s("text", { class: "star-t", y: 28 }));
       // finished: faded and crossed out, with how long it took
       if (st.kind === "item") {
@@ -2606,7 +2646,7 @@
     } else {
       const it = cur.it;
       const when = cur.at ? `· ${fmtTime(new Date(cur.at))}, about ${fmtDur(Math.round((cur.end - cur.at) / 60000))}` : "· " + it.place;
-      card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: when }), personChip(it), invoiceChip(it), mailChip(it), delegChip(it), waitChip(it), newBadge(it)));
+      card.append(h("p", { class: "now-kicker" }, areaChip(areaOf(it)), h("span", { class: "quiet", text: when }), personChip(it), invoiceChip(it), mailChip(it), delegChip(it), flownChip(it), waitChip(it), newBadge(it)));
       card.append(h("h1", { class: "now-title", onclick: onOpen }, it.title));
       if (it.sentence) card.append(h("p", { class: "now-gist", text: firstSentence(it.sentence) }));
       if (it.carries > 1) card.append(h("p", { class: "now-carry", text: `Carried ${it.carries} days.` }));

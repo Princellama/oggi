@@ -85,7 +85,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .nav button[aria-current="true"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
 .nav .navlink { font-size: 14px; color: var(--grey); padding: 8px 2px; text-decoration: none; border-bottom: 1px solid transparent; }
 .nav .navlink:hover { color: var(--soft); }
-@media (max-width: 420px) { .nav { gap: clamp(10px, 3.4vw, 40px); } .nav button, .nav .navlink { font-size: 13px; } }
+@media (max-width: 640px) { .nav { gap: clamp(8px, 3vw, 30px); } }
+@media (max-width: 420px) { .nav { gap: clamp(7px, 2.4vw, 30px); } .nav button, .nav .navlink { font-size: 12.5px; } }
 
 .wrap { max-width: 860px; margin: 0 auto; padding: 40px 28px 44px; }
 .band-top { background: var(--wash); border-bottom: 1px solid var(--edge); }
@@ -904,3 +905,7 @@ ol.items li.child { margin-left: 22px; padding-left: 12px; border-left: 1px dash
   .sky .star .moon-orbit { animation: moon-circle 9s linear infinite; }
 }
 @keyframes moon-circle { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* FLOWN: a task pulled into a focus block today */
+.flown-chip { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; letter-spacing: .03em; color: #8a5a9e; background: rgba(164,121,226,.10); border-radius: 999px; padding: 1px 8px; text-decoration: none; white-space: nowrap; }
+.flown-chip.deep { color: #9a6b12; background: rgba(231,183,92,.18); }

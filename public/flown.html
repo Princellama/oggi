@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#F9F9F7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Oggi">
+  <title>FLOWN · Oggi</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/icon-180.png">
+  <link rel="preload" href="/fonts/fraunces-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/flown.css">
+</head>
+<body class="fl">
+  <header class="fl-top">
+    <div class="fl-wrap fl-bar">
+      <a class="fl-back" href="/">← Oggi</a>
+      <span class="fl-word" id="myWord" title="Your word"></span>
+    </div>
+  </header>
+  <main class="fl-wrap fl-main" id="main">
+    <p class="quiet">Loading…</p>
+  </main>
+  <div class="fl-burst" id="burst" aria-hidden="true"></div>
+  <p class="fl-toast" id="toast" role="status" aria-live="polite" hidden></p>
+  <script src="/flown-app.js"></script>
+</body>
+</html>
