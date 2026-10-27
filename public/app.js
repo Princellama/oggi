@@ -3584,6 +3584,15 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
       if (await load().catch(() => false)) { noteFresh(); renderAll(); }
     });
     window.matchMedia("(min-width: 980px)").addEventListener("change", renderAll);
+    // Pick up what Claude writes between briefs (a quote, scope or GHL run, a mail check) without a tap.
+    // Re-renders only when the data changed, and never under the user's fingers.
+    setInterval(async () => {
+      if (document.visibilityState !== "visible") return;
+      if (camAnim || starAnim || sheetOpen || skyFull || veilOpen()) return;
+      if (document.activeElement && document.activeElement.closest("input, textarea, select")) return;
+      const before = JSON.stringify(B);
+      if (await load().catch(() => false)) { noteFresh(); if (JSON.stringify(B) !== before) renderAll(); }
+    }, 120_000);
     setInterval(() => { if (camAnim || starAnim || sheetOpen || skyFull || veilOpen()) return; if (sky && (sky.el.classList.contains("away") || !sky.el.querySelector(".sky-menu[hidden]"))) return; if (!document.activeElement || !document.activeElement.closest("input, textarea")) renderNow(); }, 60_000);
   }
 

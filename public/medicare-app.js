@@ -864,9 +864,44 @@
     const sortSel = h("select", { class: "copy", "aria-label": "Sort", style: "border:0;background:transparent;margin:0 0 14px" },
       ...["Newest first", "Oldest first", "By person"].map((o) => h("option", { text: o, selected: o === (S.logSort || "Newest first") })));
     sortSel.addEventListener("change", () => { S.logSort = sortSel.value; drawList(); });
-    main.append(sortSel);
+    const selAll = h("button", { class: "textlink", type: "button", text: "Select everyone shown", style: "margin:0 0 14px 14px" });
+    main.append(h("div", {}, sortSel, selAll));
     const holder = h("div");
     main.append(holder);
+    const bar = h("div", { class: "selbar", hidden: true });
+    main.append(bar);
+    let shown = [];
+    selAll.addEventListener("click", () => { for (const r of shown) if (selKey(r)) toggleSel(r, true); drawList(); drawBar(); });
+
+    function drawBar() {
+      bar.textContent = "";
+      const n = S.sel.size;
+      bar.hidden = !n;
+      if (!n) return;
+      const people = [...S.sel.values()];
+      const note = h("p", { class: "selbar-note", hidden: true });
+      const run = (action) => {
+        if (action === "Scope" && n > 1 && note.hidden) {
+          note.hidden = false;
+          note.textContent = `RetireFlo can't save drafts, so Claude does these ${n} one at a time and waits for your "next" between each. Tap Claude Scope again to start.`;
+          return;
+        }
+        const at = new Date().toISOString();
+        const pend = readPending();
+        for (const k of S.sel.keys()) pend[k] = { action, at };
+        writePending(pend);
+        window.open(claude(buildPrompt(action, people)), "_blank", "noopener");
+        S.sel.clear(); drawList(); drawBar();
+      };
+      bar.append(
+        h("span", { class: "selbar-n", text: `${n} selected` }),
+        h("button", { class: "btn small", type: "button", onclick: () => run("Quote") }, flameIcon(), " Claude Quote"),
+        h("button", { class: "btn small", type: "button", onclick: () => run("Scope") }, waveIcon(), " Claude Scope"),
+        h("button", { class: "btn small", type: "button", text: "Claude → GHL", onclick: () => run("GHL") }),
+        h("button", { class: "textlink", type: "button", text: "Clear", onclick: () => { S.sel.clear(); drawList(); drawBar(); } }),
+        note,
+        h("p", { class: "selbar-who", text: people.map((x) => x.name).join(", ") }));
+    }
 
     function drawList() {
       const q = (S.logQ || "").trim().toLowerCase();
@@ -879,6 +914,7 @@
       list.sort((a, b) => srt === "By person" ? String(a.personName || a.who).localeCompare(String(b.personName || b.who)) || String(b.when).localeCompare(String(a.when))
         : srt === "Oldest first" ? String(a.when).localeCompare(String(b.when)) : String(b.when).localeCompare(String(a.when)));
       holder.textContent = "";
+      shown = list;
       if (!list.length) { holder.append(h("p", { class: "quiet", text: all.length ? "Nothing matches these filters." : "Nothing logged yet." })); return; }
       const ul = h("ul", { class: "logl" });
       let lastDay = null;
@@ -897,8 +933,12 @@
         if (links.length) det.append(h("div", { class: "mc-acts" }, ...links));
         const toggle = h("button", { class: "textlink", type: "button", text: "Details", "aria-expanded": "false" });
         toggle.addEventListener("click", () => { det.hidden = !det.hidden; toggle.setAttribute("aria-expanded", String(!det.hidden)); toggle.textContent = det.hidden ? "Details" : "Hide details"; });
-        ul.append(h("li", {},
-          h("div", { class: "chips" }, chip(r.kind || "Note"), r.ghl ? chip(r.ghl, GHL_CHIP[r.ghl]) : null, ...(r.tags || []).slice(0, 4).map((t) => chip(t, "c-" + t))),
+        const key = selKey(r), pend = key ? pending(key) : null;
+        const box = key ? h("input", { type: "checkbox", class: "log-sel", "aria-label": "Select " + (r.personName || r.who) }) : null;
+        if (box) { box.checked = S.sel.has(key); box.addEventListener("change", () => { toggleSel(r, box.checked); drawList(); drawBar(); }); }
+        ul.append(h("li", { class: (box ? "selectable" : "") + (box && box.checked ? " picked" : "") },
+          box,
+          h("div", { class: "chips" }, chip(r.kind || "Note"), r.ghl ? chip(r.ghl, GHL_CHIP[r.ghl]) : null, pend ? chip(`With Claude · ${pend.action}`, "claude") : null, ...(r.tags || []).slice(0, 4).map((t) => chip(t, "c-" + t))),
           h("p", { class: "name", style: "margin:8px 0 4px", text: r.personName || r.who || "—" }),
           h("p", { class: "log-sum", text: r.summary }),
           h("div", { class: "meta" }, r.when && r.when.length > 10 ? h("span", { text: fmtClock(r.when) }) : null, r.source ? h("span", { text: "From " + r.source }) : null, toggle),
@@ -907,6 +947,87 @@
       holder.append(ul);
     }
     drawList();
+    drawBar();
+  }
+
+  // ---------------- activity log: select people, hand them to Claude ----------------
+  // Only rows about a person can be selected; one person counts once however many rows they have.
+  // The prompt carries names and Notion links only: never a phone, birth date or ID number in a URL.
+  S.sel = new Map();
+  const PERSON_KINDS = ["Prospect met", "Client review", "Phone call", "Plan comparison", "Form filled"];
+  function selKey(r) {
+    if (r.person) return r.person;
+    if (PERSON_KINDS.includes(r.kind) && r.who) return "who:" + r.who;
+    return null;
+  }
+  function toggleSel(r, on) {
+    const k = selKey(r);
+    if (!k) return;
+    if (on) S.sel.set(k, { name: r.personName ? r.personName.split(", ").reverse().join(" ") : r.who, personUrl: r.personUrl || null, logUrl: r.url || null, ghlContact: r.ghlContact || "" });
+    else S.sel.delete(k);
+  }
+  const PEND_KEY = "mcPending";
+  function readPending() { try { return JSON.parse(localStorage.getItem(PEND_KEY) || "{}"); } catch { return {}; } }
+  function writePending(p) { try { localStorage.setItem(PEND_KEY, JSON.stringify(p)); } catch {} }
+  // "With Claude" lasts until a newer log row for that person arrives, or six hours.
+  function pending(key) {
+    const p = readPending()[key];
+    if (!p) return null;
+    const newer = rows("log").some((r) => selKey(r) === key && r.created && r.created > p.at);
+    if (newer || Date.now() - Date.parse(p.at) > 6 * 3600e3) { const all = readPending(); delete all[key]; writePending(all); return null; }
+    return p;
+  }
+  const svgIcon = (cls, paths) => { const NS = "http://www.w3.org/2000/svg"; const sv = document.createElementNS(NS, "svg"); sv.setAttribute("viewBox", "0 0 16 16"); sv.setAttribute("class", "qi " + cls); sv.setAttribute("aria-hidden", "true"); for (const [d, c] of paths) { const pa = document.createElementNS(NS, "path"); pa.setAttribute("d", d); if (c) pa.setAttribute("class", c); sv.append(pa); } return sv; };
+  const flameIcon = () => svgIcon("qi-flame", [["M8.6 1.2c.3 2-.9 3.1-2 4.3C5.4 6.8 4 8.1 4 10.2 4 12.9 5.9 15 8 15s4-2 4-4.6c0-1.7-.8-3-1.7-3.9.1 1.1-.4 2-1.2 2.4.4-2.6-.3-5.4-.5-7.7z"], ["M8.1 9.2c-.9.8-1.6 1.5-1.6 2.6 0 1 .7 1.8 1.5 1.8s1.5-.8 1.5-1.8c0-1.2-.7-1.8-1.4-2.6z", "qi-core"]]);
+  const waveIcon = () => svgIcon("qi-wave", [["M1 9.2c1.6-2.6 3.4-2.6 5 0s3.4 2.6 5 0 2.6-2.8 4-1.6"], ["M1 12.6c1.6-2.2 3.4-2.2 5 0s3.4 2.2 5 0 2.6-2.4 4-1.4"]]);
+
+  const LOG_DS = "collection://4239afa2-8b29-47a7-99a7-1dd1ffa76284";
+  const GATHER = "Gather each person's details. Contact details (name, phone, email, address) come from GHL through the HighLevel (IFG) connector: find the contact by the GHL contact id if given, else phone, email, then name. Health details (date of birth, PCP, other doctors, medications with dosage, pharmacy) and the Medicare number come from their Notion People row (Notes → HEALTH and IDs lines, and the MBI field). GHL wins on contact details and Notion on health; if the two disagree on something you need, stop and show me both.";
+  const WRITEBACK = (kind, label) => `When you finish, write back so Oggi updates on its own:
+- Medicare Activity Log (${LOG_DS}): one row per person, following the System Map's Activity Log rules. Kind: ${kind}. Person: their People row. Summary in one plain sentence. Details: field by field what you entered and where (no ID numbers anywhere in the row; say "Medicare number on file"). Source: Claude. Key: ${label.toLowerCase()}-<people id>-<today's date>; check the Key isn't there already.
+- People: set Last contact only if I actually spoke with them; for a GHL push set Pushed to today and update What changed.
+- Brief Items: add or update one item per person for today (Last seen today, Area Medicare, Place Kakaako, Person = first name, a unique Key), following the brief's conventions, so it shows in the sky. Say what's ready and what's left for me.
+- Then post a short summary here, and send me a phone notification (PushNotification) saying what's ready.`;
+  function buildPrompt(action, people) {
+    const list = people.map((x) => `- ${x.name}${x.personUrl ? " · People: " + x.personUrl : " · no People row yet"}${x.ghlContact ? " · GHL contact " + x.ghlContact : ""}${x.logUrl ? " · log: " + x.logUrl : ""}`).join("\n");
+    const n = people.length, who = n === 1 ? "this person" : `these ${n} people`;
+    if (action === "Quote") return `Claude Quote: put ${who} into Sunfire (IFG) and open their 2027 quote, from Oggi's Medicare Activity Log.
+
+${list}
+
+For each person, in order:
+1. ${GATHER}
+2. Minimum to start: name, date of birth, ZIP code, and medications with dosage (or confirmed none). PCP, other doctors and pharmacy are optional; add them if on file. If something required is missing, skip that person and list exactly what's missing.
+3. In my Chrome (Claude in Chrome), open https://www.sunfirematrix.com/app/agent/ifg. If I'm signed out, stop and ask me to sign in, then carry on.
+4. Search Sunfire for the contact. If they exist, open them. If not, add them: name, date of birth, address, phone, email. Then enter medications with dosage, pharmacy and doctors. Save after each section.
+5. Leave the Medicare number field empty for me (don't type ID numbers); tell me where it's on file.
+6. Open their 2027 quote page and stop there for me to review the plans.
+With more than one person, work through them all, saving each, and end with each name and its Sunfire quote page.
+
+${WRITEBACK("Plan comparison", "quote")}`;
+    if (action === "Scope") return `Claude Scope: create a Scope of Appointment in RetireFlo for ${who}, from Oggi's Medicare Activity Log.
+
+${list}
+
+RetireFlo can't save drafts, so do one person at a time.${n > 1 ? ' After each one, stop and wait for me to say "next".' : ""}
+For each person:
+1. ${GATHER}
+2. Minimum to start: name, address, and a phone number or email. PCP, other doctors, medications with dosage, Medicare number and pharmacy are optional; use them if on file. If something required is missing, skip that person and list exactly what's missing.
+3. In my Chrome (Claude in Chrome), open https://app.retireflo.com/hawaii. If I'm signed out, stop and ask me to sign in, then carry on.
+4. Create the Scope. Plans discussed: MA, MAPD, Med Supp, Medicaid (match RetireFlo's checkboxes word for word). Fill in everything else you have, but leave the Medicare number field for me.
+5. Stop at the signature page. Never sign or submit; the client signs. Tell me it's ready for them.
+
+${WRITEBACK("Form filled", "scope")}`;
+    return `Claude → GHL: push ${who} to GHL, from Oggi's Medicare Activity Log. This message is my OK for this batch.
+
+${list}
+
+Use the ghl-medicare-prospects skill (pipeline, potential earnings, location met). For each person:
+1. ${GATHER}
+2. Minimum: name plus a phone number or email (GHL rejects a contact without one). If it's missing, skip that person and say so.
+3. Look for an existing GHL contact first (phone, email, then name) and update it rather than make a duplicate. Enter what the People row's What changed says. Never put an ID number in a GHL note.
+
+${WRITEBACK("GHL push", "push")}`;
   }
 
   // ---------------- start ----------------
@@ -914,4 +1035,15 @@
   render();
   load();
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.data) load(); });
+  // Claude writes back after a Quote, Scope or GHL run; pick it up within a minute while the page is open.
+  // Skipped while typing, presenting, or with a log row's details open, and redraws only on a change.
+  setInterval(async () => {
+    if (document.visibilityState !== "visible" || !S.data) return;
+    if (document.querySelector(".mc-full") || document.querySelector(".log-det:not([hidden])")) return;
+    if (document.activeElement && document.activeElement.closest("input:not([type=checkbox]), textarea, select")) return;
+    try {
+      const fresh = await api("GET", "/api/medicare?d=" + todayISO());
+      if (JSON.stringify(fresh) !== JSON.stringify(S.data)) { const y = window.scrollY; S.data = fresh; render(); window.scrollTo(0, y); }
+    } catch {}
+  }, 60_000);
 })();

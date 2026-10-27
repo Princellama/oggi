@@ -96,7 +96,7 @@ function toLog(pg) {
     id: pg.id, url: pg.url, summary: read(p["Summary"]) || "", when: read(p["When"]), kind: read(p["Kind"]),
     person: (read(p["Person"]) || [])[0] || null, who: read(p["Who"]) || "", tags: read(p["Tags"]) || [],
     source: read(p["Source"]), details: read(p["Details"]) || "", notionUrl: read(p["Notion link"]),
-    ghlContact: read(p["GHL contact ID"]) || "", gmail: read(p["Gmail thread"]),
+    ghlContact: read(p["GHL contact ID"]) || "", gmail: read(p["Gmail thread"]), created: pg.created_time,
   };
 }
 // In Outbox: People says GHL is owed and not yet pushed. In GHL: pushed, created in GHL, or a contact id
