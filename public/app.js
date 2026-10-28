@@ -3549,11 +3549,22 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
   // never count. Each mark lasts a day, or until he goes to that planet or opens the item.
   const FRESH_MS = 24 * 3600 * 1000;
   const itemKey = (it) => it.key || it.id;
-  const itemSig = (it) => [it.title, it.sentence, it.status, it.list, it.link, it.delegatedTo, it.handoffStep].map((x) => x || "").join("␞");
+  // Empty fields at the end are trimmed, so adding a field to this list later doesn't make every
+  // item look changed against the signatures saved before it existed.
+  const normSig = (sig) => String(sig).replace(/␞+$/, "");
+  const itemSig = (it) => normSig([it.title, it.sentence, it.status, it.list, it.link, it.delegatedTo, it.handoffStep].map((x) => x || "").join("␞"));
   const passKey = () => (B && B.day ? `${B.day.date}|${B.day.published || ""}` : "");
   function readFresh() {
     const f = store.get("freshKeys") || {};
     for (const k of Object.keys(f)) if (typeof f[k] === "number") f[k] = { at: f[k], kind: "new" };
+    // One-time cleanup: the 27 Oct hand-off update added a field to the signature, which marked
+    // every planet "updated". Drop the "updated" marks made between that release and this fix.
+    if (!store.get("sigFix1")) {
+      const from = Date.parse("2026-10-27T20:53:00Z");
+      for (const k of Object.keys(f)) if (f[k].kind === "updated" && f[k].at >= from) delete f[k];
+      store.set("freshKeys", f);
+      store.set("sigFix1", 1);
+    }
     return f;
   }
   function noteFresh() {
@@ -3572,7 +3583,7 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
       sigs[k] = sig;
       if (!Array.isArray(seen)) continue; // first run on this device: just take a baseline
       if (!seen.includes(k)) { if (!fresh[k]) { fresh[k] = { at: now, kind: "new" }; added++; } }
-      else if (samePass && base.sigs[k] != null && base.sigs[k] !== sig) {
+      else if (samePass && base.sigs[k] != null && normSig(base.sigs[k]) !== sig) {
         const was = fresh[k];
         fresh[k] = { at: now, kind: was && was.kind === "new" ? "new" : "updated" };
         if (!was || was.read) updated++;

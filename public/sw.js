@@ -1,6 +1,6 @@
 // Cache the app shell so the brief opens with a weak signal.
 // The brief data itself is cached by the page (last good copy), never here.
-const SHELL = "oggi-shell-v37";
+const SHELL = "oggi-shell-v38";
 const FILES = ["/", "/index.html", "/styles.css", "/app.js", "/fonts/fraunces-latin-600-normal.woff2", "/icons/icon.svg", "/manifest.webmanifest", "/medicare", "/medicare.css", "/medicare-app.js", "/medicare-data.js", "/flown", "/flown.css", "/flown-app.js"];
 
 self.addEventListener("install", (e) => {
