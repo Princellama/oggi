@@ -215,7 +215,21 @@
   render();
 
   // ---------- photos (files in /leadhero/photos, listed here) ----------
-  var PHOTOS = [];
+  var PHOTOS = [
+    { f: "kiosk-longs.jpg", c: "Devoted kiosk at Longs, carrier-sponsored" },
+    { f: "iron-workers.jpg", c: "Iron Workers union event, Devoted table" },
+    { f: "golf-devoted.jpg", c: "Golf tournament table with Devoted" },
+    { f: "golf-humana.jpg", c: "Humana-sponsored tent at a golf tournament" },
+    { f: "asing-park.jpg", c: "Medicare education session at Asing Park" },
+    { f: "community-center.jpg", c: "Community center seminar" },
+    { f: "event-signups.jpg", c: "Sign-ups at a community event" },
+    { f: "sams-club.jpg", c: "Sam's Club enrollment table" },
+    { f: "humana-bags.jpg", c: "Event bags packed with Humana" },
+    { f: "medicarecon-wellcare.jpg", c: "MedicareCon, at the Wellcare booth" },
+    { f: "medicarecon-humana.jpg", c: "MedicareCon, at the Humana booth" },
+    { f: "medicarians-wellcare.jpg", c: "Medicarians, Las Vegas" },
+    { f: "remote-devoted.jpg", c: "Plan research, wherever the day is" }
+  ];
   if (PHOTOS.length) {
     $("photos").hidden = false; $("toc-photos").hidden = false;
     $("photoGrid").innerHTML = PHOTOS.map(function (p) {
