@@ -474,6 +474,13 @@ app.get(["/medicare", "/medicare/*"], (req, res) => {
   res.sendFile(path.join(__dirname, "public", "medicare.html"));
 });
 
+// /leadhero: a ghost page for Aaron Burton (IFG). Public on purpose (no sign-in), not linked
+// from the nav, noindex like everything else. No client names or contact details on it.
+app.get(["/leadhero", "/leadhero/"], (req, res) => {
+  res.set("Cache-Control", "no-cache");
+  res.sendFile(path.join(__dirname, "public", "leadhero.html"));
+});
+
 // ---------- static ----------
 app.use(express.static(path.join(__dirname, "public"), {
   setHeaders(res, p) {
