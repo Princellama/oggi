@@ -108,15 +108,15 @@
     { id: "tax", label: "Income tax estimate", min: 0, max: 45, step: 1, v: 30, f: function (v) { return v + "%"; } }
   ];
   var SRC = [
-    { n: "CPA tax clients and families", r: 3, c: 45 },
-    { n: "Filipino Chamber and community groups", r: 3, c: 25 },
+    { n: "CPA tax clients and families", r: 2, c: 45 },
+    { n: "Filipino Chamber and community groups", r: 2, c: 25 },
     { n: "Devoted kiosks", r: 6, c: 15 },
     { n: "Health walks and fairs", r: 0, c: 20 },
-    { n: "Doctors, dentists, optometry", r: 3, c: 35 },
+    { n: "Doctors, dentists, optometry", r: 1, c: 35 },
     { n: "Chiropractic and massage", r: 1, c: 20 },
     { n: "Financial planners and RIAs", r: 2, c: 35 },
     { n: "Senior residences and care homes", r: 2, c: 25 },
-    { n: "Newsletter and social media", r: 4, c: 10 },
+    { n: "Newsletter and social media", r: 2, c: 10 },
     { n: "Website and news blog", r: 3, c: 20 },
     { n: "Mail (letters, ReminderMedia)", r: 3, c: 8 }
   ];
