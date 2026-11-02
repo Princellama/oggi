@@ -243,12 +243,12 @@ app.patch("/api/item/:id", requireAuth, wrap(async (req, res) => {
   else if ("delegatedTo" in fields) line = fields.delegatedTo ? `${t} → handed to ${fields.delegatedTo === "Someone else" ? "someone else" : fields.delegatedTo}` : `${t} → taken back (no longer delegated)`;
   else if ("invoice" in fields) line = `${t} → invoice ${String(fields.invoice || "cleared").toLowerCase()}`;
   else if ("waitingOn" in fields) line = fields.waitingOn ? `${t} → waiting on ${fields.waitingOn}` : `${t} → they answered (no longer waiting)`;
-  else if ("note" in fields && fields.note) line = `Note on ${t}: ${fields.note}`;
+  else if ("note" in fields && fields.note) line = `Update for Claude on ${t}: ${fields.note}`;
   else if ("handoffStep" in fields && fields.handoffStep === "Ask status") line = `${t} → asked ${item.delegatedTo || "them"} for a status`;
   else if ("handoffNotes" in fields && fields.handoffNotes) line = `Hand-off notes on ${t}: ${fields.handoffNotes}`;
   else if ("novaCooled" in fields && fields.novaCooled) line = `${t} → supernova cooling off`;
   else if ("novaStart" in fields && fields.novaStart) line = `${t} → supernova lit (grows every hour until it's done)`;
-  const mergeKey = "note" in fields ? `Note on ${t}:` : "handoffNotes" in fields ? `Hand-off notes on ${t}:` : ("decision" in fields ? `${t} → ` : null);
+  const mergeKey = "note" in fields ? `Update for Claude on ${t}:` : "handoffNotes" in fields ? `Hand-off notes on ${t}:` : ("decision" in fields ? `${t} → ` : null);
   if (line && dayId) await store.logEdit(dayId, `${stamp()} ${line}`, mergeKey);
   res.json(item);
 }));

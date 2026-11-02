@@ -664,11 +664,11 @@
   // phone: a quiet "Note · Done" row that opens a note field under the item
   function inlineTools(it, body) {
     const row = h("div", { class: "itemtools" });
-    const noteBtn = h("button", { text: it.note ? "Edit note" : "Note" });
+    const noteBtn = h("button", { text: it.note ? "Edit update" : "Update" });
     const doneBtn = h("button", { text: "Done" });
     noteBtn.addEventListener("click", () => {
       if (body.querySelector("textarea")) return;
-      const ta = h("textarea", { class: "note", rows: 1, placeholder: "Note to self…" });
+      const ta = h("textarea", { class: "note", rows: 1, placeholder: "Progress or changes — Claude reads this next brief…" });
       ta.value = it.note || "";
       const saved = h("div", { class: "saved" });
       const save = saver((v) => patchItem(it, { note: v }), saved);
@@ -2774,7 +2774,7 @@
       w.append(h("h1", { class: "now-title", text: it.title }));
       w.append(sentence(it));
       if (it.carries > 1) w.append(h("p", { class: "now-carry", text: `Carried ${it.carries} days.` }));
-      const ta = h("textarea", { class: "note", rows: 1, placeholder: "Note to self…", style: "margin-top:18px" });
+      const ta = h("textarea", { class: "note", rows: 1, placeholder: "Progress or changes — Claude reads this next brief…", style: "margin-top:18px" });
       ta.value = it.note || "";
       const saved = h("div", { class: "saved" });
       const save = saver((v) => patchItem(it, { note: v }), saved);
@@ -2845,7 +2845,7 @@
     if (!it || it.status === "Closed") return null;
     const bits = [`This is an open item from my daily brief (${areaOf(it)}): "${it.title}".`];
     if (it.sentence) bits.push(it.sentence);
-    if (it.note) bits.push(`My note on it: ${it.note}`);
+    if (it.note) bits.push(`My latest update on it: ${it.note}`);
     if (safeUrl(it.task)) bits.push(`The task behind it is ${it.task}.`);
     bits.push("Read the barayuga-notion skill and anything linked, then tell me the one next step that changes the outcome, what you can do and what is left for me. Do your part as drafts only: send, pay or submit nothing. Put no SSNs, Medicare numbers or tax figures in anything you write.");
     return { generic: true, title: "No plan written for this one yet", why: "The brief didn't write a recommendation for this item. Claude can read it and its task and work one out.", area: areaOf(it), prompt: bits.join(" ") };
@@ -3074,8 +3074,8 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
       setTimeout(() => grow(t), 0);
       inner.append(sentence(it));
 
-      inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Note to self" }), (() => {
-        const ta = h("textarea", { class: "note", rows: 2, id: "edNote", placeholder: "Note to self…" });
+      inner.append(h("div", { class: "ed-row" }, h("p", { class: "ed-label", text: "Update for Claude" }), (() => {
+        const ta = h("textarea", { class: "note", rows: 2, id: "edNote", placeholder: "Progress or changes — Claude reads this next brief…" });
         ta.value = it.note || "";
         const sv = h("div", { class: "saved" });
         const save = saver(async (v) => { await patchItem(it, { note: v }); rerenderListOnly(); }, sv);
