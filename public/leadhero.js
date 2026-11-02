@@ -97,11 +97,11 @@
 
   // ---------- planner ----------
   var G = [
-    { id: "book", label: "Starting book (members)", min: 0, max: 400, step: 1, v: 101, f: num },
+    { id: "book", label: "Starting book (members)", min: 0, max: 400, step: 1, v: 90, f: num },
     { id: "init", label: "New to Medicare / MA ($/yr)", min: 400, max: 900, step: 5, v: 725, f: money },
     { id: "ren", label: "Switch and renewal ($/yr)", min: 200, max: 500, step: 1, v: 363, f: money },
-    { id: "pnew", label: "Share of new clients who are new to MA", min: 0, max: 100, step: 1, v: 40, f: function (v) { return v + "%"; } },
-    { id: "keep", label: "Members kept each year", min: 60, max: 100, step: 1, v: 90, f: function (v) { return v + "%"; } },
+    { id: "pnew", label: "Share of new clients who are new to MA", min: 0, max: 100, step: 1, v: 10, f: function (v) { return v + "%"; } },
+    { id: "keep", label: "Members kept each year", min: 60, max: 100, step: 1, v: 95, f: function (v) { return v + "%"; } },
     { id: "grow", label: "Referral growth per year", min: 0, max: 50, step: 1, v: 15, f: function (v) { return v + "%"; } },
     { id: "lift", label: "Closing-rate improvement per year", min: 0, max: 20, step: 1, v: 5, f: function (v) { return v + "%"; } },
     { id: "opex", label: "Operating costs (% of revenue)", min: 5, max: 40, step: 1, v: 18, f: function (v) { return v + "%"; } },
