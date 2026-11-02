@@ -146,3 +146,15 @@ body.lh { height: auto; min-height: 100%; color: var(--ink); }
   .lh-toc, .lh-filters { display: none; }
   .lh-sec { break-inside: avoid-page; }
 }
+
+/* reset, routine, stack (Nov 2026) */
+.pl-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pl-head h3 { margin: 0 0 8px; }
+.pl-reset-row { margin: 0 0 4px; }
+.pl-reset { font: 600 13px var(--sans); color: var(--sea); background: var(--bg); border: 1px solid #C3DADB; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+.pl-reset:hover { background: var(--sea-l); }
+.lh-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.fl-col { text-anchor: middle; font: 600 11px var(--sans); letter-spacing: .08em; text-transform: uppercase; fill: var(--sea); }
+.fl-head { fill: var(--grey); }
+.fl-note { text-anchor: middle; font: 400 11.5px var(--sans); fill: var(--soft); }
+@media (max-width: 700px) { .lh-grid-2 { grid-template-columns: 1fr; } }

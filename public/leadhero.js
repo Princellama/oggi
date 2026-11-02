@@ -37,42 +37,37 @@
 
   // ---------- network, ranked ----------
   var NET = [
-    { n: "Filipino Chamber of Commerce", ch: "Community", cls: "c-ev", phase: "Producing", s: 5,
-      out: "23 warm leads, the largest single source", why: "Most of the warm list traces back to one golf tournament and the Chamber's membership. 72 contacts carry the Chamber tag. The gap: no named owner of the relationship on my side yet.",
-      next: "Name one contact at the Chamber and offer an educational member session during Open Enrollment (Jan–Mar)." },
     { n: "Barayuga CPA practice (my own tax clients)", ch: "Own book", cls: "c-own", phase: "Producing", s: 5,
       out: "Highest-trust channel, least worked", why: "Tax clients already trust me with their money. Clients turning 65, facing IRMAA or helping a parent are natural Medicare conversations, and so far only one has come across.",
       next: "During tax season, flag every client 63 and older and every IRMAA notice for a separate Medicare conversation." },
     { n: "Devoted kiosks: Longs Kalihi and Salt Lake", ch: "Retail", cls: "c-retail", phase: "Producing", s: 4,
       out: "17 leads since September, 2 appointments", why: "Carrier-sponsored, so it costs only my time. Foot traffic is real and every lead is tagged by location for follow-up.",
       next: "Call every kiosk lead within 48 hours and offer an in-person review before 7 December." },
-    { n: "HGEA and union golf events", ch: "Community", cls: "c-ev", phase: "Working", s: 4,
-      out: "78 tagged contacts", why: "Crossover from my group years: union and public-employee families who already know my name. Many are near or past 65.",
-      next: "Qualify the list by age and reach out through retiree associations rather than the employer." },
     { n: "Community newsletter publisher (I.L.)", ch: "Digital", cls: "c-part", phase: "Working", s: 4,
       out: "About 6,500 readers; 4 digital leads", why: "A tax client and friend who publishes a newsletter with real reach in the community. The best amplifier for the advocate site.",
       next: "Offer a short monthly explainer (starting with the HMSA closures) that links back to the blog." },
-    { n: "helpinghawaiiseniors.com and booking calendar", ch: "Digital", cls: "c-part", phase: "Working", s: 3,
-      out: "The only source with clean attribution", why: "Inbound bookings arrive already tagged, so I can see exactly what the blog produces.",
-      next: "Put the booking link at the end of every post and count bookings per post." },
+    { n: "Filipino Chamber of Commerce", ch: "Community", cls: "c-ev", phase: "Producing", s: 4,
+      out: "23 warm leads from its membership", why: "Most of the warm list traces back to one golf tournament and the Chamber's membership. 72 contacts carry the Chamber tag. The gap: no named owner of the relationship on my side yet.",
+      next: "Name one contact at the Chamber and offer an educational member session during Open Enrollment (Jan–Mar)." },
+    { n: "Provider offices I work with", ch: "Providers", cls: "c-prov", phase: "Establishing", s: 3,
+      out: "Dentists · internal and family medicine · opticians",
+      why: "Dental practices, internal and family medicine offices, and opticians whose patients ask which plans they take. When a plan closes or a network changes, their front desk needs somewhere to send people.",
+      next: "Visit the offices most affected by the HMSA closures with a one-page guide to which plans they accept." },
+    { n: "helpinghawaiiseniors.com, Contact me form and booking", ch: "Digital", cls: "c-part", phase: "Working", s: 3,
+      out: "The only source with clean attribution", why: "Every form, booking and RetireFlo intake from the site lands in GHL already tagged, so I can see exactly what the site, the magazine and the online ads produce.",
+      next: "Put the Contact me link at the end of every post and count requests per post and per ad." },
     { n: "Individual referrers (G.C., A.K., A.N., V.D., A.B.)", ch: "Professionals", cls: "c-prov", phase: "Working", s: 3,
       out: "One referral each, Ewa Beach to Maui", why: "People who have already sent someone once. Small numbers, but every one of these leads arrived warm.",
       next: "A thank-you and an AEP check-in to each, with a simple way to send the next person." },
     { n: "Financial planners and RIA partners (incl. a WFG couple)", ch: "Professionals", cls: "c-prov", phase: "Establishing", s: 3,
       out: "Two-way referrals with the CPA practice", why: "Their clients are retiring onto Medicare. I can send them tax and planning work in return.",
       next: "Set an introductory meeting and agree how referrals pass in both directions." },
-    { n: "ADA Diabetes Walk", ch: "Events", cls: "c-ev", phase: "Producing", s: 3,
-      out: "6 warm leads from one table", why: "A health-focused crowd with a reason to care about drug coverage and networks.",
-      next: "Book the 2027 table early and ask a carrier to sponsor it." },
     { n: "Community and civic golf events", ch: "Events", cls: "c-ev", phase: "Working", s: 2,
       out: "About 200 contacts, mostly unqualified", why: "Ewa Beach tournament, alumni and Filipino community groups, Waimanalo and Habitat events. Large lists, unknown ages.",
       next: "One qualifying message to the whole list; keep those 64 and older, park the rest." },
     { n: "West Loch Ewa Senior Residence", ch: "Events", cls: "c-ev", phase: "Establishing", s: 2,
       out: "Venue open; seminars not yet running", why: "Residents in one place and a venue that has said yes. The seminar channel is designed but hasn't run.",
-      next: "One educational session during Open Enrollment, with sign-ups for one-on-one reviews." },
-    { n: "Provider offices: doctors, dentists, optometry, chiropractic", ch: "Providers", cls: "c-prov", phase: "Establishing", s: 2,
-      out: "On the strategy board; not producing yet", why: "Offices whose patients are losing an HMSA plan need somewhere to send them, and they know which networks they take.",
-      next: "Visit the offices most affected by the closures with a one-page guide to which plans they accept." }
+      next: "One educational session during Open Enrollment, with sign-ups for one-on-one reviews." }
   ];
   var current = "All";
   function renderNet() {
@@ -115,10 +110,10 @@
   ];
   var SRC = [
     { n: "CPA tax clients and families", r: 3, c: 45 },
-    { n: "Filipino Chamber and community groups", r: 6, c: 25 },
-    { n: "Devoted kiosks", r: 8, c: 15 },
-    { n: "Union and employer events", r: 5, c: 15 },
-    { n: "Health walks and fairs", r: 2, c: 20 },
+    { n: "Filipino Chamber and community groups", r: 3, c: 25 },
+    { n: "Devoted kiosks", r: 6, c: 15 },
+    { n: "Union and employer events", r: 0, c: 15 },
+    { n: "Health walks and fairs", r: 0, c: 20 },
     { n: "Doctors, dentists, optometry", r: 3, c: 35 },
     { n: "Chiropractic and massage", r: 1, c: 20 },
     { n: "Financial planners and RIAs", r: 2, c: 35 },
@@ -127,6 +122,7 @@
     { n: "Website and news blog", r: 3, c: 20 },
     { n: "Mail (letters, ReminderMedia)", r: 3, c: 8 }
   ];
+  var DEF = SRC.map(function (x) { return { r: x.r, c: x.c }; });
   var val = {};
   $("globals").innerHTML = G.map(function (g) {
     val[g.id] = g.v;
@@ -206,6 +202,17 @@
     pts.forEach(function (p, i) { out.push('<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="4" fill="var(--chart-net)"><title>Net ' + money(yrs[i].net) + '</title></circle>'); });
     $("fiveChart").innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Revenue by type and net income over five years">' + out.join("") + '</svg>';
   }
+
+  function resetAll() {
+    G.forEach(function (g) { val[g.id] = g.v; $("g-" + g.id).value = g.v; });
+    SRC.forEach(function (x, i) {
+      x.r = DEF[i].r; x.c = DEF[i].c;
+      document.querySelector('[data-s="' + i + '"][data-k="r"]').value = x.r;
+      document.querySelector('[data-s="' + i + '"][data-k="c"]').value = x.c;
+    });
+    render();
+  }
+  [].forEach.call(document.querySelectorAll("[data-reset]"), function (b) { b.addEventListener("click", resetAll); });
 
   document.addEventListener("input", function (e) {
     var t = e.target;

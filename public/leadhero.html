@@ -19,12 +19,49 @@
     <p class="lh-lede">Licensed Medicare agent with IFG, Honolulu. Advocate first, agent second, and a CPA behind both. This page is the local strategy, the campaigns running this AEP, what I put my own money into, and the network I've built, in one place.</p>
     <p class="lh-for">Prepared for Aaron Burton, IFG · November 2026</p>
     <nav class="lh-toc" aria-label="Sections">
-      <a href="#story">Background</a><a href="#position">Positioning</a><a href="#book">Book &amp; pipeline</a><a href="#campaigns">Campaigns</a><a href="#invest">Investments</a><a href="#network">Network</a><a href="#planner">Planner</a><a href="#help">Where I need help</a><a href="#photos" id="toc-photos" hidden>Photos</a>
+      <a href="#planner">Lead estimator</a><a href="#story">Background</a><a href="#position">Positioning</a><a href="#book">Book &amp; pipeline</a><a href="#routine">Routine</a><a href="#stack">Tech stack</a><a href="#campaigns">Campaigns</a><a href="#invest">Investments</a><a href="#network">Network</a><a href="#help">Where I need help</a><a href="#photos" id="toc-photos" hidden>Photos</a>
     </nav>
   </div>
 </header>
 
 <main class="lh-wrap">
+
+  <section id="planner" class="lh-sec">
+    <h2>Lead estimator</h2>
+    <p>My lead-strategy model, updated with 2027 Hawaii commissions. Move the sliders to see how referrals per month and closing rates by source turn into clients, revenue and a five-year book. The defaults are my realistic estimate for the coming year, about 30 referrals a month across twelve sources, not a promise.</p>
+    <p class="pl-reset-row"><button type="button" class="pl-reset" data-reset>Reset to my defaults</button></p>
+
+    <div class="lh-card">
+      <h3>Assumptions</h3>
+      <div class="pl-grid" id="globals"></div>
+    </div>
+
+    <div class="lh-card">
+      <div class="pl-head"><h3>Sources, year one</h3><button type="button" class="pl-reset" data-reset>Reset</button></div>
+      <div class="pl-table-wrap">
+        <table class="pl-table">
+          <thead><tr><th>Source</th><th>Referrals / mo</th><th>Close %</th><th class="n">Clients</th><th class="n">Year-1 $</th></tr></thead>
+          <tbody id="srcBody"></tbody>
+          <tfoot><tr><td>Total</td><td id="totRef"></td><td id="totCr"></td><td class="n" id="totCl"></td><td class="n" id="totRev"></td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="lh-stats" id="kpis"></div>
+
+    <div class="lh-card">
+      <h3>Five years</h3>
+      <div class="pl-legend"><span><i class="k-new"></i>New to Medicare / MA</span><span><i class="k-sw"></i>Switches</span><span><i class="k-ren"></i>Renewals</span><span><i class="k-net"></i>Net income</span></div>
+      <div id="fiveChart" class="pl-chart"></div>
+      <div class="pl-table-wrap">
+        <table class="pl-table pl-five">
+          <thead><tr><th>Year</th><th class="n">Book start</th><th class="n">New clients</th><th class="n">Book end</th><th class="n">Revenue</th><th class="n">Opex</th><th class="n">Net</th></tr></thead>
+          <tbody id="fiveBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
 
   <section id="story" class="lh-sec">
     <h2>Where I'm coming from</h2>
@@ -46,13 +83,13 @@
       <article class="lh-hat">
         <h3>The advocate</h3>
         <p class="lh-tag">helpinghawaiiseniors.com · eric@helpinghawaiiseniors.com</p>
-        <p>A plain-language news and education site for Hawaii seniors, with a blog that explains what's changing and who it hits, starting with the HMSA Akamai closures (about 16,000 members). The alias email keeps that conversation in the advocate's voice: it's the address on the site, on event sign-ups and on community mail, so people meet the helper before they meet the salesperson.</p>
-        <p class="lh-note">Guardrails: the site says plainly that I'm a licensed agent, carries the TPMO disclaimer, and doesn't look like a government or SHIP page. Plan-specific material goes through carrier approval. I'd like IFG compliance to look it over.</p>
+        <p>A plain-language news and education site for Hawaii seniors, with a blog that explains what's changing and who it hits, starting with the HMSA Akamai closures (about 16,000 members).</p>
+        <p>It's also my lead collector. I advertise the site in a magazine and online, and every visitor who asks for help comes in through its Contact me form, booking calendar or RetireFlo intake, already tagged in GHL. The alias email keeps the conversation in the advocate's voice, so people meet the helper before they meet the salesperson.</p>
       </article>
       <article class="lh-hat">
         <h3>The agent</h3>
-        <p class="lh-tag">IFG · Devoted, UHC, Humana</p>
-        <p>Where the advocate conversation turns into a Scope of Appointment, a plan review and an enrollment. RetireFlo intake feeds GHL, every prospect is tagged with where we met, and a daily call list tells me who's owed a call.</p>
+        <p class="lh-tag">Licensed in Hawaii · Producer license 491278 · NPN 19168935</p>
+        <p>Appointed through IFG with Devoted, UHC and Humana. This is where the advocate conversation turns into a Scope of Appointment, a plan review and an enrollment. RetireFlo intake feeds GHL, every prospect is tagged with where we met, and a daily call list tells me who's owed a call.</p>
       </article>
       <article class="lh-hat">
         <h3>The CPA</h3>
@@ -96,6 +133,50 @@
     </div>
   </section>
 
+  <section id="routine" class="lh-sec">
+    <h2>My current routine</h2>
+    <div class="lh-grid lh-grid-2">
+      <article class="lh-item"><span class="lh-chip c-retail">Kiosk calendar</span><h3>Devoted kiosks, through 7 December</h3>
+        <p>Longs Salt Lake (#9955) most Mondays, Wednesdays and Thursdays, 8 to noon, and Longs Kalihi (#9653) on its set days, 9 to 1. Each shift is on my calendar with its letter of authorization. I set up, check in with Devoted by photo, and dictate every conversation so it's in GHL, tagged by location, the same day.</p></article>
+      <article class="lh-item"><span class="lh-chip c-sys">Prospecting hour</span><h3>An hour of phone calls, every weekday</h3>
+        <p>A call list is built each morning from GHL: kiosk leads inside 48 hours, promised call-backs, people waiting on a plan comparison, and new T65 and event leads. Every call is recorded, with identity check, the TPMO disclaimer and a Scope of Appointment before any plan talk, and the outcome is logged back to GHL.</p></article>
+    </div>
+  </section>
+
+  <section id="stack" class="lh-sec">
+    <h2>Tech stack</h2>
+    <p>Few tools, each with one job, all feeding one CRM.</p>
+    <figure class="lh-flow lh-stack" aria-label="How the tools connect">
+      <svg viewBox="0 0 720 300" role="img">
+        <title>Lead sources into helpinghawaiiseniors.com and RetireFlo, into GoHighLevel through IFG, then SunFire to enroll</title>
+        <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="fl-head"/></marker></defs>
+        <text x="90" y="20" class="fl-col">Where people find me</text>
+        <text x="300" y="20" class="fl-col">Intake</text>
+        <text x="505" y="20" class="fl-col">CRM (IFG)</text>
+        <text x="650" y="20" class="fl-col">Enroll</text>
+        <g class="fl-box"><rect x="10" y="34" width="160" height="46" rx="9"/><text x="90" y="54">Facebook &amp; online</text><text x="90" y="70" class="fl-sub">ads, posts</text></g>
+        <g class="fl-box"><rect x="10" y="90" width="160" height="46" rx="9"/><text x="90" y="110">Magazine &amp; mail</text><text x="90" y="126" class="fl-sub">QR code to the site</text></g>
+        <g class="fl-box"><rect x="10" y="146" width="160" height="46" rx="9"/><text x="90" y="166">Kiosks &amp; events</text><text x="90" y="182" class="fl-sub">dictated same day</text></g>
+        <g class="fl-box"><rect x="10" y="202" width="160" height="46" rx="9"/><text x="90" y="222">Referrals &amp; CPA</text><text x="90" y="238" class="fl-sub">partners, tax clients</text></g>
+        <g class="fl-box fl-mid"><rect x="220" y="62" width="160" height="58" rx="9"/><text x="300" y="86">helpinghawaii</text><text x="300" y="102">seniors.com</text><text x="300" y="116" class="fl-sub">Contact me · booking</text></g>
+        <g class="fl-box fl-mid"><rect x="220" y="160" width="160" height="58" rx="9"/><text x="300" y="186">RetireFlo</text><text x="300" y="204" class="fl-sub">intake survey · SOA</text></g>
+        <g class="fl-box fl-end"><rect x="420" y="90" width="170" height="104" rx="10"/><text x="505" y="118">GoHighLevel</text><text x="505" y="136" class="fl-sub">through IFG</text><text x="505" y="160" class="fl-sub">contacts · tags · pipelines</text><text x="505" y="176" class="fl-sub">workflows · texts · email</text></g>
+        <g class="fl-box"><rect x="610" y="112" width="100" height="58" rx="9"/><text x="660" y="136">SunFire</text><text x="660" y="154" class="fl-sub">compare · enroll</text></g>
+        <path class="fl-arrow" marker-end="url(#ar)" d="M170 57 C195 57 195 84 218 88"/>
+        <path class="fl-arrow" marker-end="url(#ar)" d="M170 113 C195 113 200 100 218 98"/>
+        <path class="fl-arrow" marker-end="url(#ar)" d="M170 169 C192 169 196 186 218 188"/>
+        <path class="fl-arrow" marker-end="url(#ar)" d="M170 225 C320 260 470 240 500 196"/>
+        <path class="fl-arrow" marker-end="url(#ar)" d="M300 120 L300 158"/>
+        <path class="fl-arrow" marker-end="url(#ar)" d="M380 92 C400 92 400 118 418 120"/>
+        <path class="fl-arrow" marker-end="url(#ar)" d="M380 190 C400 190 400 168 418 166"/>
+        <path class="fl-arrow" marker-end="url(#ar)" d="M590 141 L608 141"/>
+        <path class="fl-arrow fl-back" marker-end="url(#ar)" d="M660 170 C660 272 505 280 505 196"/>
+        <text x="600" y="262" class="fl-sub fl-note">enrollment logged back</text>
+      </svg>
+      <figcaption>The site and RetireFlo collect; GoHighLevel, through IFG, holds every contact and follow-up; SunFire is where plans are compared and the enrollment is written.</figcaption>
+    </figure>
+  </section>
+
   <section id="campaigns" class="lh-sec">
     <h2>Campaigns this AEP</h2>
     <div class="lh-grid">
@@ -134,51 +215,13 @@
     <ol class="lh-rank" id="netList"></ol>
   </section>
 
-  <section id="planner" class="lh-sec">
-    <h2>Lead source planner</h2>
-    <p>My lead-strategy model, updated with 2027 Hawaii commissions. Move the sliders to see how referrals per month and closing rates by source turn into clients, revenue and a five-year book. Defaults are my working estimates, not a promise.</p>
-
-    <div class="lh-card">
-      <h3>Assumptions</h3>
-      <div class="pl-grid" id="globals"></div>
-    </div>
-
-    <div class="lh-card">
-      <h3>Sources, year one</h3>
-      <div class="pl-table-wrap">
-        <table class="pl-table">
-          <thead><tr><th>Source</th><th>Referrals / mo</th><th>Close %</th><th class="n">Clients</th><th class="n">Year-1 $</th></tr></thead>
-          <tbody id="srcBody"></tbody>
-          <tfoot><tr><td>Total</td><td id="totRef"></td><td id="totCr"></td><td class="n" id="totCl"></td><td class="n" id="totRev"></td></tr></tfoot>
-        </table>
-      </div>
-    </div>
-
-    <div class="lh-stats" id="kpis"></div>
-
-    <div class="lh-card">
-      <h3>Five years</h3>
-      <div class="pl-legend"><span><i class="k-new"></i>New to Medicare / MA</span><span><i class="k-sw"></i>Switches</span><span><i class="k-ren"></i>Renewals</span><span><i class="k-net"></i>Net income</span></div>
-      <div id="fiveChart" class="pl-chart"></div>
-      <div class="pl-table-wrap">
-        <table class="pl-table pl-five">
-          <thead><tr><th>Year</th><th class="n">Book start</th><th class="n">New clients</th><th class="n">Book end</th><th class="n">Revenue</th><th class="n">Opex</th><th class="n">Net</th></tr></thead>
-          <tbody id="fiveBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
 
   <section id="help" class="lh-sec">
     <h2>Where I need help</h2>
     <div class="lh-grid">
       <article class="lh-item"><h3>Follow-up</h3><p>I generate conversations faster than I close the loop on them. I want a cadence I don't have to reinvent: who gets touched, when, and how, and the discipline to run it during AEP.</p></article>
       <article class="lh-item"><h3>Closing warm leads</h3><p>When I get someone to an in-person meeting, I close at a high rate. The gap is getting warm leads from "call me later" to a kitchen-table appointment.</p></article>
-      <article class="lh-item"><h3>Multi-state</h3><p>Family members on the mainland keep coming up. I'd like to know how IFG handles non-resident licensing and appointments, and where to hand off when it isn't worth licensing.</p></article>
-    </div>
-    <div class="lh-card lh-close">
-      <p>I'm excited to see what I can do as part of a real agency: undo some bad habits from group work, and build new ones that last.</p>
-      <p class="lh-sign">— Eric</p>
+      <article class="lh-item"><h3>Training</h3><p>I want IFG's training and systems: a sales process I can repeat from first call to enrollment, carrier and product updates each season, and compliance I don't have to piece together myself. A ride-along on a kiosk day would help most.</p></article>
     </div>
   </section>
 
