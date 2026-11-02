@@ -14,11 +14,10 @@
 
   // ---------- pipeline snapshot (GHL, open opportunities, 2 Nov 2026) ----------
   var PIPES = [
-    { n: "Events", c: 358, v: 1451 },
+    { n: "Events", c: 319, v: 1451 },
     { n: "Retail Market", c: 54, v: 19964, hot: true },
-    { n: "FEX", c: 39, v: 0 },
     { n: "Referrals", c: 29, v: 10527, hot: true },
-    { n: "T65", c: 27, v: 12335, hot: true },
+    { n: "T65", c: 26, v: 11972, hot: true },
     { n: "Business Tracker", c: 10, v: 3630 },
     { n: "Digital Marketing", c: 4, v: 1452 },
     { n: "Onboarding", c: 4, v: 0 },
@@ -112,7 +111,6 @@
     { n: "CPA tax clients and families", r: 3, c: 45 },
     { n: "Filipino Chamber and community groups", r: 3, c: 25 },
     { n: "Devoted kiosks", r: 6, c: 15 },
-    { n: "Union and employer events", r: 0, c: 15 },
     { n: "Health walks and fairs", r: 0, c: 20 },
     { n: "Doctors, dentists, optometry", r: 3, c: 35 },
     { n: "Chiropractic and massage", r: 1, c: 20 },
