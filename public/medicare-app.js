@@ -63,12 +63,14 @@
 
   // ---------------- state ----------------
   const S = { data: null, err: null, msg: null, tab: "overview", pulseScope: "All", pulseCarrier: "All", partnerFilter: "All", draft: { kind: "In the field" } };
-  const TABS = ["overview", "pulse", "carriers", "veterans", "campaigns", "content", "partners", "log"];
+  const TABS = ["overview", "calls", "pulse", "carriers", "veterans", "campaigns", "content", "partners", "log"];
   const PROMPTS = {
     scan: "/medicare-marketing scan — scan Hawaii and national Medicare news and the four carriers (Devoted, UHC, Humana, HMSA), and add what's new to Medicare Pulse.",
     count: "/medicare-marketing count — count leads, appointments and enrollments in GHL for each running campaign in Medicare Campaigns, and sync my kiosk and event schedule from Google Calendar into Medicare Field Days.",
     writeAll: "/medicare-marketing write — write every Medicare Content row that is Requested: thumbnail, IG and Facebook captions, summary, call to action and disclaimer.",
     write: (r) => `/medicare-marketing write — write this post in Medicare Content: “${r.title}”${r.url ? " " + r.url : ""}. Thumbnail, IG and Facebook captions, summary, call to action and disclaimer.`,
+    calls: "/medicare-calls — build my Medicare call list for the next calling day and write it to the Medicare Calls table in Notion so it shows in Oggi's Calls tab.",
+    fileCalls: (day) => `/medicare-calls file — file my logged calls from ${day}: read the Medicare Calls rows for that day that have an Outcome and are not Filed, and for each one update the People row (Last contact, AEP 2027 stage, any corrected email, address or phone), add an Encounters row (Setting: Phone call), move the GHL opportunity stage and add the notes to the GHL contact, write a Medicare Activity Log row, turn any next step into a QuickAction, then tick Filed. Never copy a Medicare number into a note.`,
     partner: (p) => `/medicare-marketing partner — give me a short talk track for ${p.name}${p.url ? " (" + p.url + ")" : ""}: who they are, what this AEP's changes mean for their patients or members, and one ask.`,
   };
 
@@ -120,7 +122,8 @@
       a.setAttribute("aria-current", a.dataset.tab === S.tab ? "page" : "false");
       const old = a.querySelector(".dot"); if (old) old.remove();
       const n = a.dataset.tab === "pulse" ? rows("pulse").filter((r) => r.status === "New").length
-        : a.dataset.tab === "content" ? rows("content").filter((r) => r.status === "Requested").length : 0;
+        : a.dataset.tab === "content" ? rows("content").filter((r) => r.status === "Requested").length
+        : a.dataset.tab === "calls" ? callDay().list.filter((c) => !c.outcome).length : 0;
       if (n) a.append(h("span", { class: "dot", text: n }));
       if (a.dataset.tab === S.tab) try { a.scrollIntoView({ block: "nearest", inline: "nearest" }); } catch {}
     }
@@ -141,7 +144,7 @@
     for (const [k, v] of otherErrors()) main.append(h("p", { class: "mc-err", text: `${k}: ${v.error}` }));
     if (S.msg) main.append(h("p", { class: "mc-msg", text: S.msg }));
     if (S.tab === "carriers" && S.sub === "plans") return plans2027(main);
-    ({ overview, pulse, carriers, veterans, campaigns, content, partners, log })[S.tab](main);
+    ({ overview, calls, pulse, carriers, veterans, campaigns, content, partners, log })[S.tab](main);
   }
 
   // ---------------- overview ----------------
@@ -345,6 +348,142 @@
           safeUrl(p.url) ? ext(h("a", { class: "textlink", href: p.url, text: "Open in Notion" })) : null)));
     }
     main.append(ul);
+  }
+
+
+  // ---------------- calls ----------------
+  // The day's call list from Medicare Calls (written by Claude's medicare-calls skill), with a call log
+  // under each person that saves to Notion as Eric types. "File my calls" sends the log to Claude.
+  const CALL_BANDS = [["You promised", "Each one is waiting on you. Do the prep in Have ready before dialing."],
+    ["Waiting on them", "A gentle nudge. They owe you something before you can move."],
+    ["Lead", "Fresh leads from the GHL call stages, with permission from this fall."]];
+  const CALL_OUTCOMES = ["Reached", "Left voicemail", "No answer", "Wrong number", "Call back later", "Booked appointment", "Enrolled", "Staying put", "Not interested"];
+  const CALL_DONE = new Set(["Reached", "Booked appointment", "Enrolled", "Staying put", "Not interested", "Wrong number"]);
+  // Today's list if there is one, else the nearest upcoming day, else the latest past day.
+  function callDay() {
+    const all = rows("calls"), today = todayISO();
+    const days = [...new Set(all.map((c) => (c.date || "").slice(0, 10)).filter(Boolean))].sort();
+    const pick = S.callDate && days.includes(S.callDate) ? S.callDate
+      : days.includes(today) ? today : days.find((d) => d > today) || days[days.length - 1] || null;
+    return { day: pick, days, list: all.filter((c) => (c.date || "").slice(0, 10) === pick).sort((a, b) => (a.order ?? 99) - (b.order ?? 99)) };
+  }
+  const notionPage = (id) => (id ? "https://www.notion.so/" + String(id).replace(/-/g, "") : null);
+  const telHref = (p) => { const d = String(p || "").replace(/[^\d+]/g, ""); return d.length >= 10 ? "tel:" + (d.startsWith("+") ? d : d.length === 10 ? "+1" + d : "+" + d) : null; };
+  async function saveCall(c, fields, flag) {
+    S.callSaving = (S.callSaving || 0) + 1;
+    if (flag) flag.textContent = "Saving…";
+    try {
+      const fresh = await api("PATCH", "/api/medicare/call/" + c.id, fields);
+      for (const k of Object.keys(fields)) if (k !== "stamp") c[k] = fresh[k];
+      c.calledAt = fresh.calledAt;
+      if (flag) { flag.textContent = "Saved"; setTimeout(() => { if (flag.textContent === "Saved") flag.textContent = ""; }, 1500); }
+    } catch { if (flag) flag.textContent = "Not saved. Check the connection; your text is still here."; }
+    finally { S.callSaving--; header(); }
+  }
+  function callScript() {
+    const say = (t) => h("span", { class: "cl-say", text: t });
+    const step = (b, ...kids) => h("div", { class: "cl-step" }, h("b", { text: b }), h("p", {}, ...kids));
+    return h("details", { class: "cl-script" }, h("summary", { text: "The script, every call" }),
+      h("div", { class: "cl-steps" },
+        step("1 · Open", say("“Hi, is this [name]? This is Eric Barayuga, a licensed Medicare agent. I'm following up on [their reason]. Is now a good time for a few minutes?”")),
+        step("2 · Recording", say("“Just so you know, this call is recorded for quality and compliance.”"), " Keep Plaud running."),
+        step("3 · Verify", say("“To make sure I have the right person, can you confirm your date of birth and home address?”"), " Have them say it; don't read it to them. Corrections go in the log."),
+        step("4 · Disclaimer", "Once plans come up, inside the first minute: ", say("“We do not offer every plan available in your area. Currently we represent [#] organizations which offer [#] products in your area. Please contact Medicare.gov, 1-800-MEDICARE, or your local State Health Insurance Program to get information on all of your options.”")),
+        step("5 · Scope", "Before any specific plan talk: ", say("“Medicare asks me to note which products you want to talk about. I'll send the short form now, or we can record it on this call.”"), " If you called them and they want a plan review, book it 48+ hours out unless they ask to do it now."),
+        step("6 · Their reason", "Use the Say line on their card. No “best plan,” no urgency without a real date, no benefit figures you haven't checked in the carrier's own materials."),
+        step("7 · Close", say("“So the next step is [step] on [day]. Mahalo for your time.”")),
+        step("Voicemail", say("“Hi [name], Eric Barayuga, licensed Medicare agent, following up on [reason]. Please call me back at [your number]. Mahalo.”"), " No plan names or benefits in a voicemail.")));
+  }
+  function callCard(c) {
+    const flag = h("span", { class: "cl-flag", "aria-live": "polite" });
+    const status = h("span", { class: "chip" });
+    const paint = () => {
+      status.className = "chip" + (c.filed ? " ok" : c.outcome ? (CALL_DONE.has(c.outcome) ? " ok" : " warn") : "");
+      status.textContent = c.filed ? "Filed" : c.outcome || "Not called";
+      li.classList.toggle("cl-done", !!c.outcome);
+    };
+    const fact = (k, v, copy, extra) => h("div", { class: "cl-fact" }, h("span", { class: "k", text: k }),
+      v ? h("span", { class: "v" }, h("span", { class: copy ? "cl-mono" : "", text: v }), copy ? copyBtn(() => v) : null, extra || null)
+        : h("span", { class: "v quiet", text: "not on file" }));
+    const tel = telHref(c.phone);
+    const box = (k, label) => {
+      const inp = h("input", { type: "checkbox", id: `cl-${c.id}-${k}` });
+      inp.checked = !!c[k];
+      inp.addEventListener("change", () => saveCall(c, { [k]: inp.checked }, flag));
+      return h("label", { for: inp.id }, inp, label);
+    };
+    const text = (k, label, attrs, area) => {
+      const el = h(area ? "textarea" : "input", { id: `cl-${c.id}-${k}`, autocomplete: "off", ...attrs });
+      el.value = c[k] || "";
+      let t = null;
+      const push = () => { clearTimeout(t); t = null; if ((c[k] || "") !== el.value) saveCall(c, { [k]: el.value }, flag); };
+      el.addEventListener("input", () => { clearTimeout(t); flag.textContent = ""; t = setTimeout(push, 900); });
+      el.addEventListener("blur", push);
+      return h("div", { class: "cl-field" + (area ? " wide" : "") }, h("label", { for: el.id, text: label }), el);
+    };
+    const out = h("select", { id: `cl-${c.id}-outcome` }, h("option", { value: "", text: "Choose…" }), ...CALL_OUTCOMES.map((o) => h("option", { value: o, text: o, selected: o === c.outcome })));
+    out.addEventListener("change", () => saveCall(c, { outcome: out.value || null, stamp: !c.calledAt }, flag).then(paint));
+    const nd = h("input", { type: "date", id: `cl-${c.id}-nextDate`, value: c.nextDate ? c.nextDate.slice(0, 10) : "" });
+    nd.addEventListener("change", () => saveCall(c, { nextDate: nd.value || null }, flag));
+    const people = safeUrl(notionPage(c.person));
+    const log = h("details", { class: "cl-log" }, h("summary", { text: "Call log" }),
+      h("div", { class: "cl-body" },
+        h("div", { class: "cl-checks" }, box("recording", "Recording on"), box("verified", "Identity verified"), box("disclaimer", "Disclaimer read"), box("soa", "SOA sent or recorded")),
+        h("div", { class: "cl-grid" },
+          h("div", { class: "cl-field" }, h("label", { for: out.id, text: "Outcome" }), out),
+          text("nextStep", "Next step", { type: "text", placeholder: "e.g. Plan review Thursday" }),
+          h("div", { class: "cl-field" }, h("label", { for: nd.id, text: "Next step date" }), nd)),
+        text("notes", "Notes", { placeholder: "What they said, what you promised, doctors and drugs they mention. Not their Medicare number.", rows: "5" }, true),
+        h("div", { class: "cl-grid" },
+          text("newEmail", "Corrected email", { type: "email", placeholder: "only if it changed" }),
+          text("newAddress", "Corrected address", { type: "text", placeholder: "only if it changed" }),
+          text("newPhone", "Corrected phone", { type: "tel", placeholder: "only if it changed" })),
+        h("p", { class: "cl-meta" }, c.calledAt ? h("span", { text: "Called " + fmtWeekday(c.calledAt) + " " + fmtClock(c.calledAt) }) : null, flag)));
+    const li = h("li", { class: "cl-card" },
+      h("div", { class: "cl-top" },
+        h("span", { class: "cl-name", text: c.name }), status,
+        h("span", { class: "cl-tag", text: c.tag }),
+        people ? ext(h("a", { class: "textlink", href: people, text: "People row" })) : null),
+      h("div", { class: "cl-facts" },
+        fact("Phone", c.phone, true, tel ? h("a", { class: "btn small cl-dial", href: tel, text: "Call" }) : null),
+        fact("Email", c.email, true),
+        fact("Address", c.address, false),
+        fact("Medicare #", c.mbiOn ? "On file in " + c.mbiOn : "", false)),
+      c.why ? h("div", { class: "cl-row" }, h("span", { text: "Why" }), h("p", { text: c.why })) : null,
+      c.say ? h("div", { class: "cl-row" }, h("span", { text: "Say" }), h("p", { text: c.say })) : null,
+      c.ready ? h("div", { class: "cl-row" }, h("span", { text: "Have ready" }), h("p", { text: c.ready })) : null,
+      log);
+    paint();
+    return li;
+  }
+  function calls(main) {
+    const { day, days, list } = callDay();
+    const logged = list.filter((c) => c.outcome).length, toFile = list.filter((c) => c.outcome && !c.filed).length;
+    const when = day ? (day === todayISO() ? "Today" : `${fmtWeekday(day + "T12:00:00")} ${fmtDay(day)}`) : "";
+    main.append(h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Calls" + (when ? " · " + when : "") }),
+      h("div", { class: "chips" },
+        days.length > 1 ? (() => {
+          const s = h("select", { class: "copy", "aria-label": "Which day's list", style: "border:0;background:transparent" },
+            ...days.slice().reverse().map((d) => h("option", { value: d, text: d === todayISO() ? "Today" : `${fmtWeekday(d + "T12:00:00")} ${fmtDay(d)}`, selected: d === day })));
+          s.addEventListener("change", () => { S.callDate = s.value; render(); });
+          return s;
+        })() : null,
+        ext(h("a", { class: "btn small ghost", href: claude(PROMPTS.calls), text: "Build tomorrow's list" })),
+        toFile ? ext(h("a", { class: "btn small", href: claude(PROMPTS.fileCalls(day)), text: `File ${toFile} call${toFile === 1 ? "" : "s"}` })) : null)));
+    if (!list.length) {
+      main.append(h("p", { class: "mc-lede", text: "No call list yet. Ask Claude “who do I call?” and the list lands here, with a script and a call log for each person." }));
+      return;
+    }
+    main.append(h("p", { class: "mc-lede", text: `${list.length} calls, ${logged} logged. Open a card's call log when you dial and type as you go; it saves to Notion on its own. Medicare numbers stay on the People row, never here.` }));
+    main.append(callScript());
+    for (const [band, sub] of CALL_BANDS) {
+      const bl = list.filter((c) => c.band === band);
+      if (!bl.length) continue;
+      main.append(h("section", { class: "mc-sec cl-band" },
+        h("h3", { class: "sec", text: band === "Lead" ? "Leads not yet worked" : band }),
+        h("p", { class: "mc-lede", text: sub }),
+        h("ul", { class: "cl-list" }, ...bl.map(callCard))));
+    }
   }
 
   // ---------------- campaigns ----------------
@@ -1039,7 +1178,7 @@ ${WRITEBACK("GHL push", "push")}`;
   // Skipped while typing, presenting, or with a log row's details open, and redraws only on a change.
   setInterval(async () => {
     if (document.visibilityState !== "visible" || !S.data) return;
-    if (document.querySelector(".mc-full") || document.querySelector(".log-det:not([hidden])")) return;
+    if (document.querySelector(".mc-full") || document.querySelector(".log-det:not([hidden])") || document.querySelector(".cl-log[open]") || S.callSaving) return;
     if (document.activeElement && document.activeElement.closest("input:not([type=checkbox]), textarea, select")) return;
     try {
       const fresh = await api("GET", "/api/medicare?d=" + todayISO());

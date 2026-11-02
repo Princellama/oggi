@@ -64,6 +64,18 @@ state.log = [
   { summary: "Kiosk review of his Devoted plan for 2027; staying put.", when: at(0, 9), kind: "Client review", personName: "Baqui Jr., Steven", tags: ["Kiosk", "Devoted", "AEP 2027"], source: "Kiosk dictation", ghl: "In Outbox", details: "Notion People: Last contact, AEP 2027 = Staying put.\nOutbox: GHL owed the stage change." },
 ].map((r) => ({ id: id(), url: null, person: null, personUrl: null, notionUrl: null, gmail: null, ghlContact: "", details: "", ...r }));
 
+// Sample call list (invented people). The real list is written by Claude into Medicare Calls.
+state.calls = [
+  { name: "Mele Kahananui", band: "You promised", tag: "T65 · referral", phone: "808-555-0142", email: "mele@example.com", address: "1200 Example St, Honolulu HI 96817", mbiOn: "Notion",
+    why: "Her Part B started this month with no plan behind it. You offered to go over two PPOs her doctor takes.", say: "“Your Part B is active now. Would you like to set a time to look at the two plans we talked about?”", ready: "Her doctor's network status, a fresh SOA.", outcome: "Booked appointment", recording: true, verified: true, disclaimer: true, soa: true, nextStep: "Plan review at the Salt Lake table", nextDate: iso(3), notes: "Prefers mornings. Asked about dental." },
+  { name: "Ben Agcaoili", band: "You promised", tag: "UHC · Kalihi kiosk", phone: "808-555-0177", email: "", address: "Honolulu (city only)", mbiOn: "",
+    why: "You promised his 2027 options with dental by last week.", say: "“I owe you the 2027 options with dental. Do you have a few minutes, or shall we set a time?”", ready: "The dental options and his dentist's network status." },
+  { name: "Lani Fujimoto", band: "Waiting on them", tag: "Humana PPO", phone: "808-555-0119", email: "lani@example.com", address: "", mbiOn: "GHL",
+    why: "You asked for her new doctor's name five days ago.", say: "“Did you get your new doctor's name? I'll check the network before anything changes.”", ready: "The provider search open." },
+  { name: "Rogelio Tabura", band: "Lead", tag: "A+B only · Kalihi", phone: "808-555-0163", email: "", address: "77 Example Ave, Wahiawa", mbiOn: "",
+    why: "Original Medicare only; he may not know what drug coverage would add.", say: "“You mentioned you only have Parts A and B. Would you like to go over drug coverage?”", ready: "Whether he has drug coverage anywhere else." },
+].map((r, i) => ({ id: id(), url: null, key: "", date: iso(0), order: i + 1, person: null, ghlContact: "", outcome: null, recording: false, verified: false, disclaimer: false, soa: false, nextStep: "", nextDate: null, notes: "", newEmail: "", newAddress: "", newPhone: "", calledAt: null, filed: false, ...r }));
+
 const copy = (x) => JSON.parse(JSON.stringify(x));
 async function getAll() {
   return {
@@ -74,6 +86,7 @@ async function getAll() {
     field: { rows: copy(state.field) },
     portals: { rows: copy(state.portals) },
     log: { rows: copy(state.log) },
+    calls: { rows: copy(state.calls) },
   };
 }
 const find = (t, i) => { const r = state[t].find((x) => x.id === i); if (!r) throw Object.assign(new Error("not found"), { status: 404 }); return r; };
@@ -87,6 +100,7 @@ async function createContent({ title, kind, brief, campaign, image }) {
 }
 async function updatePartner(i, f) { return copy(Object.assign(find("partners", i), f)); }
 async function updatePortal(i, f) { return copy(Object.assign(find("portals", i), f)); }
+async function updateCall(i, f) { return copy(Object.assign(find("calls", i), f)); }
 async function fileUrl() { return null; }
 
-module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, updatePortal, fileUrl };
+module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, updatePortal, updateCall, fileUrl };

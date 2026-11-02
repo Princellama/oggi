@@ -394,6 +394,22 @@ app.patch("/api/medicare/portal/:id", requireAuth, wrap(async (req, res) => {
   res.json(await mstore.updatePortal(req.params.id, f));
 }));
 
+// Medicare Calls: Eric's call log from the Calls tab. The list itself is written by Claude; only the
+// log fields are accepted here. The first outcome stamps Called at.
+const CALL_OUTCOMES = ["Reached", "Left voicemail", "No answer", "Wrong number", "Call back later", "Booked appointment", "Enrolled", "Staying put", "Not interested"];
+app.patch("/api/medicare/call/:id", requireAuth, wrap(async (req, res) => {
+  const b = req.body, f = {};
+  if ("outcome" in b) {
+    if (b.outcome !== null && b.outcome !== "" && !CALL_OUTCOMES.includes(b.outcome)) return res.status(400).json({ error: "outcome" });
+    f.outcome = b.outcome || null;
+    if (f.outcome && b.stamp) f.calledAt = new Date().toISOString();
+  }
+  for (const k of ["recording", "verified", "disclaimer", "soa"]) if (k in b) f[k] = !!b[k];
+  if ("nextDate" in b) { if (!isDay(b.nextDate || null)) return res.status(400).json({ error: "nextDate" }); f.nextDate = b.nextDate || null; }
+  for (const [k, max] of [["nextStep", 300], ["notes", 1900], ["newEmail", 200], ["newAddress", 300], ["newPhone", 40]]) if (k in b) f[k] = String(b[k] || "").slice(0, max);
+  res.json(await mstore.updateCall(req.params.id, f));
+}));
+
 // Photos and thumbnails are private Notion files with short-lived URLs, so they come through here.
 const PLACEHOLDER = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#EDECE6"/><path d="M30 64 L44 48 L54 58 L62 50 L72 64 Z" fill="#D6D5CC"/><circle cx="62" cy="38" r="5" fill="#D6D5CC"/></svg>');
 app.get("/api/medicare/img/:id", requireAuth, wrap(async (req, res) => {

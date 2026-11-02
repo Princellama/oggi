@@ -14,6 +14,7 @@ const DS = {
   portals: process.env.NOTION_PORTALS_DS || "e94d3fc0-0caa-461a-b01a-8974241c9c40",
   log: process.env.NOTION_ACTIVITY_DS || "4239afa2-8b29-47a7-99a7-1dd1ffa76284",
   people: process.env.NOTION_PEOPLE_DS || "47d42794-febb-4efb-9173-14a22ce848cb",
+  calls: process.env.NOTION_CALLS_DS || "243be2d4-fdf7-48c5-899a-568749b3cb42",
 };
 
 function read(p) {
@@ -126,6 +127,42 @@ async function getLog() {
   });
 }
 
+// Medicare Calls: one row per call on a day's list. Claude (the medicare-calls skill) writes the list;
+// Eric's call log (checklist, outcome, notes, corrections) is written from the Calls tab. Claude files
+// the log into People, Encounters and GHL and ticks Filed. Medicare numbers never go in this table.
+function toCall(pg) {
+  const p = pg.properties;
+  return {
+    id: pg.id, url: pg.url, name: read(p["Name"]) || "", key: read(p["Key"]) || "", date: read(p["Date"]),
+    band: read(p["Band"]) || "Lead", order: read(p["Order"]), tag: read(p["Tag"]) || "",
+    phone: read(p["Phone"]) || "", email: read(p["Email"]) || "", address: read(p["Address"]) || "",
+    mbiOn: read(p["Medicare on file"]) || "", person: (read(p["Person"]) || [])[0] || null, ghlContact: read(p["GHL contact ID"]) || "",
+    why: read(p["Why"]) || "", say: read(p["Say"]) || "", ready: read(p["Have ready"]) || "",
+    outcome: read(p["Outcome"]), recording: read(p["Recording on"]), verified: read(p["Identity verified"]),
+    disclaimer: read(p["Disclaimer read"]), soa: read(p["SOA"]), nextStep: read(p["Next step"]) || "", nextDate: read(p["Next date"]),
+    notes: read(p["Notes"]) || "", newEmail: read(p["New email"]) || "", newAddress: read(p["New address"]) || "", newPhone: read(p["New phone"]) || "",
+    calledAt: read(p["Called at"]), filed: read(p["Filed"]),
+  };
+}
+async function getCalls(today) {
+  const rows = await queryAll(DS.calls, {
+    filter: { property: "Date", date: { on_or_after: isoDay(today, -7) } },
+    sorts: [{ property: "Date", direction: "descending" }, { property: "Order", direction: "ascending" }],
+  });
+  return rows.map(toCall);
+}
+const CALL_TEXT = [["nextStep", "Next step"], ["notes", "Notes"], ["newEmail", "New email"], ["newAddress", "New address"], ["newPhone", "New phone"]];
+const CALL_BOX = [["recording", "Recording on"], ["verified", "Identity verified"], ["disclaimer", "Disclaimer read"], ["soa", "SOA"]];
+async function updateCall(id, f) {
+  const props = {};
+  for (const [k, name] of CALL_TEXT) if (k in f) props[name] = { rich_text: rich(f[k] || "") };
+  for (const [k, name] of CALL_BOX) if (k in f) props[name] = { checkbox: !!f[k] };
+  if ("outcome" in f) props["Outcome"] = { select: f.outcome ? { name: f.outcome } : null };
+  if ("nextDate" in f) props["Next date"] = { date: f.nextDate ? { start: f.nextDate } : null };
+  if ("calledAt" in f) props["Called at"] = { date: f.calledAt ? { start: f.calledAt } : null };
+  return toCall(await call("PATCH", `/pages/${id}`, { properties: props }));
+}
+
 const isoDay = (s, add) => { const d = new Date(s + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + add); return d.toISOString().slice(0, 10); };
 
 // Each table loads on its own, so one table not yet shared with the integration doesn't blank the page.
@@ -137,7 +174,7 @@ async function part(fn) {
 }
 
 async function getAll(today) {
-  const [pulse, campaigns, content, partners, field, portals, log] = await Promise.all([
+  const [pulse, campaigns, content, partners, field, portals, log, calls] = await Promise.all([
     part(async () => (await queryAll(DS.pulse, {
       filter: { property: "Status", select: { does_not_equal: "Archived" } },
       sorts: [{ property: "Date", direction: "descending" }],
@@ -151,8 +188,9 @@ async function getAll(today) {
     })).map(toField)),
     part(async () => (await queryAll(DS.portals, {})).map(toPortal)),
     part(getLog),
+    part(() => getCalls(today)),
   ]);
-  return { pulse, campaigns, content, partners, field, portals, log };
+  return { pulse, campaigns, content, partners, field, portals, log, calls };
 }
 
 // ---------- writes ----------
@@ -263,4 +301,4 @@ async function fileUrl(id, prop, i) {
   return url;
 }
 
-module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, updatePortal, fileUrl, DS };
+module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, updatePortal, updateCall, fileUrl, DS };
