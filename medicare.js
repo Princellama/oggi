@@ -15,6 +15,7 @@ const DS = {
   log: process.env.NOTION_ACTIVITY_DS || "4239afa2-8b29-47a7-99a7-1dd1ffa76284",
   people: process.env.NOTION_PEOPLE_DS || "47d42794-febb-4efb-9173-14a22ce848cb",
   calls: process.env.NOTION_CALLS_DS || "243be2d4-fdf7-48c5-899a-568749b3cb42",
+  callSessions: process.env.NOTION_CALL_SESSIONS_DS || "15f4273f-7ab9-439d-8178-de3f14147f36",
 };
 
 function read(p) {
@@ -142,6 +143,8 @@ function toCall(pg) {
     disclaimer: read(p["Disclaimer read"]), soa: read(p["SOA"]), nextStep: read(p["Next step"]) || "", nextDate: read(p["Next date"]),
     notes: read(p["Notes"]) || "", newEmail: read(p["New email"]) || "", newAddress: read(p["New address"]) || "", newPhone: read(p["New phone"]) || "",
     calledAt: read(p["Called at"]), filed: read(p["Filed"]),
+    plaud: read(p["Plaud note"]), dialedAt: read(p["Dialed at"]), session: read(p["Session"]) || "",
+    plaudMatch: read(p["Plaud match"]) || "", claudeNext: read(p["Claude next"]) || "",
   };
 }
 async function getCalls(today) {
@@ -152,7 +155,7 @@ async function getCalls(today) {
   return rows.map(toCall);
 }
 const CALL_TEXT = [["nextStep", "Next step"], ["notes", "Notes"], ["newEmail", "New email"], ["newAddress", "New address"], ["newPhone", "New phone"]];
-const CALL_BOX = [["recording", "Recording on"], ["verified", "Identity verified"], ["disclaimer", "Disclaimer read"], ["soa", "SOA"]];
+const CALL_BOX = [["recording", "Recording on"], ["verified", "Identity verified"], ["disclaimer", "Disclaimer read"], ["soa", "SOA"], ["plaud", "Plaud note"]];
 async function updateCall(id, f) {
   const props = {};
   for (const [k, name] of CALL_TEXT) if (k in f) props[name] = { rich_text: rich(f[k] || "") };
@@ -160,7 +163,44 @@ async function updateCall(id, f) {
   if ("outcome" in f) props["Outcome"] = { select: f.outcome ? { name: f.outcome } : null };
   if ("nextDate" in f) props["Next date"] = { date: f.nextDate ? { start: f.nextDate } : null };
   if ("calledAt" in f) props["Called at"] = { date: f.calledAt ? { start: f.calledAt } : null };
+  if ("dialedAt" in f) props["Dialed at"] = { date: f.dialedAt ? { start: f.dialedAt } : null };
+  if ("session" in f) props["Session"] = { rich_text: rich(f.session || "") };
   return toCall(await call("PATCH", `/pages/${id}`, { properties: props }));
+}
+
+// Medicare Call Sessions: Start/End from the Calls tab. Calls dialed in a session carry its Key, and
+// Claude uses Started/Ended to find the Plaud recordings made during it.
+function toCallSession(pg) {
+  const p = pg.properties;
+  return {
+    id: pg.id, name: read(p["Name"]) || "", key: read(p["Key"]) || "", started: read(p["Started"]), ended: read(p["Ended"]),
+    dialed: read(p["Dialed"]), reached: read(p["Reached"]), voicemail: read(p["Voicemail"]), noAnswer: read(p["No answer"]),
+    booked: read(p["Booked"]), plaudNotes: read(p["Plaud notes"]), minutes: read(p["Minutes"]), note: read(p["Note"]) || "",
+  };
+}
+async function getCallSessions(today) {
+  const rows = await queryAll(DS.callSessions, {
+    filter: { property: "Started", date: { on_or_after: isoDay(today, -14) } },
+    sorts: [{ property: "Started", direction: "descending" }],
+  });
+  return rows.map(toCallSession);
+}
+const SESSION_NUM = [["dialed", "Dialed"], ["reached", "Reached"], ["voicemail", "Voicemail"], ["noAnswer", "No answer"], ["booked", "Booked"], ["plaudNotes", "Plaud notes"], ["minutes", "Minutes"]];
+function sessionProps(f) {
+  const props = {};
+  if ("name" in f) props["Name"] = { title: rich(f.name) };
+  if ("key" in f) props["Key"] = { rich_text: rich(f.key) };
+  if ("started" in f) props["Started"] = { date: f.started ? { start: f.started } : null };
+  if ("ended" in f) props["Ended"] = { date: f.ended ? { start: f.ended } : null };
+  for (const [k, name] of SESSION_NUM) if (k in f) props[name] = { number: f[k] == null ? null : Number(f[k]) };
+  if ("note" in f) props["Note"] = { rich_text: rich(f.note || "") };
+  return props;
+}
+async function createCallSession(f) {
+  return toCallSession(await call("POST", "/pages", { parent: { type: "data_source_id", data_source_id: DS.callSessions }, properties: sessionProps(f) }));
+}
+async function updateCallSession(id, f) {
+  return toCallSession(await call("PATCH", `/pages/${id}`, { properties: sessionProps(f) }));
 }
 
 const isoDay = (s, add) => { const d = new Date(s + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + add); return d.toISOString().slice(0, 10); };
@@ -174,7 +214,7 @@ async function part(fn) {
 }
 
 async function getAll(today) {
-  const [pulse, campaigns, content, partners, field, portals, log, calls] = await Promise.all([
+  const [pulse, campaigns, content, partners, field, portals, log, calls, callSessions] = await Promise.all([
     part(async () => (await queryAll(DS.pulse, {
       filter: { property: "Status", select: { does_not_equal: "Archived" } },
       sorts: [{ property: "Date", direction: "descending" }],
@@ -189,8 +229,9 @@ async function getAll(today) {
     part(async () => (await queryAll(DS.portals, {})).map(toPortal)),
     part(getLog),
     part(() => getCalls(today)),
+    part(() => getCallSessions(today)),
   ]);
-  return { pulse, campaigns, content, partners, field, portals, log, calls };
+  return { pulse, campaigns, content, partners, field, portals, log, calls, callSessions };
 }
 
 // ---------- writes ----------
@@ -301,4 +342,4 @@ async function fileUrl(id, prop, i) {
   return url;
 }
 
-module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, updatePortal, updateCall, fileUrl, DS };
+module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, updatePortal, updateCall, createCallSession, updateCallSession, fileUrl, DS };

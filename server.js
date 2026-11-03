@@ -404,10 +404,34 @@ app.patch("/api/medicare/call/:id", requireAuth, wrap(async (req, res) => {
     f.outcome = b.outcome || null;
     if (f.outcome && b.stamp) f.calledAt = new Date().toISOString();
   }
-  for (const k of ["recording", "verified", "disclaimer", "soa"]) if (k in b) f[k] = !!b[k];
+  // Tapping Call stamps Dialed at; during a session the call also carries the session's Key.
+  if (b.dialed) f.dialedAt = new Date().toISOString();
+  if ("session" in b) { const k = String(b.session || ""); if (k && !/^sess-\d{8}-\d{4}$/.test(k)) return res.status(400).json({ error: "session" }); f.session = k; }
+  for (const k of ["recording", "verified", "disclaimer", "soa", "plaud"]) if (k in b) f[k] = !!b[k];
   if ("nextDate" in b) { if (!isDay(b.nextDate || null)) return res.status(400).json({ error: "nextDate" }); f.nextDate = b.nextDate || null; }
   for (const [k, max] of [["nextStep", 300], ["notes", 1900], ["newEmail", 200], ["newAddress", 300], ["newPhone", 40]]) if (k in b) f[k] = String(b[k] || "").slice(0, max);
   res.json(await mstore.updateCall(req.params.id, f));
+}));
+
+// Call sessions: Start stamps Started and names the session in Hawaii time; End stamps Ended and
+// stores the counts the Calls tab worked out from the calls carrying the session's Key.
+const hst = (d, o) => new Intl.DateTimeFormat("en-US", { timeZone: "Pacific/Honolulu", ...o }).format(d);
+app.post("/api/medicare/call-session", requireAuth, wrap(async (req, res) => {
+  const now = new Date();
+  const ymd = hst(now, { year: "numeric", month: "2-digit", day: "2-digit" }).replace(/(\d+)\/(\d+)\/(\d+)/, "$3$1$2");
+  const hm = hst(now, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).replace(":", "");
+  res.json(await mstore.createCallSession({
+    name: "Calls · " + hst(now, { weekday: "short", month: "short", day: "numeric" }) + ", " + hst(now, { hour: "numeric", minute: "2-digit" }),
+    key: `sess-${ymd}-${hm}`, started: now.toISOString(),
+  }));
+}));
+app.patch("/api/medicare/call-session/:id", requireAuth, wrap(async (req, res) => {
+  const b = req.body, f = {};
+  if (b.end) f.ended = new Date().toISOString();
+  if (b.reopen) f.ended = null;
+  for (const k of ["dialed", "reached", "voicemail", "noAnswer", "booked", "plaudNotes", "minutes"]) if (k in b) { const n = Number(b[k]); if (!Number.isFinite(n) || n < 0) return res.status(400).json({ error: k }); f[k] = Math.round(n); }
+  if ("note" in b) f.note = String(b.note || "").slice(0, 1000);
+  res.json(await mstore.updateCallSession(req.params.id, f));
 }));
 
 // Photos and thumbnails are private Notion files with short-lived URLs, so they come through here.

@@ -357,4 +357,28 @@ ol.script li { margin-bottom: 10px; }
 .cl-field input:focus, .cl-field select:focus, .cl-field textarea:focus { outline: none; border-color: var(--grey); background: var(--bg); }
 .cl-meta { margin: 0; font-size: 12.5px; color: var(--grey); display: flex; gap: 12px; flex-wrap: wrap; }
 .cl-flag { color: var(--ok); }
+.cl-session { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; border: 1px solid var(--hair); border-radius: 10px; padding: 14px 16px; margin: 0 0 14px; background: var(--wash); }
+.cl-session .cl-sub { margin: 0; font-size: 13px; color: var(--grey); flex: 1 1 260px; }
+.cl-session.live { border-color: #CFE2D3; background: #F3F8F4; }
+.cl-start { font-size: 15px; padding: 10px 18px; }
+.cl-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); animation: clpulse 1.6s ease-in-out infinite; }
+@keyframes clpulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .cl-dot { animation: none; } }
+.cl-live { font-weight: 600; color: var(--ok); font-size: 14px; }
+.cl-timer { font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; color: var(--ink); }
+.cl-session.live .cl-sub { flex: 1 1 auto; }
+.cl-dash { margin: 0 0 22px; }
+.cl-dash-k { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--grey); }
+.cl-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; margin-bottom: 8px; }
+.cl-tile { border: 1px solid var(--hair); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; background: var(--bg); }
+.cl-tile b { font-size: 22px; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.1; }
+.cl-tile span { font-size: 11.5px; color: var(--grey); }
+.cl-tile.good b { color: var(--ok); }
+.cl-tile.warn b { color: var(--clay-h); }
+.cl-checks label.cl-plaud { color: var(--clay-h); font-weight: 600; }
+.cl-claude p { color: var(--clay-h); }
+.cl-follow { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.cl-follow li { border: 1px solid var(--hair); border-radius: 10px; padding: 10px 14px; display: flex; flex-direction: column; gap: 4px; }
+.cl-follow p { margin: 0; font-size: 14px; }
+.cl-claude-line { color: var(--ink); }
 @media (max-width: 560px) { .cl-step, .cl-row { grid-template-columns: 1fr; gap: 2px; } }

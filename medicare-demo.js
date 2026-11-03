@@ -87,6 +87,7 @@ async function getAll() {
     portals: { rows: copy(state.portals) },
     log: { rows: copy(state.log) },
     calls: { rows: copy(state.calls) },
+    callSessions: { rows: copy(state.callSessions) },
   };
 }
 const find = (t, i) => { const r = state[t].find((x) => x.id === i); if (!r) throw Object.assign(new Error("not found"), { status: 404 }); return r; };
@@ -101,6 +102,9 @@ async function createContent({ title, kind, brief, campaign, image }) {
 async function updatePartner(i, f) { return copy(Object.assign(find("partners", i), f)); }
 async function updatePortal(i, f) { return copy(Object.assign(find("portals", i), f)); }
 async function updateCall(i, f) { return copy(Object.assign(find("calls", i), f)); }
+state.callSessions = [];
+async function createCallSession(f) { const r = { id: "sess" + (state.callSessions.length + 1), ended: null, ...f }; state.callSessions.unshift(r); return copy(r); }
+async function updateCallSession(i, f) { return copy(Object.assign(find("callSessions", i), f)); }
 async function fileUrl() { return null; }
 
-module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, updatePortal, updateCall, fileUrl };
+module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, updatePortal, updateCall, createCallSession, updateCallSession, fileUrl };
