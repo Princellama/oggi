@@ -15,6 +15,7 @@ if (!DEMO && !process.env.NOTION_TOKEN) {
 }
 const store = DEMO ? require("./demo") : require("./notion");
 const mstore = DEMO ? require("./medicare-demo") : require("./medicare");
+const cstore = DEMO ? require("./cpa-demo") : require("./cpa");
 const fstore = DEMO ? require("./flown-demo") : require("./flown");
 
 const PORT = process.env.PORT || 8080;
@@ -496,6 +497,56 @@ app.get("/flown", (req, res) => {
 app.get(["/medicare", "/medicare/*"], (req, res) => {
   res.set("Cache-Control", "no-cache");
   res.sendFile(path.join(__dirname, "public", "medicare.html"));
+});
+
+// ---------- /cpa ----------
+const CPA = {
+  entity: ["S corp", "LLC", "Sole prop", "C corp", "Partnership", "Individual", "Trust"],
+  cadence: ["Monthly", "Quarterly", "Annual", "As needed"],
+  services: ["Bookkeeping", "Payroll", "GE tax", "Estimates", "Business return", "Personal return", "Advisory", "Sales tax"],
+  cstatus: ["Active", "Paused", "Former"],
+  type: ["Monthly", "Quarterly", "Year-end", "Annual", "Ad hoc"],
+  mstatus: ["Planned", "Prepped", "Held", "Followed up", "Cancelled"],
+};
+const bad = (m) => Object.assign(new Error(m), { status: 400 });
+const isUrl = (v) => v === null || /^https?:\/\/\S+$/.test(String(v));
+const isWhen = (v) => v === null || /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?([+-]\d{2}:\d{2}|Z)?)?$/.test(String(v));
+function cpaClientFields(b) {
+  const f = {};
+  if ("name" in b) { f.name = String(b.name || "").trim().slice(0, 140); if (!f.name) throw bad("name"); }
+  if ("owner" in b) f.owner = String(b.owner || "").slice(0, 140);
+  for (const [k, list] of [["entity", CPA.entity], ["cadence", CPA.cadence], ["status", CPA.cstatus]]) if (k in b) { if (b[k] && !list.includes(b[k])) throw bad(k); f[k] = b[k] || null; }
+  if ("services" in b) f.services = (Array.isArray(b.services) ? b.services : []).filter((x) => CPA.services.includes(x));
+  if ("through" in b) { if (!isDay(b.through || null)) throw bad("through"); f.through = b.through || null; }
+  for (const k of ["ytdRevenue", "ytdNet", "projectedNet", "priorTax", "fedPaid", "statePaid", "withholding"]) if (k in b) {
+    const v = b[k] === "" || b[k] == null ? null : Number(b[k]); if (v !== null && (!Number.isFinite(v) || Math.abs(v) > 1e9)) throw bad(k); f[k] = v;
+  }
+  for (const k of ["estimateCall", "watch", "notes"]) if (k in b) f[k] = String(b[k] || "").slice(0, 4000);
+  for (const k of ["qbo", "taxdome"]) if (k in b) { const v = b[k] || null; if (!isUrl(v)) throw bad(k); f[k] = v; }
+  return f;
+}
+function cpaMeetingFields(b) {
+  const f = {};
+  if ("title" in b) { f.title = String(b.title || "").trim().slice(0, 140); if (!f.title) throw bad("title"); }
+  if ("when" in b) { if (!isWhen(b.when || null)) throw bad("when"); f.when = b.when || null; }
+  for (const [k, list] of [["type", CPA.type], ["status", CPA.mstatus]]) if (k in b) { if (!list.includes(b[k])) throw bad(k); f[k] = b[k]; }
+  if ("link" in b) { const v = b.link || null; if (!isUrl(v)) throw bad("link"); f.link = v; }
+  if ("client" in b) { const v = b.client || null; if (v !== null && !/^[\w-]{8,64}$/.test(String(v))) throw bad("client"); f.client = v; }
+  if ("agenda" in b) {
+    if (b.agenda === null) f.agenda = null;
+    else { if (!Array.isArray(b.agenda) || b.agenda.length > 40) throw bad("agenda"); f.agenda = b.agenda.map((x) => ({ t: String((x && x.t) || "").slice(0, 160), done: !!(x && x.done) })).filter((x) => x.t); }
+  }
+  for (const k of ["notes", "decisions", "followups"]) if (k in b) f[k] = String(b[k] || "").slice(0, 6000);
+  return f;
+}
+app.get("/api/cpa", requireAuth, wrap(async (req, res) => { res.set("Cache-Control", "no-store"); res.json(await cstore.getAll()); }));
+app.patch("/api/cpa/client/:id", requireAuth, wrap(async (req, res) => res.json(await cstore.updateClient(req.params.id, cpaClientFields(req.body)))));
+app.post("/api/cpa/client", requireAuth, wrap(async (req, res) => { const f = cpaClientFields(req.body); if (!f.name) throw bad("name"); res.json(await cstore.createClient({ status: "Active", ...f })); }));
+app.patch("/api/cpa/meeting/:id", requireAuth, wrap(async (req, res) => res.json(await cstore.updateMeeting(req.params.id, cpaMeetingFields(req.body)))));
+app.post("/api/cpa/meeting", requireAuth, wrap(async (req, res) => { const f = cpaMeetingFields(req.body); if (!f.title) throw bad("title"); res.json(await cstore.createMeeting({ status: "Planned", type: "Ad hoc", ...f })); }));
+app.get(["/cpa", "/cpa/*"], (req, res) => {
+  res.set("Cache-Control", "no-cache");
+  res.sendFile(path.join(__dirname, "public", "cpa.html"));
 });
 
 // /leadhero: a ghost page for Aaron Burton (IFG). Public on purpose (no sign-in), not linked
