@@ -98,3 +98,33 @@
   .dl { grid-template-columns: 64px 1fr; }
   .dl-who { grid-column: 2; }
 }
+
+/* after-the-meeting row */
+.actions.after { margin-top: -6px; padding-top: 10px; border-top: 1px dashed var(--hair); }
+
+/* print to PDF: only the meeting sheet prints */
+#print { display: none; }
+@media print {
+  @page { margin: 16mm 15mm; }
+  body.printing > *:not(#print) { display: none !important; }
+  body.printing { background: #fff !important; }
+  body.printing #print { display: block; color: #1d1d1b; font: 11pt/1.45 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  #print header { border-bottom: 1.5pt solid #1d1d1b; padding-bottom: 8pt; margin-bottom: 12pt; }
+  #print .kick { font-size: 8.5pt; letter-spacing: .12em; text-transform: uppercase; color: #6b6b66; margin: 0 0 2pt; }
+  #print h1 { font-family: var(--serif), Georgia, serif; font-size: 20pt; font-weight: 600; margin: 0 0 3pt; }
+  #print .meta { font-size: 10pt; color: #55554f; margin: 0; }
+  #print h2 { font-size: 9pt; letter-spacing: .1em; text-transform: uppercase; color: #55554f; margin: 14pt 0 5pt; break-after: avoid; }
+  #print p.pre { white-space: pre-wrap; margin: 0; }
+  #print ul { margin: 0; padding-left: 16pt; }
+  #print li { margin: 0 0 3pt; break-inside: avoid; }
+  #print ul.ag { list-style: none; padding: 0; }
+  #print ul.ag li { display: grid; grid-template-columns: 16pt 1fr; }
+  #print .box { display: inline-block; width: 9pt; height: 9pt; border: 0.8pt solid #55554f; font-size: 8pt; line-height: 9pt; text-align: center; margin-top: 2.5pt; }
+  #print ul.ag li.done { color: #6b6b66; }
+  #print .client { margin-top: 16pt; padding: 8pt 10pt; border: 0.8pt solid #cfcfc8; border-radius: 6pt; }
+  #print .client h2:first-child { margin-top: 0; }
+  #print .figs { display: flex; flex-wrap: wrap; gap: 6pt 18pt; margin: 2pt 0 4pt; }
+  #print .figs b { display: block; font-size: 13pt; font-variant-numeric: tabular-nums; }
+  #print .figs span { font-size: 8.5pt; color: #6b6b66; }
+  #print footer { margin-top: 18pt; font-size: 8.5pt; color: #8a8a84; }
+}

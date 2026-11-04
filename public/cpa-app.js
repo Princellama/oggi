@@ -154,6 +154,67 @@
       "Read the Notes, Decisions and Follow-ups. Make a QuickAction for each follow-up with a due date, update the client row (Estimate call, Watch, figures), " +
       "draft a short recap email to the client in my Gmail drafts, set the meeting Status to Followed up, and schedule the next meeting from the client's cadence if none exists.";
   }
+  function rowLinks(m, c) {
+    return "Meeting row: " + (m.url || "(CPA Meetings)") + "\nClient row: " + ((c && c.url) || "(CPA Clients)");
+  }
+  // Plaud → this meeting's Notes, Decisions, Follow-ups (and the client row). Oggi reads Notion, so it updates too.
+  function voicePrompt(m, c) {
+    const who = c ? c.name + (c.owner ? " (" + c.owner + ")" : "") : "a client";
+    return "Retrieve my Plaud voice notes for my CPA meeting with " + who + " on " + fmtWhen(m.when) + ".\n" + rowLinks(m, c) + "\n\n" +
+      "Read the process-captures skill and use its Plaud loop, but only for this meeting: the recording(s) made from an hour before to three hours after the meeting time, or that clearly mention " + (c ? (c.owner || c.name) : "the client") + ". " +
+      "Work from the transcript, never Plaud's summary. If none matches, or one is still transcribing, say so and change nothing.\n\n" +
+      "Then update the meeting row in Notion (Oggi reads it, so Oggi updates too):\n" +
+      "- Notes: add a \"From Plaud\" section with the time of the recording and what was discussed, in plain sentences. Keep what I already typed; add below it.\n" +
+      "- Decisions: add each decision made, one per line.\n" +
+      "- Follow-ups: add each who-does-what-by-when, one per line.\n" +
+      "- Agenda: tick the items that were covered (JSON list of {t, done}).\n" +
+      "- Status: Held, if it is still Planned or Prepped.\n" +
+      "If what was said changes the client's figures, estimate call or needs-attention list, update the client row too. Tax figures go only on these two CPA rows, never in Captures, QuickActions or Brief Items. " +
+      "Mark the capture Processed, with What it produced pointing at the meeting row. Tell me in a few lines what you added and anything you need me to confirm.";
+  }
+  // For now Claude stages the update in Oggi's Outbox; an agent that types it into TaxDome comes later.
+  function taxdomePrompt(m, c) {
+    const who = c ? c.name + (c.owner ? " (" + c.owner + ")" : "") : "a client";
+    return "Get my TaxDome update ready for " + who + " after our " + m.type.toLowerCase() + " meeting on " + fmtWhen(m.when) + ".\n" + rowLinks(m, c) +
+      (c && c.taxdome ? "\nTaxDome: " + c.taxdome : "") + "\n\n" +
+      "Read the meeting's Notes, Decisions and Follow-ups and the client row. Don't open or change TaxDome yet. " +
+      "Stage it in Oggi's Outbox: with the barayuga-notion skill, find " + (c ? (c.owner || c.name) : "the client") + " in People (near matches stop and ask), set Push to TaxDome, and write What changed so I can enter it without opening another screen: " +
+      "a short client note on the meeting, the tasks to create (title, who, due date), documents to request, and any deadline to note. " +
+      "Keep tax figures out of People; point to the CPA meeting row for amounts instead. Leave Pushed empty. Tell me in a few lines what you staged.";
+  }
+
+  // ---------- print to PDF ----------
+  // Builds a clean page of the meeting and opens the browser's print sheet (Save as PDF / Share → Save to Files on a phone).
+  function printMeeting(m) {
+    const c = clientOf(m.client);
+    const ag = agendaOf(m);
+    const lines = (s) => String(s || "").split("\n").map((x) => x.trim()).filter(Boolean);
+    const block = (title, s) => (String(s || "").trim() ? '<h2>' + esc(title) + '</h2><p class="pre">' + esc(String(s).trim()) + "</p>" : "");
+    const list = (title, s) => { const l = lines(s); return l.length ? "<h2>" + esc(title) + "</h2><ul>" + l.map((x) => "<li>" + esc(x.replace(/^[-•]\s*/, "")) + "</li>").join("") + "</ul>" : ""; };
+    const fig = (label, v) => (v == null || v === "" ? "" : "<div><b>" + money(v) + "</b><span>" + esc(label) + "</span></div>");
+    const paid = c ? (c.fedPaid || 0) + (c.statePaid || 0) + (c.withholding || 0) : 0;
+    const figs = c ? fig("YTD revenue", c.ytdRevenue) + fig("YTD net", c.ytdNet) + fig("Projected net", c.projectedNet) + fig("Prior-year tax", c.priorTax) + (paid ? fig("Paid this year", paid) : "") : "";
+    const printed = new Date().toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+    const html =
+      '<header><p class="kick">Meeting notes</p><h1>' + esc(m.title) + "</h1>" +
+      '<p class="meta">' + esc([c ? c.name : "", c && c.owner, fmtWhen(m.when), m.type, m.status].filter(Boolean).join(" · ")) + "</p></header>" +
+      (ag.length ? "<h2>Agenda</h2><ul class=\"ag\">" + ag.map((x) => '<li class="' + (x.done ? "done" : "") + '"><span class="box">' + (x.done ? "✓" : "") + "</span>" + esc(x.t) + "</li>").join("") + "</ul>" : "") +
+      block("Notes", m.notes) + list("Decisions", m.decisions) + list("Follow-ups", m.followups) +
+      (c && (figs || c.estimateCall || c.watch) ? '<div class="client"><h2>' + esc(c.name) + (c.through ? " · figures through " + esc(fmtDay(c.through, { month: "short", day: "numeric", year: "numeric" })) : "") + "</h2>" +
+        (figs ? '<div class="figs">' + figs + "</div>" : "") + block("Estimate call", c.estimateCall) + list("Needs attention", c.watch) + "</div>" : "") +
+      '<footer>Printed ' + esc(printed) + "</footer>";
+    let sheet = document.getElementById("print");
+    if (!sheet) { sheet = document.createElement("article"); sheet.id = "print"; document.body.appendChild(sheet); }
+    sheet.innerHTML = html;
+    const title = document.title;
+    const day = dayOf(m.when);
+    document.title = (m.title + (day ? " " + day : "")).replace(/[\/\\:*?"<>|]+/g, "-");
+    document.body.classList.add("printing");
+    const done = () => { document.body.classList.remove("printing"); document.title = title; window.removeEventListener("afterprint", done); };
+    window.addEventListener("afterprint", done);
+    setTimeout(() => { window.print(); setTimeout(() => { if (!window.matchMedia("print").matches) done(); }, 1500); }, 50);
+  }
+
   function agendaOf(m) { return m.agenda && m.agenda.length ? m.agenda : TEMPLATES[m.type] ? TEMPLATES[m.type].map((t) => ({ t, done: false })) : []; }
 
   function meetingCard(m, isNext) {
@@ -175,6 +236,11 @@
         '<a class="btn" href="' + esc(claude(filePrompt(m, c))) + '" target="_blank" rel="noopener">File with Claude</a>' +
         (m.brief ? '<a class="btn" href="' + esc(m.brief) + '" target="_blank" rel="noopener">Talking points</a>' : "") +
         (m.url ? '<a class="btn" href="' + esc(m.url) + '" target="_blank" rel="noopener">Notion</a>' : "") +
+      "</div>" +
+      '<div class="actions after" aria-label="After the meeting">' +
+        '<a class="btn" href="' + esc(claude(voicePrompt(m, c))) + '" target="_blank" rel="noopener">🎙 Retrieve Voice Notes</a>' +
+        '<button type="button" class="btn" data-print>⎙ Print to PDF</button>' +
+        '<a class="btn" href="' + esc(claude(taxdomePrompt(m, c))) + '" target="_blank" rel="noopener" title="Claude stages it in the Outbox; the TaxDome agent comes later">Update TaxDome</a>' +
       "</div>" +
       '<span class="lbl">Agenda' + (m.agenda ? "" : " · " + esc(m.type) + " template") + "</span>" +
       '<ul class="agenda">' + ag.map((x, i) => '<li class="' + (x.done ? "done" : "") + '"><input type="checkbox" data-ag="' + i + '"' + (x.done ? " checked" : "") + ' aria-label="Covered"><span>' + esc(x.t) + '</span><button class="x" data-agdel="' + i + '" aria-label="Remove">×</button></li>').join("") + "</ul>" +
@@ -378,6 +444,7 @@
     const card = t.closest("[data-mid]");
     if (card) {
       const m = data.meetings.find((x) => x.id === card.dataset.mid); if (!m) return;
+      if (t.closest("[data-print]")) { printMeeting(m); return; }
       const st = t.closest("[data-status]");
       if (st) { const prev = m.status; m.status = st.dataset.status; render(); try { replace("meetings", await api("PATCH", "/api/cpa/meeting/" + m.id, { status: m.status })); } catch (err) { m.status = prev; render(); alert(err.message); } return; }
       const del = t.closest("[data-agdel]");
@@ -444,5 +511,11 @@
   });
 
   load();
-  setInterval(() => { if (!document.hidden && !document.activeElement.matches("textarea, input, select")) load(); }, 120000);
+  const idle = () => !document.hidden && !document.activeElement.matches("textarea, input, select");
+  setInterval(() => { if (idle()) load(); }, 120000);
+  // Coming back from a Claude chat (voice notes, prep, file): show what it wrote straight away.
+  let lastFocusLoad = Date.now();
+  const onReturn = () => { if (idle() && Date.now() - lastFocusLoad > 15000) { lastFocusLoad = Date.now(); load(); } };
+  window.addEventListener("focus", onReturn);
+  document.addEventListener("visibilitychange", onReturn);
 })();
