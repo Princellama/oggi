@@ -152,3 +152,13 @@ body.fl { height: auto; min-height: 100%; overflow-x: hidden; }
   .fl-time.at input { width: 7.4em; }
   .fl-burst .msg { font-size: 24px; }
 }
+
+/* quotes of the day */
+.fl-quotes { margin: 0 0 18px; }
+.fl-quotes ul { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.fl-quotes .q { margin: 0; font: italic 17px/1.45 var(--serif); color: var(--ink); }
+.fl-quotes .by { margin: 2px 0 0; font-size: 12.5px; color: var(--soft); display: flex; gap: 10px; align-items: baseline; }
+.fl-quotes .by .textlink { font-size: 12px; }
+.fl-qadd { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.fl-qadd .fl-in:first-child { flex: 3 1 240px; }
+.fl-qadd .fl-in:nth-child(2) { flex: 1 1 120px; }

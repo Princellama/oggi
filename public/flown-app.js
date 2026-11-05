@@ -208,6 +208,22 @@
       h("div", {}, h("span", { class: "fl-lab", text: "Word" }), word),
       h("div", { class: "full" }, h("span", { class: "fl-lab", text: "Intention" }), intent, saved)));
 
+    // quotes of the day from the session chat
+    sess.quotes = sess.quotes || [];
+    const qText = h("input", { class: "fl-in", placeholder: "A quote from the chat", "aria-label": "Quote", maxlength: 400 });
+    const qBy = h("input", { class: "fl-in", placeholder: "Who said it", "aria-label": "Who said it", maxlength: 60 });
+    card.append(h("div", { class: "fl-quotes" },
+      h("span", { class: "fl-lab", text: "Quotes of the day" }),
+      sess.quotes.length ? h("ul", {}, ...sess.quotes.map((q, i) => h("li", {},
+        h("p", { class: "q", text: "“" + q.text + "”" }),
+        h("p", { class: "by" }, (q.by ? "— " + q.by : "") + (q.at ? " · " + q.at : ""),
+          h("button", { class: "textlink", type: "button", text: "remove", "aria-label": "Remove this quote", onclick: async () => { sess.quotes.splice(i, 1); await save(sess, { quotes: sess.quotes }); render(); } }))))) : null,
+      h("div", { class: "fl-qadd" }, qText, qBy, h("button", { class: "textlink", type: "button", text: "+ Add quote", onclick: async () => {
+        if (!qText.value.trim()) return;
+        sess.quotes.push({ text: qText.value.trim(), by: qBy.value.trim(), at: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) });
+        await save(sess, { quotes: sess.quotes }); render();
+      } }))));
+
     // the blocks
     card.append(h("span", { class: "fl-lab", text: "Focus blocks" }));
     const ul = h("ol", { class: "fl-blocks" });

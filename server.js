@@ -461,6 +461,7 @@ function sessionFields(b) {
   if ("start" in b && isTime(b.start)) { f.start = b.start || null; if ("end" in b && isTime(b.end)) f.end = b.end || null; }
   if ("breathwork" in b) f.breathwork = !!b.breathwork;
   if ("blocks" in b && Array.isArray(b.blocks)) f.blocks = b.blocks;
+  if ("quotes" in b && Array.isArray(b.quotes)) f.quotes = b.quotes;
   if ("status" in b && ["Planned", "Done", "Skipped"].includes(b.status)) f.status = b.status;
   if ("calendarId" in b) f.calendarId = b.calendarId ? String(b.calendarId).slice(0, 200) : null;
   return f;

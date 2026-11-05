@@ -36,6 +36,16 @@ function cleanBlocks(list) {
   }));
 }
 
+// Quotes of the day from the session chat: JSON after a "quotes: " prefix, like Blocks.
+function parseQuotes(s) {
+  const txt = String(s || ""), i = txt.indexOf("[");
+  if (i < 0) return [];
+  try { const a = JSON.parse(txt.slice(i)); return Array.isArray(a) ? cleanQuotes(a) : []; } catch { return []; }
+}
+const cleanQuotes = (list) => (Array.isArray(list) ? list : []).slice(0, 12).map((q) => ({
+  text: String(q.text || "").slice(0, 400), by: String(q.by || "").slice(0, 60), at: String(q.at || "").slice(0, 20),
+})).filter((q) => q.text.trim());
+
 function toSession(pg) {
   const p = pg.properties;
   return {
@@ -50,6 +60,7 @@ function toSession(pg) {
     gratitude: read(p["Gratitude"]) || "",
     breathwork: !!read(p["Breathwork"]),
     blocks: parseBlocks(read(p["Blocks"])),
+    quotes: parseQuotes(read(p["Quotes"])),
     status: read(p["Status"]) || "Planned",
     calendarId: read(p["Calendar ID"]) || null,
   };
@@ -78,6 +89,7 @@ function sessionProps(f) {
   if ("gratitude" in f) props["Gratitude"] = { rich_text: rich(f.gratitude) };
   if ("breathwork" in f) props["Breathwork"] = { checkbox: !!f.breathwork };
   if ("blocks" in f) props["Blocks"] = { rich_text: rich(JSON.stringify(cleanBlocks(f.blocks))) };
+  if ("quotes" in f) props["Quotes"] = { rich_text: rich("quotes: " + JSON.stringify(cleanQuotes(f.quotes))) };
   if ("status" in f) props["Status"] = sel(f.status);
   if ("calendarId" in f) props["Calendar ID"] = { rich_text: rich(f.calendarId || "") };
   return props;
