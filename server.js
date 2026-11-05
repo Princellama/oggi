@@ -17,6 +17,7 @@ const store = DEMO ? require("./demo") : require("./notion");
 const mstore = DEMO ? require("./medicare-demo") : require("./medicare");
 const cstore = DEMO ? require("./cpa-demo") : require("./cpa");
 const fstore = DEMO ? require("./flown-demo") : require("./flown");
+const istore = DEMO ? require("./italian-demo") : require("./italian");
 
 const PORT = process.env.PORT || 8080;
 const SECRET = process.env.SESSION_SECRET || (DEMO ? "demo-secret" : null);
@@ -492,6 +493,50 @@ app.delete("/api/flown/member/:id", requireAuth, wrap(async (req, res) => res.js
 app.get("/flown", (req, res) => {
   res.set("Cache-Control", "no-cache");
   res.sendFile(path.join(__dirname, "public", "flown.html"));
+});
+
+// ---------- /italian ----------
+// Eric's Italian lessons: the word index (counted once per day), the lessons, and a reader that
+// marks the words he already knows in anything he pastes or uploads.
+const clip = (v, n) => String(v || "").replace(/\s+/g, " ").trim().slice(0, n);
+const IT_SESSIONS = ["Wednesday night", "Sunday morning", "Extra"];
+app.get("/api/italian", requireAuth, wrap(async (req, res) => { res.set("Cache-Control", "no-store"); res.json(await istore.getAll()); }));
+app.post("/api/italian/word", requireAuth, wrap(async (req, res) => {
+  const italian = clip(req.body.italian, 120);
+  if (!italian || !/\p{L}/u.test(italian)) throw bad("italian");
+  const lessonId = req.body.lessonId ? String(req.body.lessonId).slice(0, 64) : null;
+  res.json(await istore.addWord({ italian, english: clip(req.body.english, 200), lessonId }, localDate(req)));
+}));
+app.patch("/api/italian/word/:id", requireAuth, wrap(async (req, res) => {
+  const b = req.body, f = {};
+  if ("status" in b) { if (!["New", "Learning", "Known"].includes(b.status)) throw bad("status"); f.status = b.status; }
+  for (const [k, n] of [["english", 200], ["note", 600], ["example", 400]]) if (k in b) f[k] = clip(b[k], n);
+  res.json(await istore.updateWord(req.params.id, f));
+}));
+app.post("/api/italian/seen", requireAuth, wrap(async (req, res) => {
+  const ids = Array.isArray(req.body.ids) ? [...new Set(req.body.ids.map(String))].slice(0, 150) : [];
+  res.json(await istore.markSeen(ids, localDate(req)));
+}));
+app.post("/api/italian/lesson", requireAuth, wrap(async (req, res) => {
+  const session = IT_SESSIONS.includes(req.body.session) ? req.body.session : "Extra";
+  res.json(await istore.lessonFor(localDate(req), session, clip(req.body.name, 80) || "Lesson"));
+}));
+app.patch("/api/italian/lesson/:id", requireAuth, wrap(async (req, res) => res.json(await istore.updateLesson(req.params.id, { note: clip(req.body.note, 1500) }))));
+// A PDF comes up as raw bytes; pdf.js pulls its text on the server so the page's CSP stays strict.
+app.post("/api/italian/pdf", requireAuth, express.raw({ type: "application/pdf", limit: "15mb" }), wrap(async (req, res) => {
+  if (!Buffer.isBuffer(req.body) || req.body.subarray(0, 5).toString() !== "%PDF-") throw bad("not a PDF");
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(req.body), disableFontFace: true, isEvalSupported: false, useSystemFonts: false }).promise;
+  const pages = [];
+  for (let i = 1; i <= Math.min(doc.numPages, 60); i++) {
+    const c = await (await doc.getPage(i)).getTextContent();
+    pages.push(c.items.map((it) => (it.str || "") + (it.hasEOL ? "\n" : " ")).join("").replace(/[ \t]+/g, " ").trim());
+  }
+  res.json({ text: pages.join("\n\n").slice(0, 200000), pages: doc.numPages });
+}));
+app.get("/italian", (req, res) => {
+  res.set("Cache-Control", "no-cache");
+  res.sendFile(path.join(__dirname, "public", "italian.html"));
 });
 
 app.get(["/medicare", "/medicare/*"], (req, res) => {
