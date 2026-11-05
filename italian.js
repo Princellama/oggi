@@ -9,6 +9,7 @@ const { _call: call, _read: baseRead, _rich: rich, _queryAll: queryAll } = N;
 const DS = {
   words: process.env.NOTION_ITALIAN_WORDS_DS || "18a90bd5-ea28-4fb6-b40e-952336a816f2",
   lessons: process.env.NOTION_ITALIAN_LESSONS_DS || "2dd22fd4-f3b1-4ffe-b11c-495b8314b586",
+  assign: process.env.NOTION_ITALIAN_ASSIGN_DS || "86f96ab5-9d2d-4876-8e30-54a2248112cc",
 };
 
 function read(p) {
@@ -32,15 +33,30 @@ function toWord(pg) {
 function toLesson(pg) {
   const p = pg.properties;
   return { id: pg.id, url: pg.url, name: read(p["Name"]) || "", date: read(p["Date"]), session: read(p["Session"]), note: read(p["Note"]) || "",
-    plaud: read(p["Plaud"]) || "", processed: read(p["Processed"]), words: read(p["Words"]) || [] };
+    plaud: read(p["Plaud"]) || "", processed: read(p["Processed"]), words: read(p["Words"]) || [], minutes: read(p["Minutes"]) };
 }
+function toAssign(pg) {
+  const p = pg.properties;
+  return { id: pg.id, url: pg.url, title: read(p["Title"]) || "", kind: read(p["Kind"]), from: read(p["From"]), status: read(p["Status"]),
+    body: read(p["Body"]) || "", quiz: read(p["Quiz"]) || "", answer: read(p["Answer"]) || "", correction: read(p["Correction"]) || "",
+    feedback: read(p["Feedback"]) || "", due: read(p["Due"]), score: read(p["Score"]), doneOn: read(p["Done on"]), created: pg.created_time };
+}
+// Preply lessons come from Eric's personal calendar through the Events table the brief keeps in sync.
+const isItalianEvent = (e) => /preply|italian|italiano/i.test(e.title || "");
+const minusDays = (iso, n) => { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
 
-async function getAll() {
-  const [words, lessons] = await Promise.all([
+async function getAll(today) {
+  const [words, lessons, assign, events] = await Promise.all([
     queryAll(DS.words, { sorts: [{ property: "Last seen", direction: "descending" }] }),
     queryAll(DS.lessons, { sorts: [{ property: "Date", direction: "descending" }] }),
+    queryAll(DS.assign, { filter: { property: "Kind", select: { does_not_equal: "Access" } }, sorts: [{ timestamp: "created_time", direction: "descending" }] }).catch((e) => { console.error("italian assign", e.message); return []; }),
+    N.getEvents(minusDays(today || new Date().toISOString().slice(0, 10), 75)).catch((e) => { console.error("italian events", e.message); return []; }),
   ]);
-  return { words: words.map(toWord), lessons: lessons.map(toLesson) };
+  return {
+    words: words.map(toWord), lessons: lessons.map(toLesson),
+    assignments: assign.map(toAssign).filter((a) => a.kind !== "Access"),
+    events: events.filter(isItalianEvent).map((e) => ({ id: e.id, title: e.title, start: e.start, end: e.end })),
+  };
 }
 
 const text = (v) => ({ rich_text: rich(v || "") });
@@ -101,14 +117,46 @@ function lessonProps(f) {
   if ("date" in f) o["Date"] = dateP(f.date);
   if ("session" in f) o["Session"] = { select: f.session ? { name: f.session } : null };
   if ("note" in f) o["Note"] = text(f.note);
+  if ("minutes" in f) o["Minutes"] = { number: f.minutes == null ? null : Number(f.minutes) };
   return o;
 }
-// One lesson per day: return today's if it exists, otherwise create it.
-async function lessonFor(today, session, name) {
-  const rows = await queryAll(DS.lessons, { filter: { property: "Date", date: { equals: today } } });
-  if (rows.length) return toLesson(rows[0]);
-  return toLesson(await call("POST", "/pages", { parent: { type: "data_source_id", data_source_id: DS.lessons }, properties: lessonProps({ name, date: today, session }) }));
+// One lesson row per day (and one self-study row per day): return it if it exists, otherwise create it.
+async function lessonFor(today, session, name, extra = {}) {
+  const rows = (await queryAll(DS.lessons, { filter: { property: "Date", date: { equals: today } } })).map(toLesson);
+  const self = session === "Self-study";
+  const hit = rows.find((l) => (l.session === "Self-study") === self);
+  if (hit) {
+    if (self && extra.minutes) return updateLesson(hit.id, { minutes: (hit.minutes || 0) + extra.minutes, ...(extra.note ? { note: [hit.note, extra.note].filter(Boolean).join(" · ") } : {}) });
+    return hit;
+  }
+  return toLesson(await call("POST", "/pages", { parent: { type: "data_source_id", data_source_id: DS.lessons }, properties: lessonProps({ name, date: today, session, ...extra }) }));
 }
 async function updateLesson(id, f) { return toLesson(await call("PATCH", `/pages/${id}`, { properties: lessonProps(f) })); }
 
-module.exports = { getAll, addWord, updateWord, markSeen, lessonFor, updateLesson, keyOf, DS };
+// ---- assignments, quizzes, texts, writing, requests to Claude ----
+function assignProps(f) {
+  const o = {};
+  if ("title" in f) o["Title"] = { title: rich(f.title) };
+  for (const [k, name] of [["kind", "Kind"], ["from", "From"], ["status", "Status"]]) if (k in f) o[name] = { select: f[k] ? { name: f[k] } : null };
+  for (const [k, name] of [["body", "Body"], ["quiz", "Quiz"], ["answer", "Answer"], ["correction", "Correction"], ["feedback", "Feedback"]]) if (k in f) o[name] = text(f[k]);
+  if ("due" in f) o["Due"] = dateP(f.due);
+  if ("doneOn" in f) o["Done on"] = dateP(f.doneOn);
+  if ("score" in f) o["Score"] = { number: f.score == null ? null : Number(f.score) };
+  return o;
+}
+async function getAssign(id) { return toAssign(await call("GET", `/pages/${id}`)); }
+async function createAssign(f) { return toAssign(await call("POST", "/pages", { parent: { type: "data_source_id", data_source_id: DS.assign }, properties: assignProps(f) })); }
+async function updateAssign(id, f) { return toAssign(await call("PATCH", `/pages/${id}`, { properties: assignProps(f) })); }
+
+// The teacher's PIN lives as a salted scrypt hash in one Kind = Access row, never in the clear.
+async function getAccess() {
+  const rows = await queryAll(DS.assign, { filter: { property: "Kind", select: { equals: "Access" } } });
+  return rows.length ? { id: rows[0].id, hash: read(rows[0].properties["Body"]) || "" } : null;
+}
+async function setAccess(hash) {
+  const a = await getAccess();
+  if (a) { await call("PATCH", `/pages/${a.id}`, { properties: assignProps({ body: hash, status: hash ? "Assigned" : "Archived" }) }); return; }
+  if (hash) await createAssign({ title: "Teacher access (PIN hash, do not edit)", kind: "Access", from: "Eric", status: "Assigned", body: hash });
+}
+
+module.exports = { getAll, addWord, updateWord, markSeen, lessonFor, updateLesson, getAssign, createAssign, updateAssign, getAccess, setAccess, keyOf, DS };

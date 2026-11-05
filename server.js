@@ -499,8 +499,8 @@ app.get("/flown", (req, res) => {
 // Eric's Italian lessons: the word index (counted once per day), the lessons, and a reader that
 // marks the words he already knows in anything he pastes or uploads.
 const clip = (v, n) => String(v || "").replace(/\s+/g, " ").trim().slice(0, n);
-const IT_SESSIONS = ["Wednesday night", "Sunday morning", "Extra"];
-app.get("/api/italian", requireAuth, wrap(async (req, res) => { res.set("Cache-Control", "no-store"); res.json(await istore.getAll()); }));
+const IT_SESSIONS = ["Wednesday night", "Sunday morning", "Extra", "Self-study"];
+app.get("/api/italian", requireAuth, wrap(async (req, res) => { res.set("Cache-Control", "no-store"); res.json({ ...(await istore.getAll(localDate(req))), teacherPin: !!(await teacherHash()) }); }));
 app.post("/api/italian/word", requireAuth, wrap(async (req, res) => {
   const italian = clip(req.body.italian, 120);
   if (!italian || !/\p{L}/u.test(italian)) throw bad("italian");
@@ -519,7 +519,14 @@ app.post("/api/italian/seen", requireAuth, wrap(async (req, res) => {
 }));
 app.post("/api/italian/lesson", requireAuth, wrap(async (req, res) => {
   const session = IT_SESSIONS.includes(req.body.session) ? req.body.session : "Extra";
-  res.json(await istore.lessonFor(localDate(req), session, clip(req.body.name, 80) || "Lesson"));
+  const extra = {};
+  if (session === "Self-study") {
+    const m = Math.round(Number(req.body.minutes));
+    if (!(m > 0 && m <= 600)) throw bad("minutes");
+    extra.minutes = m;
+    if (req.body.note) extra.note = clip(req.body.note, 300);
+  }
+  res.json(await istore.lessonFor(localDate(req), session, clip(req.body.name, 80) || "Lesson", extra));
 }));
 app.patch("/api/italian/lesson/:id", requireAuth, wrap(async (req, res) => res.json(await istore.updateLesson(req.params.id, { note: clip(req.body.note, 1500) }))));
 // A PDF comes up as raw bytes; pdf.js pulls its text on the server so the page's CSP stays strict.
@@ -534,7 +541,116 @@ app.post("/api/italian/pdf", requireAuth, express.raw({ type: "application/pdf",
   }
   res.json({ text: pages.join("\n\n").slice(0, 200000), pages: doc.numPages });
 }));
-app.get("/italian", (req, res) => {
+// Eric's side of assignments: requests to Claude (made on the next Italian brief), writing for the
+// teacher to correct, answers and quiz scores.
+const IT_KINDS_OWNER = ["Request", "Writing"];
+app.post("/api/italian/assign", requireAuth, wrap(async (req, res) => {
+  const kind = IT_KINDS_OWNER.includes(req.body.kind) ? req.body.kind : null;
+  if (!kind) throw bad("kind");
+  const body = String(req.body.body || "").slice(0, 6000).trim();
+  if (!body) throw bad("body");
+  res.json(await istore.createAssign({ kind, from: "Eric", status: kind === "Request" ? "Queued" : "Submitted", title: clip(req.body.title, 120) || clip(body, 60), body }));
+}));
+app.patch("/api/italian/assign/:id", requireAuth, wrap(async (req, res) => {
+  const a = await istore.getAssign(req.params.id);
+  if (!a || a.kind === "Access") throw bad("not found");
+  const b = req.body, f = {};
+  if ("answer" in b) f.answer = String(b.answer || "").slice(0, 6000);
+  if ("status" in b) { if (!["Submitted", "Done", "Archived", "Assigned"].includes(b.status)) throw bad("status"); f.status = b.status; if (b.status === "Done" || b.status === "Submitted") f.doneOn = localDate(req); }
+  if ("score" in b) { const n = Number(b.score); if (!(n >= 0 && n <= 100)) throw bad("score"); f.score = Math.round(n); }
+  if (a.from === "Eric" && "body" in b) f.body = String(b.body || "").slice(0, 6000);
+  res.json(await istore.updateAssign(a.id, f));
+}));
+
+// ---- the teacher: a PIN page at /italian/teacher, nothing else in Oggi ----
+// The PIN is set by Eric on /italian and kept as a salted scrypt hash in Notion. A teacher session is
+// its own cookie, scoped to /api/italian/t, and stops working the moment Eric changes or removes the PIN.
+let tCache = { at: 0, hash: null };
+async function teacherHash() {
+  if (Date.now() - tCache.at < 60_000) return tCache.hash;
+  const a = await istore.getAccess().catch(() => null);
+  tCache = { at: Date.now(), hash: a && a.hash ? a.hash : null };
+  return tCache.hash;
+}
+const pinVersion = (hash) => crypto.createHash("sha256").update(hash).digest("base64url").slice(0, 16);
+function checkPin(pin, hash) {
+  const [salt, want] = String(hash).split(":");
+  if (!salt || !want) return false;
+  const got = crypto.scryptSync(String(pin), Buffer.from(salt, "base64url"), 32);
+  const w = Buffer.from(want, "base64url");
+  return w.length === got.length && crypto.timingSafeEqual(got, w);
+}
+app.post("/api/italian/teacher-pin", requireAuth, wrap(async (req, res) => {
+  if (req.body.off) { await istore.setAccess(""); tCache = { at: 0, hash: null }; return res.json({ on: false }); }
+  const pin = String(req.body.pin || "").trim();
+  if (!/^\d{6,8}$/.test(pin)) throw bad("Use 6 to 8 digits.");
+  const salt = crypto.randomBytes(16);
+  await istore.setAccess(salt.toString("base64url") + ":" + crypto.scryptSync(pin, salt, 32).toString("base64url"));
+  tCache = { at: 0, hash: null };
+  res.json({ on: true });
+}));
+const tFails = new Map(); // ip -> { n, until }
+let tGlobal = { n: 0, since: Date.now(), until: 0 };
+app.post("/auth/italian-teacher", wrap(async (req, res) => {
+  const now = Date.now();
+  if (now - tGlobal.since > 3600_000) tGlobal = { n: 0, since: now, until: 0 };
+  if (tGlobal.until > now) return res.status(429).json({ error: "Too many wrong PINs. Try again in an hour." });
+  const ip = req.ip || "?";
+  const f = tFails.get(ip) || { n: 0, until: 0 };
+  if (f.until > now) return res.status(429).json({ error: `Too many wrong tries. Try again in ${Math.ceil((f.until - now) / 60000)} minutes.` });
+  const hash = await teacherHash();
+  if (!hash) return res.status(503).json({ error: "Teacher access isn't turned on." });
+  if (!checkPin(String(req.body.pin || "").trim(), hash)) {
+    f.n += 1; if (f.n >= 5) { f.until = now + 15 * 60_000; f.n = 0; }
+    tFails.set(ip, f);
+    tGlobal.n += 1; if (tGlobal.n >= 20) tGlobal.until = now + 3600_000;
+    return res.status(401).json({ error: "That PIN isn't right." });
+  }
+  tFails.delete(ip);
+  const t = sign({ k: "teacher", v: pinVersion(hash), exp: now + 120 * 24 * 3600_000 });
+  const secure = BASE_URL.startsWith("https") ? "; Secure" : "";
+  res.set("Set-Cookie", `oggi_it=${encodeURIComponent(t)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${120 * 24 * 3600}${secure}`);
+  res.json({ ok: true });
+}));
+app.post("/auth/italian-teacher/signout", (req, res) => { res.set("Set-Cookie", "oggi_it=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"); res.json({ ok: true }); });
+function requireTeacher(req, res, next) {
+  const p = verify(cookie(req, "oggi_it"));
+  if (!p || p.k !== "teacher") return res.status(401).json({ error: "pin" });
+  teacherHash().then((hash) => (hash && p.v === pinVersion(hash) ? next() : res.status(401).json({ error: "pin" })), () => res.status(502).json({ error: "failed" }));
+}
+const T_EDIT = ["Assignment", "Text", "Writing", "Quiz"];
+app.get("/api/italian/t", requireTeacher, wrap(async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  const all = await istore.getAll(localDate(req));
+  res.json({ words: all.words, lessons: all.lessons.map(({ plaud, ...l }) => l), events: all.events, assignments: all.assignments.filter((a) => T_EDIT.includes(a.kind)) });
+}));
+app.post("/api/italian/t/assign", requireTeacher, wrap(async (req, res) => {
+  const kind = ["Assignment", "Text"].includes(req.body.kind) ? req.body.kind : "Assignment";
+  const title = clip(req.body.title, 120), body = String(req.body.body || "").slice(0, 8000).trim();
+  if (!title || !body) throw bad("title and text");
+  const due = /^\d{4}-\d{2}-\d{2}$/.test(req.body.due || "") ? req.body.due : null;
+  res.json(await istore.createAssign({ kind, from: "Teacher", status: "Assigned", title, body, due }));
+}));
+app.patch("/api/italian/t/assign/:id", requireTeacher, wrap(async (req, res) => {
+  const a = await istore.getAssign(req.params.id);
+  if (!a || !T_EDIT.includes(a.kind)) throw bad("not found");
+  const b = req.body, f = {};
+  if (a.from === "Teacher") {
+    if ("title" in b) f.title = clip(b.title, 120);
+    if ("body" in b) f.body = String(b.body || "").slice(0, 8000);
+    if ("due" in b) f.due = /^\d{4}-\d{2}-\d{2}$/.test(b.due || "") ? b.due : null;
+  }
+  if ("correction" in b) f.correction = String(b.correction || "").slice(0, 8000);
+  if ("feedback" in b) f.feedback = String(b.feedback || "").slice(0, 3000);
+  if ("status" in b) { if (!["Reviewed", "Archived", "Assigned"].includes(b.status)) throw bad("status"); f.status = b.status; }
+  res.json(await istore.updateAssign(a.id, f));
+}));
+app.post("/api/italian/t/word", requireTeacher, wrap(async (req, res) => {
+  const italian = clip(req.body.italian, 120);
+  if (!italian || !/\p{L}/u.test(italian)) throw bad("italian");
+  res.json(await istore.addWord({ italian, english: clip(req.body.english, 200), lessonId: null }, localDate(req)));
+}));
+app.get(["/italian", "/italian/*"], (req, res) => {
   res.set("Cache-Control", "no-cache");
   res.sendFile(path.join(__dirname, "public", "italian.html"));
 });
