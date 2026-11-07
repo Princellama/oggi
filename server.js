@@ -18,6 +18,7 @@ const mstore = DEMO ? require("./medicare-demo") : require("./medicare");
 const cstore = DEMO ? require("./cpa-demo") : require("./cpa");
 const fstore = DEMO ? require("./flown-demo") : require("./flown");
 const istore = DEMO ? require("./italian-demo") : require("./italian");
+const feedstore = DEMO ? require("./feeding-demo") : require("./feeding");
 
 const PORT = process.env.PORT || 8080;
 const SECRET = process.env.SESSION_SECRET || (DEMO ? "demo-secret" : null);
@@ -494,6 +495,36 @@ app.delete("/api/flown/member/:id", requireAuth, wrap(async (req, res) => res.js
 app.get("/flown", (req, res) => {
   res.set("Cache-Control", "no-cache");
   res.sendFile(path.join(__dirname, "public", "flown.html"));
+});
+
+// ---------- /feeding ----------
+// The Nov 11 SCE lunch for 70 at Kingdom Hall C: dishes and cooks, supplies, the timeline, notes.
+// One Notion table (Feeding), one row per thing. Private to Eric like the rest of Oggi.
+const FEED_KINDS = ["Dish", "Supply", "Step", "Note"];
+function feedFields(b) {
+  const f = {};
+  const lim = { name: 200, who: 120, amount: 160, cat: 60, time: 40, needs: 400, notes: 4000 };
+  for (const k of Object.keys(lim)) if (k in b) f[k] = String(b[k] ?? "").slice(0, lim[k]);
+  if ("kind" in b && FEED_KINDS.includes(b.kind)) f.kind = b.kind;
+  if ("order" in b && Number.isFinite(Number(b.order))) f.order = Number(b.order);
+  if ("status" in b && ["asked", "confirmed", "cooking", "delivered"].includes(b.status)) f.status = b.status;
+  if ("source" in b && ["costco", "borrow", "have", "cook"].includes(b.source)) f.source = b.source;
+  if ("day" in b && ["prep", "event", "after"].includes(b.day)) f.day = b.day;
+  for (const k of ["got", "returned", "fixed", "done"]) if (k in b) f[k] = !!b[k];
+  if ("checks" in b && Array.isArray(b.checks)) f.checks = b.checks.map(String).slice(0, 10);
+  return f;
+}
+app.get("/api/feeding", requireAuth, wrap(async (req, res) => { res.set("Cache-Control", "no-store"); res.json(await feedstore.getAll()); }));
+app.post("/api/feeding", requireAuth, wrap(async (req, res) => {
+  const f = feedFields(req.body);
+  if (!f.kind || !f.name) return res.status(400).json({ error: "kind and name" });
+  res.json(await feedstore.create(f));
+}));
+app.patch("/api/feeding/:id", requireAuth, wrap(async (req, res) => res.json(await feedstore.update(req.params.id, feedFields(req.body)))));
+app.delete("/api/feeding/:id", requireAuth, wrap(async (req, res) => res.json(await feedstore.remove(req.params.id))));
+app.get("/feeding", (req, res) => {
+  res.set("Cache-Control", "no-cache");
+  res.sendFile(path.join(__dirname, "public", "feeding.html"));
 });
 
 // ---------- /italian ----------

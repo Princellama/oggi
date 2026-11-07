@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#2f6b3a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Oggi">
+  <title>SCE Lunch · Oggi</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/icon-180.png">
+  <link rel="preload" href="/fonts/fraunces-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/feeding.css">
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">← Oggi</a>
+  <header class="event">
+    <div class="ev-main">
+      <div class="eyebrow">SCE event lunch · Filipino</div>
+      <h1>Lunch for 70 at Kingdom Hall C</h1>
+      <div class="facts">
+        <span>📅 <b>Wed, Nov 11</b></span>
+        <span>📍 2055 Kam IV Road</span>
+        <span>🚗 Food drop-off <b class="mono">11:00–11:15 am</b></span>
+        <span>🍽️ Lunch <b class="mono">12:00 pm</b></span>
+      </div>
+    </div>
+    <div class="countdown"><div class="n mono" id="days">–</div><small id="daysLbl">days to go</small></div>
+    <div class="plates"><span class="pill">55 guests</span><span class="pill">+ 15 helpers</span><span class="pill">= 70 plates</span></div>
+  </header>
+
+  <div class="progress" aria-label="Progress">
+    <div class="stat"><b class="mono" id="pDish">0/0</b><span>dishes confirmed</span><div class="bar"><i id="bDish"></i></div></div>
+    <div class="stat"><b class="mono" id="pItem">0/0</b><span>supplies in hand</span><div class="bar"><i id="bItem"></i></div></div>
+    <div class="stat"><b class="mono" id="pRet">0</b><span>borrowed to return</span><div class="bar"><i id="bRet"></i></div></div>
+  </div>
+
+  <div id="banner" class="banner" hidden></div>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="dishes" aria-selected="true">🍲 Dishes</button>
+    <button role="tab" data-tab="supplies" aria-selected="false">🛒 Supplies</button>
+    <button role="tab" data-tab="dayof" aria-selected="false">⏱️ Timeline</button>
+    <button role="tab" data-tab="notes" aria-selected="false">📝 Notes</button>
+  </nav>
+
+  <section id="tab-dishes">
+    <div class="sechead"><h2>Menu &amp; cooks</h2><p class="hint">Tap the status to move it along. Tap a check-in once it's settled with the cook.</p></div>
+    <div id="flags"></div>
+    <div class="dishes" id="dishList"><div class="empty">Loading the menu…</div></div>
+    <form class="add" id="addDish">
+      <input type="text" id="dName" placeholder="Add a dish" aria-label="Dish">
+      <input type="text" id="dWho" placeholder="Cook" aria-label="Cook">
+      <button class="btn" type="submit">Add</button>
+    </form>
+  </section>
+
+  <section id="tab-supplies" hidden>
+    <div class="sechead"><h2>Supplies</h2><p class="hint">Quantities are starting suggestions for 70. Adjust them.</p></div>
+    <div class="filters" id="filters">
+      <button data-f="all" class="on">All</button>
+      <button data-f="costco">🛒 Costco list</button>
+      <button data-f="borrow">🤝 Borrow</button>
+      <button data-f="have">🏠 Have it</button>
+      <button data-f="cook">👩‍🍳 Cooks bring</button>
+      <button data-f="open">Still needed</button>
+    </div>
+    <div id="itemList"><div class="empty">Loading supplies…</div></div>
+    <form class="add" id="addItem">
+      <input type="text" id="newName" placeholder="Add a supply, e.g. extension cord" aria-label="Supply name">
+      <input type="text" id="newQty" placeholder="Qty" aria-label="Quantity">
+      <select id="newSrc" aria-label="Where it comes from"><option value="costco">Costco</option><option value="borrow">Borrow</option><option value="have">Have it</option><option value="cook">Cooks bring</option></select>
+      <button class="btn" type="submit">Add</button>
+    </form>
+  </section>
+
+  <section id="tab-dayof" hidden>
+    <div class="sechead"><h2>Timeline</h2><p class="hint">Times in red are fixed. The rest are suggestions, so edit freely.</p></div>
+    <div class="tl" id="tlList"><div class="empty">Loading the timeline…</div></div>
+    <form class="add" id="addStep">
+      <input type="text" id="stWhat" placeholder="Add a step" aria-label="Step">
+      <input type="text" id="stTime" placeholder="Time" aria-label="Time">
+      <select id="stDay" aria-label="When"><option value="prep">Before</option><option value="event">Nov 11</option><option value="after">After</option></select>
+      <button class="btn" type="submit">Add</button>
+    </form>
+  </section>
+
+  <section id="tab-notes" hidden>
+    <div class="sechead"><h2>Notes</h2><p class="hint">Saves as you type.</p></div>
+    <label class="f">Cook check-in notes<textarea id="note-cooks" rows="7" placeholder="What each cook said, what they need, who's buying what…"></textarea></label>
+    <label class="f">Venue &amp; setup<textarea id="note-venue" rows="4" placeholder="Kitchen access, tables, outlets, who has the key…"></textarea></label>
+    <label class="f">Money &amp; receipts<textarea id="note-money" rows="4" placeholder="Costco total, who to reimburse…"></textarea></label>
+    <p class="saved" id="noteSaved" aria-live="polite"></p>
+  </section>
+</div>
+<script src="/feeding-app.js"></script>
+</body>
+</html>
