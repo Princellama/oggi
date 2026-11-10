@@ -581,7 +581,7 @@
 
     // bottom band
     const bot = h("div", { class: "wrap" });
-    if (!evening) bot.append(xteinkBlock());
+    bot.append(xteinkBlock());
     const open = openNeeds();
     bot.append(h("div", { class: "mapblock" },
       h("h2", { class: "sec", text: evening ? "Where the rest of it sits" : "Where today sits" }),
