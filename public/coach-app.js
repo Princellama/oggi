@@ -1,0 +1,182 @@
+/* Oggi · /coach — Roger, Eric's coach. Morning: his note, last night's win, the day's screens with his pick.
+   Evening: a short checkout, one question at a time, saved to the Daily Log in Notion. Roger answers overnight. */
+(function () {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  function h(tag, attrs, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v == null || v === false) continue;
+      if (k === "class") el.className = v;
+      else if (k === "text") el.textContent = v;
+      else if (k === "value") el.value = v;
+      else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v === true ? "" : v);
+    }
+    for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+    return el;
+  }
+  const pad = (n) => String(n).padStart(2, "0");
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+  const fmtDay = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  function toast(t) { const el = $("#toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 2200); }
+  async function api(method, url, body) {
+    const r = await fetch(url, { method, credentials: "same-origin", headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
+    if (r.status === 401) { location.href = "/"; throw new Error("signin"); }
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }
+  const HABITS = [["Bible reading", "Bible reading"], ["Walk", "Walk 30 min"], ["Workout", "Workout"], ["Italian", "Italian"],
+    ["No phone first hour", "No phone 1st hour"], ["Bed by 10", "Bed by 10"], ["Reading", "Read my book"], ["Veg at 2 meals", "Veg at 2 meals"]];
+  const GROW = /habit|discipline|mindset|productiv|leader|business|develop|sales|finance|money|focus|growth/i;
+  const S = { data: null, screens: [], mode: new Date().getHours() < 14 ? "morning" : "evening", step: 0, draft: {} };
+
+  function roger(text, label) {
+    return h("div", { class: "roger" }, h("img", { src: "/icons/roger.svg", alt: "Roger" }), h("div", { class: "say" }, h("small", { text: label || "Roger" }), text));
+  }
+  function modes() {
+    const m = $("#modes"); m.textContent = "";
+    for (const [k, t] of [["morning", "Morning"], ["evening", "Evening checkout"]])
+      m.append(h("button", { type: "button", "aria-pressed": String(S.mode === k), text: t, onclick: () => { S.mode = k; S.step = 0; render(); } }));
+  }
+
+  // ---------------- morning ----------------
+  function pickOf() {
+    const t = S.data.today, raw = (t && t.rogerPick) || "";
+    const [kind, why] = raw.split("|");
+    const fromJiro = S.screens.find((s) => s.pick);
+    return kind ? { kind: kind.trim(), why: (why || "").trim() } : fromJiro ? { kind: fromJiro.kind, why: fromJiro.why || "" } : null;
+  }
+  function screensCard() {
+    const card = h("div", { class: "co-card" }, h("h3", { text: "Today's XTEINK screens" }));
+    if (!S.screens.length) { card.append(h("p", { class: "quiet", text: "No screens yet. The 4:41 job makes them." })); return card; }
+    const pick = pickOf();
+    const row = h("div", { class: "xt-row" });
+    for (const s of S.screens) {
+      const on = pick && pick.kind === s.kind;
+      row.append(h("figure", { class: "xt-card" + (on ? " pick" : "") },
+        on ? h("span", { class: "star", text: "★ Roger's pick" }) : null,
+        h("img", { src: `/api/xteink/${s.kind}.png?d=${s.day}`, alt: s.label, loading: "lazy" }),
+        h("figcaption", { text: s.label }),
+        h("a", { class: "btn small" + (on ? "" : " ghost"), href: `/api/xteink/${s.kind}.bmp?d=${s.day}`, download: `${s.kind}-${s.day}.bmp`, text: "Download" })));
+    }
+    card.append(row);
+    if (pick && pick.why) card.append(h("p", { class: "quiet", style: "margin-top:10px", text: "★ " + pick.why }));
+    return card;
+  }
+  function morning(main) {
+    const { today: t, yesterday: y, streaks } = S.data;
+    const note = t && t.rogerMorning;
+    const fallback = "Good morning, Eric. " + (y && y.win ? `Yesterday you managed this: ${y.win} Well done. ` : "") + (y && y.tomorrow ? `You said today's one thing is: ${y.tomorrow}` : "Pick one thing that moves the needle, and do that first.");
+    main.append(roger(note || fallback, "Roger · " + fmtDay(today())));
+    if (y && y.tomorrow) main.append(h("div", { class: "co-card" }, h("h3", { text: "Today's one thing" }), h("p", { text: y.tomorrow })));
+    if (y && y.win) main.append(h("div", { class: "co-card co-win" }, h("h3", { text: "Yesterday's win" }), h("p", { text: y.win })));
+    if (y && (y.notes || y.apply)) main.append(h("div", { class: "co-card" }, h("h3", { text: `Last night · ${y.book || "your book"}${y.chapter ? " · " + y.chapter : ""}` }),
+      y.notes ? h("p", { text: y.notes }) : null, y.apply ? h("p", { class: "quiet", style: "margin-top:8px", text: "You'll use it: " + y.apply }) : null));
+    main.append(screensCard());
+    const st = Object.entries(streaks || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+    main.append(h("div", { class: "co-card" }, h("h3", { text: "Streaks" }),
+      st.length ? h("div", { class: "streaks" }, ...st.map(([k, n]) => h("span", null, (HABITS.find((x) => x[0] === k) || [k, k])[1] + " · ", h("b", { text: n + (n === 1 ? " day" : " days") })))) : h("p", { class: "quiet", text: "No streaks yet. Tonight's checkout starts them." })));
+  }
+
+  // ---------------- evening checkout ----------------
+  function steps() {
+    const book = (S.data.books || [])[0];
+    const list = [
+      { k: "mood", say: "Good evening, Eric. How was today, honestly?" },
+      { k: "win", say: "What was today's win? One thing that moved the needle. Small counts." },
+    ];
+    if (book) {
+      list.push({ k: "book", say: `And ${book.title}. How was it tonight? Tell me as you would at a book club: what did the chapter say, and what stuck with you?` });
+      if (GROW.test((book.themes || []).join(" ") + " " + book.title)) list.push({ k: "apply", say: "Splendid. Now, how will you put that to work this week? And is there someone you could try it with: Hazel, a client, a friend?" });
+    }
+    list.push({ k: "habits", say: "Let's tick the chain. What did you get done today?" });
+    list.push({ k: "grateful", say: "What are you grateful for today?" });
+    list.push({ k: "tomorrow", say: "Last one. What's the one thing for tomorrow? I'll put it first in the morning." });
+    list.push({ k: "done" });
+    return list;
+  }
+  async function saveDraft(fields) {
+    Object.assign(S.draft, fields);
+    try { await api("POST", "/api/coach?d=" + today(), { ...fields, d: today() }); }
+    catch (e) { toast("Couldn't save to Notion. Your answer is kept here."); throw e; }
+  }
+  function evening(main) {
+    const t = S.data.today || {}, list = steps(), st = list[S.step];
+    const val = (k) => (k in S.draft ? S.draft[k] : t[k]) || "";
+    if (t.checkedOut && S.step === 0 && !S.again) {
+      main.append(roger("You've already checked out tonight, old chap. Rest well; I'll have a word with you in the morning.", "Roger"));
+      main.append(h("button", { class: "btn ghost", type: "button", text: "Go through it again", onclick: () => { S.again = true; render(); } }));
+      return;
+    }
+    main.append(h("div", { class: "prog" }, ...list.slice(0, -1).map((_, i) => h("i", { class: i <= S.step ? "on" : "" }))));
+    const box = h("div", { class: "step" });
+    const next = async (fields) => { try { if (fields) await saveDraft(fields); S.step++; render(); window.scrollTo(0, 0); } catch {} };
+    const back = S.step > 0 ? h("button", { class: "textlink", type: "button", text: "← Back", onclick: () => { S.step--; render(); } }) : h("span");
+    if (st.k === "done") {
+      saveDraft({ checkedOut: true }).catch(() => {});
+      const d = { ...t, ...S.draft };
+      box.append(roger("Thank you, Eric. That's the day put away properly. Rest well, and I'll have a word with you in the morning.", "Roger"));
+      box.append(h("div", { class: "co-card done-list" }, h("h3", { text: "Tonight" }),
+        d.win ? h("p", null, h("b", { text: "Win" }), d.win) : null,
+        d.notes ? h("p", null, h("b", { text: (d.book || "Book") + (d.chapter ? " · " + d.chapter : "") }), d.notes) : null,
+        d.apply ? h("p", null, h("b", { text: "You'll use it" }), d.apply) : null,
+        d.grateful ? h("p", null, h("b", { text: "Grateful for" }), d.grateful) : null,
+        d.tomorrow ? h("p", null, h("b", { text: "Tomorrow's one thing" }), d.tomorrow) : null));
+      main.append(box); return;
+    }
+    box.append(roger(st.say));
+    if (st.k === "mood") {
+      const cur = val("mood");
+      box.append(h("div", { class: "moods" }, ...["Great", "Good", "Okay", "Rough"].map((m) => h("button", { type: "button", "aria-pressed": String(cur === m), text: m, onclick: () => next({ mood: m }) }))));
+      box.append(h("div", { class: "co-acts" }, back, h("button", { class: "textlink", type: "button", text: "Skip", onclick: () => next() })));
+    } else if (st.k === "habits") {
+      const cur = { ...(t.habits || {}), ...(S.draft.habits || {}) };
+      const grid = h("div", { class: "habits" });
+      for (const [k, label] of HABITS) {
+        const cb = h("input", { type: "checkbox" }); cb.checked = !!cur[k]; cb.dataset.k = k;
+        grid.append(h("label", null, cb, label));
+      }
+      const water = h("input", { class: "co-field", type: "number", min: "0", max: "20", inputmode: "numeric", placeholder: "Glasses of water", value: val("water") === "" ? "" : String(val("water")) });
+      box.append(grid, h("p", { class: "quiet", style: "margin:14px 0 6px", text: "Water (goal 8)" }), water);
+      box.append(h("div", { class: "co-acts" }, back, h("button", { class: "btn", type: "button", text: "Next", onclick: () => {
+        const hb = {}; grid.querySelectorAll("input").forEach((c) => (hb[c.dataset.k] = c.checked));
+        next({ habits: hb, water: water.value });
+      } })));
+    } else if (st.k === "book") {
+      const book = S.data.books[0];
+      const ch = h("input", { class: "co-field", type: "text", placeholder: "Chapter or pages (e.g. Ch. 3)", value: val("chapter") });
+      const ta = h("textarea", { class: "co-field", placeholder: "What did it say? What stuck with you? Tap the mic on your keyboard to talk." }, val("notes"));
+      box.append(ch, h("div", { style: "height:10px" }), ta);
+      box.append(h("div", { class: "co-acts" }, back, h("span", null,
+        h("button", { class: "textlink", type: "button", text: "Didn't read today", onclick: () => { S.step += steps()[S.step + 1] && steps()[S.step + 1].k === "apply" ? 2 : 1; render(); } }), "  ",
+        h("button", { class: "btn", type: "button", text: "Next", onclick: () => next({ book: book.title, chapter: ch.value.trim(), notes: ta.value.trim(), habits: { ...(S.draft.habits || {}), Reading: !!ta.value.trim() } }) }))));
+    } else {
+      const ta = h("textarea", { class: "co-field", placeholder: "Type or tap the mic to talk." }, val(st.k));
+      box.append(ta, h("div", { class: "co-acts" }, back, h("button", { class: "btn", type: "button", text: "Next", onclick: () => next({ [st.k]: ta.value.trim() }) })));
+    }
+    main.append(box);
+  }
+
+  function render() {
+    modes();
+    const main = $("#main"); main.textContent = "";
+    if (!S.data) { main.append(h("p", { class: "quiet", text: "One moment…" })); return; }
+    if (S.data.error === "share") {
+      main.append(roger("I can't see your Daily Log yet. In Notion, open Daily Log → ••• → Connections → add oggi, then refresh.", "Roger"));
+      return;
+    }
+    if (S.data.error) { main.append(roger("I couldn't reach Notion just now. Pull to refresh in a moment.", "Roger")); return; }
+    if (S.mode === "morning") morning(main); else evening(main);
+  }
+  async function load() {
+    try {
+      const me = await (await fetch("/auth/me", { credentials: "same-origin" })).json();
+      if (!me.signedIn) { location.href = "/"; return; }
+      const [d, sc] = await Promise.all([api("GET", "/api/coach?d=" + today()), api("GET", "/api/xteink/screens").catch(() => [])]);
+      S.data = d; S.screens = sc;
+    } catch (e) { if (e.message !== "signin") S.data = { error: "load" }; }
+    render();
+  }
+  render(); load();
+})();

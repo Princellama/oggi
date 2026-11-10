@@ -1,7 +1,7 @@
 // Cache the app shell so the brief opens with a weak signal.
 // The brief data itself is cached by the page (last good copy), never here.
-const SHELL = "oggi-shell-v43";
-const FILES = ["/", "/index.html", "/styles.css", "/app.js", "/fonts/fraunces-latin-600-normal.woff2", "/icons/icon.svg", "/manifest.webmanifest", "/medicare", "/medicare.css", "/medicare-app.js", "/medicare-data.js", "/flown", "/flown.css", "/flown-app.js", "/cpa", "/cpa.css", "/cpa-app.js", "/italian", "/italian.css", "/italian-app.js", "/feeding", "/feeding.css", "/feeding-app.js"];
+const SHELL = "oggi-shell-v44";
+const FILES = ["/", "/index.html", "/styles.css", "/app.js", "/fonts/fraunces-latin-600-normal.woff2", "/icons/icon.svg", "/manifest.webmanifest", "/medicare", "/medicare.css", "/medicare-app.js", "/medicare-data.js", "/flown", "/flown.css", "/flown-app.js", "/cpa", "/cpa.css", "/cpa-app.js", "/italian", "/italian.css", "/italian-app.js", "/feeding", "/feeding.css", "/feeding-app.js", "/coach", "/coach.css", "/coach-app.js", "/icons/roger.svg"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(SHELL).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));

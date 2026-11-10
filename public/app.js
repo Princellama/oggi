@@ -623,23 +623,26 @@
     pane.append(h("div", null, bot));
   }
 
-  // XTEINK: today's screens from JIRO, with a download for the reader (USB Mode → Pushed Images → Set as Wallpaper).
+  // XTEINK: today's screens from JIRO, Roger's pick starred, each with a download for the reader.
   let xtScreens = null, xtLoading = false;
   function xteinkBlock() {
-    const box = h("div", { class: "blk xt" }, h("h2", { class: "sec", text: "XTEINK" }));
+    const box = h("div", { class: "blk xt" }, h("h2", { class: "sec" }, "XTEINK ", h("a", { class: "xt-coach", href: "/coach", text: "· Roger's picks →" })));
     if (!xtScreens) {
       if (!xtLoading) { xtLoading = true; fetch("/api/xteink/screens", { credentials: "same-origin" }).then((r) => r.ok ? r.json() : []).catch(() => []).then((l) => { xtScreens = l; rerenderListOnly(); }); }
       box.append(h("p", { class: "quiet", text: "Loading today's screens…" }));
       return box;
     }
     if (!xtScreens.length) { box.append(h("p", { class: "quiet", text: "No screen yet. The 4:41 job makes it." })); return box; }
+    const pick = xtScreens.find((s) => s.pick);
+    if (pick && pick.why) box.append(h("div", { class: "xt-roger" }, h("img", { src: "/icons/roger.svg", alt: "Roger" }), h("p", null, h("b", { text: "Roger: " }), pick.why)));
     const row = h("div", { class: "xt-row" });
     for (const s of xtScreens) {
       const d = new Date(s.day + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-      row.append(h("figure", { class: "xt-card" },
+      row.append(h("figure", { class: "xt-card" + (s.pick ? " pick" : "") },
+        s.pick ? h("span", { class: "xt-star", text: "★ Pick" }) : null,
         h("img", { src: `/api/xteink/${s.kind}.png?d=${s.day}`, alt: `${s.label} for ${d}`, loading: "lazy" }),
         h("figcaption", null, h("b", { text: s.label }), h("span", { class: "quiet", text: " · " + d })),
-        h("a", { class: "btn small", href: `/api/xteink/${s.kind}.bmp?d=${s.day}`, download: `${s.kind}-${s.day}.bmp`, text: "Download for the X4" })));
+        h("a", { class: "btn small" + (s.pick ? "" : " ghost"), href: `/api/xteink/${s.kind}.bmp?d=${s.day}`, download: `${s.kind}-${s.day}.bmp`, text: "Download" })));
     }
     box.append(row, h("p", { class: "quiet xt-how", text: "Plug in the reader → USB Mode → drag into Pushed Images → eject → hold the file → Set as Wallpaper." }));
     return box;

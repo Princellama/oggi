@@ -18,6 +18,7 @@ const mstore = DEMO ? require("./medicare-demo") : require("./medicare");
 const cstore = DEMO ? require("./cpa-demo") : require("./cpa");
 const fstore = DEMO ? require("./flown-demo") : require("./flown");
 const istore = DEMO ? require("./italian-demo") : require("./italian");
+const coach = require("./coach");
 const feedstore = DEMO ? require("./feeding-demo") : require("./feeding");
 
 const PORT = process.env.PORT || 8080;
@@ -321,11 +322,11 @@ app.get("/api/xteink/screens", requireAuth, wrap(async (req, res) => {
   const r = await fetch(XT_BASE + "/screens.json");
   if (!r.ok) return res.json([]);
   const list = await r.json();
-  res.set("Cache-Control", "no-cache").json(list.map((s) => ({ kind: s.kind, label: s.label, day: s.day })));
+  res.set("Cache-Control", "no-cache").json(list.map((s) => ({ kind: s.kind, label: s.label, day: s.day, pick: !!s.pick, why: s.why || "" })));
 }));
 app.get("/api/xteink/:kind.:ext", requireAuth, wrap(async (req, res) => {
   const { kind, ext } = req.params;
-  if (!["dashboard", "prospecting"].includes(kind) || !["png", "bmp"].includes(ext)) return res.status(404).end();
+  if (!["dashboard", "prospecting", "cpa", "quote", "book"].includes(kind) || !["png", "bmp"].includes(ext)) return res.status(404).end();
   const r = await fetch(`${XT_BASE}/${kind === "dashboard" ? "today" : kind}.${ext}`);
   if (!r.ok) return res.status(r.status).end();
   const buf = Buffer.from(await r.arrayBuffer());
@@ -544,6 +545,28 @@ app.delete("/api/feeding/:id", requireAuth, wrap(async (req, res) => res.json(aw
 app.get("/feeding", (req, res) => {
   res.set("Cache-Control", "no-cache");
   res.sendFile(path.join(__dirname, "public", "feeding.html"));
+});
+
+// ---------- /coach (Roger) ----------
+app.get("/api/coach", requireAuth, wrap(async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  if (DEMO) return res.json({ today: null, yesterday: { day: "", win: "Two enrollments: Henry and Thelma.", rogerMorning: "", rogerPick: "", habits: {} }, streaks: {}, books: [{ title: "Atomic Habits", author: "James Clear", chapter: "", themes: ["Habits"] }] });
+  try { res.json(await coach.getAll(localDate(req))); }
+  catch (e) { if (e.status === 404 || e.status === 403) return res.json({ error: "share" }); throw e; }
+}));
+app.post("/api/coach", requireAuth, wrap(async (req, res) => {
+  const b = req.body || {}, f = {};
+  for (const k of ["win", "grateful", "book", "chapter", "notes", "apply", "tomorrow"]) if (k in b) f[k] = String(b[k] || "").slice(0, 4000);
+  if (b.habits && typeof b.habits === "object") { f.habits = {}; for (const h of coach.HABITS) if (h in b.habits) f.habits[h] = !!b.habits[h]; }
+  if ("water" in b) f.water = b.water === "" || b.water == null ? null : Math.max(0, Math.min(20, Number(b.water) || 0));
+  if ("mood" in b) { if (b.mood && !["Great", "Good", "Okay", "Rough"].includes(b.mood)) throw bad("mood"); f.mood = b.mood || null; }
+  if ("checkedOut" in b) f.checkedOut = !!b.checkedOut;
+  if (DEMO) return res.json({ ok: true });
+  res.json(await coach.save(localDate(req), f));
+}));
+app.get(["/coach", "/coach/*"], (req, res) => {
+  res.set("Cache-Control", "no-cache");
+  res.sendFile(path.join(__dirname, "public", "coach.html"));
 });
 
 // ---------- /italian ----------
