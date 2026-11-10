@@ -63,7 +63,7 @@
 
   // ---------------- state ----------------
   const S = { data: null, err: null, msg: null, tab: "overview", pulseScope: "All", pulseCarrier: "All", partnerFilter: "All", draft: { kind: "In the field" } };
-  const TABS = ["overview", "calls", "pulse", "carriers", "veterans", "campaigns", "content", "partners", "log"];
+  const TABS = ["overview", "calls", "pulse", "carriers", "specialized", "campaigns", "content", "partners", "log"];
   const PROMPTS = {
     scan: "/medicare-marketing scan — scan Hawaii and national Medicare news and the four carriers (Devoted, UHC, Humana, HMSA), and add what's new to Medicare Pulse.",
     count: "/medicare-marketing count — count leads, appointments and enrollments in GHL for each running campaign in Medicare Campaigns, and sync my kiosk and event schedule from Google Calendar into Medicare Field Days.",
@@ -77,8 +77,12 @@
 
   // ---------------- routing ----------------
   // /medicare/carriers/2027[/Devoted] is the 2027 Plans page, shown under the Carriers tab.
+  // /medicare/specialized[/veterans|/csnp] is the Specialized area; the old /medicare/veterans still lands there.
+  const SPECS = ["veterans", "csnp"];
   function routeFromPath() {
-    const [t, sub, c] = location.pathname.replace(/^\/medicare\/?/, "").split("/");
+    let [t, sub, c] = location.pathname.replace(/^\/medicare\/?/, "").split("/");
+    if (t === "veterans") { t = "specialized"; sub = "veterans"; history.replaceState({}, "", "/medicare/specialized/veterans"); }
+    if (t === "specialized") S.spec = SPECS.includes(sub) ? sub : null;
     S.sub = t === "carriers" && sub === "2027" ? "plans" : null;
     if (S.sub) S.planCarrier = decodeURIComponent(c || "") || S.planCarrier || "Devoted";
     return TABS.includes(t) ? t : "overview";
@@ -86,7 +90,8 @@
   const tabFromPath = routeFromPath;
   function go(tab, push = true, sub = null) {
     S.tab = tab; S.msg = null; S.sub = sub;
-    const path = tab === "overview" ? "/medicare" : "/medicare/" + tab + (sub === "plans" ? "/2027/" + encodeURIComponent(S.planCarrier || "Devoted") : "");
+    const path = tab === "overview" ? "/medicare" : "/medicare/" + tab + (sub === "plans" ? "/2027/" + encodeURIComponent(S.planCarrier || "Devoted") : "")
+      + (tab === "specialized" && S.spec ? "/" + S.spec : "");
     if (push) history.pushState({}, "", path);
     render();
     window.scrollTo(0, 0);
@@ -94,7 +99,7 @@
   $("#tabs").addEventListener("click", (e) => {
     const a = e.target.closest("a[data-tab]");
     if (!a || e.metaKey || e.ctrlKey) return;
-    e.preventDefault(); go(a.dataset.tab);
+    e.preventDefault(); if (a.dataset.tab === "specialized") S.spec = null; go(a.dataset.tab);
   });
   window.addEventListener("popstate", () => { const t = routeFromPath(); go(t, false, S.sub); });
 
@@ -145,7 +150,7 @@
     for (const [k, v] of otherErrors()) main.append(h("p", { class: "mc-err", text: `${k}: ${v.error}` }));
     if (S.msg) main.append(h("p", { class: "mc-msg", text: S.msg }));
     if (S.tab === "carriers" && S.sub === "plans") return plans2027(main);
-    ({ overview, calls, pulse, carriers, veterans, campaigns, content, partners, log })[S.tab](main);
+    ({ overview, calls, pulse, carriers, specialized, campaigns, content, partners, log })[S.tab](main);
   }
 
   // ---------------- overview ----------------
@@ -933,7 +938,6 @@
   }
   function veterans(main) {
     const V = MC_DATA.veterans;
-    main.append(h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Veterans" }), h("span", { class: "quiet", text: `${V.area} · 2027` })));
     main.append(h("p", { class: "mc-lede", text: "For veterans with TRICARE For Life or VA care: Medicare Advantage plans with no drug coverage, how they fit with the VA, and what to say. Show the plans only after a signed Scope." }));
     main.append(h("nav", { class: "vet-jump" }, ...[["vet-options", "Options"], ["vet-diagram", "Diagram"], ["vet-faq", "FAQ"], ["vet-script", "Script"], ["vet-email", "Email"]].map(([id, t]) =>
       h("a", { href: "#" + id, text: t, onclick: (e) => { e.preventDefault(); document.getElementById(id).scrollIntoView({ behavior: "smooth", block: "start" }); } }))));
@@ -993,6 +997,177 @@
       h("a", { class: "btn small", href: "mailto:?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(text), text: "Open in Mail" }),
       copyBtn(() => subject + "\n\n" + text, "Copy all")));
     main.append(em);
+  }
+
+  // ---------------- specialized (veterans, C-SNP) ----------------
+  const SPEC_CARDS = [
+    { k: "veterans", t: "Veterans", s: "TRICARE For Life or VA care: Medicare Advantage plans with no drug coverage, and how they fit with the VA." },
+    { k: "csnp", t: "Chronic conditions (C-SNP)", s: "Diabetes or a heart condition: who qualifies, the Med-QUEST level that picks the plan, the questions to ask." },
+  ];
+  function specialized(main) {
+    main.append(h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Specialized" }), h("span", { class: "quiet", text: "Oahu · 2027" })));
+    if (!S.spec) main.append(h("p", { class: "mc-lede", text: "Playbooks for people a regular plan doesn't fit: who qualifies, what to ask, what to say and send. Show plans only after a signed Scope." }));
+    main.append(h("div", { class: "spec-cards" + (S.spec ? " compact" : "") }, ...SPEC_CARDS.map((c) =>
+      h("a", { class: "spec-card" + (S.spec === c.k ? " on" : ""), href: "/medicare/specialized/" + c.k, "aria-current": S.spec === c.k ? "page" : "false",
+        onclick: (e) => { e.preventDefault(); S.spec = c.k; go("specialized"); } },
+        h("span", { class: "spec-t", text: c.t }), S.spec ? null : h("span", { class: "spec-s", text: c.s }), S.spec ? null : h("span", { class: "pin-go", text: "→" })))));
+    if (S.spec === "veterans") veterans(main);
+    if (S.spec === "csnp") csnp(main);
+  }
+
+  function jump(items) {
+    return h("nav", { class: "vet-jump" }, ...items.map(([id, t]) =>
+      h("a", { href: "#" + id, text: t, onclick: (e) => { e.preventDefault(); document.getElementById(id).scrollIntoView({ behavior: "smooth", block: "start" }); } })));
+  }
+  function csnpDiagram() {
+    const W = 960, laneH = 132, top = 56;
+    const lanes = [
+      { t: "QMB or QMB Plus: Med-QUEST pays Medicare copays", boxes: [["Doctor-confirmed condition", "Diabetes, heart failure or cardiovascular", "you"], ["C-SNP Plus 003", "$0 premium, richest extras", "plan"], ["Copays covered by Med-QUEST", "Food & Home Card $200/mo if they qualify", "ok"]] },
+      { t: "SLMB or QI: Med-QUEST pays only the Part B premium", boxes: [["Doctor-confirmed condition", "", "you"], ["Not 003", "They'd pay 30% specialist, $2,241 a hospital stay", "warn"], ["C-SNP Giveback Extras 006", "Flat copays, $7,800 max (or Core 004)", "plan"]] },
+      { t: "No Med-QUEST", boxes: [["Doctor-confirmed condition", "", "you"], ["C-SNP Giveback Extras 006", "$0 deductible, strong extras", "plan"], ["$90 a month back", "If they pay their own Part B", "ok"]] },
+      { t: "No qualifying condition", boxes: [["High blood pressure, cholesterol or prediabetes only", "", "you"], ["Not eligible for a C-SNP", "", "no"], ["Regular plans", "2027 Plans page", "plan"]] },
+    ];
+    const H = top + lanes.length * laneH + 24;
+    const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, class: "vd", role: "img", "aria-label": "Which Devoted plan fits, by Med-QUEST level and chronic condition" });
+    svg.append(s("text", { x: 0, y: 26, class: "vd-h" }, "Which plan: ask the Med-QUEST level first"));
+    svg.append(s("text", { x: 0, y: 46, class: "vd-s vd-left" }, "The condition gets them in the door. The Med-QUEST level decides whether 003's copays are covered."));
+    lanes.forEach((lane, i) => {
+      const y = top + i * laneH + 14;
+      svg.append(s("rect", { x: 0, y: y - 6, width: W, height: laneH - 14, rx: 12, class: "vd-lane" }));
+      svg.append(s("text", { x: 14, y: y + 14, class: "vd-l" }, lane.t));
+      const n = lane.boxes.length, gap = 34, bw = (W - 28 - gap * (n - 1)) / n, by = y + 26, bh = laneH - 52;
+      lane.boxes.forEach(([t, sub, tone], j) => {
+        const bx = 14 + j * (bw + gap);
+        svg.append(box(bx, by, bw, bh, tone, t, sub));
+        if (j < n - 1) svg.append(arrow(bx + bw + 3, bx + bw + gap - 3, by + bh / 2));
+      });
+    });
+    return svg;
+  }
+  function csnpEmail(planSpecific) {
+    const C = MC_DATA.csnp;
+    const lines = ["Hi [Name],", ""];
+    if (!planSpecific) {
+      lines.push(
+        "Thanks for talking with me. Here's the information I mentioned about Medicare plans for people managing diabetes or a heart condition.",
+        "",
+        "They're called Chronic Condition Special Needs Plans (C-SNPs). They're Medicare Advantage plans only for people with certain conditions, such as diabetes, heart failure, an irregular heartbeat like AFib, or blocked arteries. They come with a care team focused on that condition, and your doctor confirms the diagnosis when you join.",
+        "",
+        "If you get help from Med-QUEST, it can also make a big difference in what you pay, so bring your Med-QUEST letter when we meet. People with a qualifying condition can join one of these plans any time of year, not just during open enrollment.",
+        "",
+        "Straight from the source:");
+      for (const l of C.links) lines.push(`- ${l.t}: ${l.u}`);
+      lines.push("", "If you'd like to see whether one fits you, I'm happy to sit down with you and your list of doctors and medications.",
+        "", "Mahalo,", "Eric Barayuga", "(808) 256-6736");
+    } else {
+      lines.push("Thank you for meeting with me. As promised, here are the 2027 Devoted plans on Oahu for people with a qualifying chronic condition:", "");
+      for (const p of C.plans) {
+        const bits = [`${p.premium} premium`, p.giveback ? `$${p.giveback} a month back on your Part B premium` : null, `${p.deductible} medical deductible`,
+          `specialist ${p.specialist}`, `hospital ${p.inpatient}`, `out-of-pocket max ${p.moop}`, `dental ${p.dental} a year`, p.food ? `Food & Home Card ${p.food}` : null].filter(Boolean);
+        lines.push(`- Devoted ${p.name} (${p.type}): ${bits.join(", ")}.`);
+      }
+      lines.push("",
+        "Which one fits depends on your Med-QUEST level: if Med-QUEST covers your Medicare copays (QMB), the first plan's costs are mostly covered for you; if not, the second plan's flat copays are usually the better deal.",
+        "",
+        "After you join, Devoted will contact your doctor to confirm your condition. Please let your doctor's office know to expect it; if it isn't confirmed within 60 days, you'd be moved off the plan. Both are HMOs, so we'll check your doctors are in the network before you choose.",
+        "", "Mahalo,", "Eric Barayuga", "(808) 256-6736", "", MC_DATA.disclaimer);
+    }
+    return lines.join("\n");
+  }
+  function csnp(main) {
+    const C = MC_DATA.csnp;
+    main.append(h("p", { class: "mc-lede", text: "Devoted's chronic-condition plans. The condition gets someone in; their Med-QUEST level decides which plan fits. Ask the condition questions only after a signed Scope." }));
+    main.append(jump([["cs-who", "Who"], ["cs-plan", "Which plan"], ["cs-ask", "Questions"], ["cs-enroll", "Enrolling"], ["cs-find", "Find them"], ["cs-script", "Script"], ["cs-email", "Email"], ["cs-faq", "FAQ"]]));
+
+    // Who qualifies
+    const who = h("section", { class: "mc-sec", id: "cs-who" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Who qualifies" })));
+    who.append(h("div", { class: "cs-req" },
+      h("div", {}, h("b", { text: "1" }), h("span", { text: "Medicare A and B, living on Oahu (or Maui, Kauai)" })),
+      h("div", {}, h("b", { text: "2" }), h("span", { text: "One doctor-diagnosed condition from the list below" })),
+      h("div", {}, h("b", { text: "3" }), h("span", { text: "A current doctor who will confirm it within 60 days" }))));
+    who.append(h("p", { class: "mc-lede", style: "margin-top:16px", text: "Diabetes is the one you'll meet most, and the easiest to confirm. Medication clues tell you which question to ask; only the doctor's diagnosis counts." }));
+    const tbl = h("div", { class: "cs-conds" });
+    for (const c of C.conditions) tbl.append(h("article", { class: "cs-cond" }, h("h3", { text: c.c }), h("p", { text: c.note }), h("p", { class: "quiet", text: "Listen for: " + c.clues })));
+    who.append(tbl);
+    who.append(h("div", { class: "cs-not" }, h("b", { text: "Doesn't count" }), h("ul", {}, ...C.notCount.map((t) => h("li", { text: t })))));
+    main.append(who);
+
+    // Which plan
+    const ps = h("section", { class: "mc-sec", id: "cs-plan" });
+    const frame = h("div", { class: "vd-frame" });
+    const closeBtn = h("button", { class: "vd-close", type: "button", "aria-label": "Close full screen", text: "×" });
+    frame.append(closeBtn, csnpDiagram());
+    let closeFull = null;
+    closeBtn.addEventListener("click", () => closeFull && closeFull());
+    ps.append(h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Which plan" }),
+      h("button", { class: "btn small ghost", type: "button", text: "⤢ Full screen", onclick: () => { closeFull = openFull(frame, () => (closeFull = null)); } })), frame);
+    const lv = h("div", { class: "cs-levels" });
+    for (const l of C.levels) lv.append(h("article", { class: "cs-level t-" + l.tone },
+      h("div", { class: "chips" }, chip(l.lvl)), h("p", { class: "quiet", text: "Med-QUEST pays: " + l.pays }), h("h3", { text: "→ " + l.fit }), h("p", { text: l.why })));
+    ps.append(lv);
+    const grid = h("div", { class: "vet-plans", style: "margin-top:18px" });
+    for (const p of C.plans) {
+      grid.append(h("article", { class: "vplan k-Devoted" },
+        h("div", { class: "chips" }, chip("Devoted", "c-Devoted"), chip(p.type), p.isNew ? chip("New for 2027", "new") : null),
+        h("h3", { text: p.name }),
+        h("p", { class: "who", text: "Fits: " + p.fit }),
+        h("dl", {}, ...[["Premium", p.premium], ["Giveback", p.giveback ? `$${p.giveback}/mo` : null], ["Deductible", p.deductible], ["Primary care", p.pcp], ["Specialist", p.specialist],
+          ["Hospital", p.inpatient], ["ER", p.er], ["Out-of-pocket max", p.moop], ["Dental / yr", p.dental], ["Eyewear / yr", p.eyewear], ["OTC", p.otc], ["Food & Home", p.food]]
+          .filter(([, v]) => v != null).flatMap(([k, v]) => [h("dt", { text: k }), h("dd", { text: v })])),
+        h("p", { class: "who", text: p.who }),
+        h("p", { class: "quiet", text: p.id })));
+    }
+    ps.append(grid);
+    if (C.checks.length) ps.append(h("ul", { class: "vet-checks" }, ...C.checks.map((c) => h("li", { text: c }))));
+    main.append(ps);
+
+    // Questions
+    const qs = h("section", { class: "mc-sec", id: "cs-ask" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Questions to ask" }),
+      copyBtn(() => C.questions.map((g) => g.h + "\n" + g.qs.map((q) => "- " + q).join("\n")).join("\n\n"), "Copy")));
+    qs.append(h("p", { class: "mc-lede", text: "After the Scope. In this order: the Med-QUEST answer changes which plan you show." }));
+    for (const g of C.questions) qs.append(h("div", { class: "cs-qgroup" }, h("h3", { text: g.h }), h("ol", { class: "script" }, ...g.qs.map((q) => h("li", { text: q })))));
+    main.append(qs);
+
+    // Enrolling
+    const en = h("section", { class: "mc-sec", id: "cs-enroll" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Enrolling" })));
+    en.append(h("ol", { class: "script" }, ...C.steps.map((t) => h("li", { text: t }))));
+    en.append(h("div", { class: "cap" }, h("div", { class: "lab" }, h("span", { text: "For the doctor's office" }), copyBtn(() => C.doctorLine)), h("p", { class: "txt", text: C.doctorLine })));
+    main.append(en);
+
+    // Find them
+    const fd = h("section", { class: "mc-sec", id: "cs-find" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Where to find them" }),
+      ext(h("a", { class: "btn small", href: claude("Look through my Notion People (Medicare book) for possible Devoted C-SNP prospects on Oahu: people whose Notes mention Med-QUEST, QUEST, QMB or SLMB and whose HEALTH lines mention diabetes, heart failure, AFib or another arrhythmia, a stent, bypass or heart attack, a valve problem, poor leg circulation or blood clots. List them with their Med-QUEST level if known, the condition, their doctor and current plan, and which plan in Oggi /medicare/specialized/csnp fits. Don't write to GHL. Don't put health details in any brief item."), text: "Find in my book" }))));
+    fd.append(h("div", { class: "cs-find" }, ...C.find.map((f) => h("div", {}, h("h3", { text: f.h }), h("p", { text: f.t })))));
+    main.append(fd);
+
+    // Script
+    const scr = h("section", { class: "mc-sec", id: "cs-script" });
+    scr.append(h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "In the field" }), copyBtn(() => C.script.join("\n\n"), "Copy script")));
+    scr.append(h("p", { class: "mc-lede", text: "Say it, don't read it. No plan names or amounts until they've signed a Scope." }));
+    scr.append(h("ol", { class: "script" }, ...C.script.map((l) => h("li", { text: l }))));
+    main.append(scr);
+
+    // Email
+    const em = h("section", { class: "mc-sec", id: "cs-email" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Email" })));
+    em.append(filterBar(["Educational", "After a Scope"], S.csEmail || "Educational", (v) => (S.csEmail = v)));
+    const specific = S.csEmail === "After a Scope";
+    em.append(h("p", { class: "mc-lede", text: specific
+      ? "Names the plans and figures, so it's marketing: send only after a Scope for Medicare Advantage. The disclaimer is at the bottom."
+      : "Safe to send to anyone: explains C-SNPs and links the official pages. No plan names or amounts." }));
+    const text = csnpEmail(specific);
+    const subject = specific ? "Your 2027 Devoted options for diabetes and heart conditions" : "Medicare plans for people managing diabetes or a heart condition";
+    em.append(h("div", { class: "cap" }, h("div", { class: "lab" }, h("span", { text: "Subject" }), copyBtn(() => subject)), h("p", { class: "txt", text: subject })));
+    em.append(h("div", { class: "cap" }, h("div", { class: "lab" }, h("span", { text: "Body" }), copyBtn(() => text)), h("p", { class: "txt email-body", text })));
+    em.append(h("div", { class: "mc-acts" },
+      h("a", { class: "btn small", href: "mailto:?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(text), text: "Open in Mail" }),
+      copyBtn(() => subject + "\n\n" + text, "Copy all")));
+    main.append(em);
+
+    // FAQ + sources
+    const fsec = h("section", { class: "mc-sec", id: "cs-faq" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "FAQ" })));
+    for (const f of C.faq) fsec.append(h("details", { class: "faq" }, h("summary", { text: f.q }), h("p", { text: f.a })));
+    fsec.append(h("ul", { class: "vet-checks" }, ...C.links.map((l) => h("li", {}, ext(h("a", { class: "textlink", href: l.u, text: l.t }))))));
+    main.append(fsec);
   }
 
   // ---------------- 2027 plans (cheat sheet + presentation) ----------------

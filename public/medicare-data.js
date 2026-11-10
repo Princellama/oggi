@@ -1,5 +1,6 @@
 /* Oggi · /medicare — reference content that changes once a year, kept in the repo rather than Notion.
-   Veterans tab (Oahu MA-only plans for TRICARE For Life / VA) and the 2027 Plans pages.
+   Specialized tab (Veterans: Oahu MA-only plans for TRICARE For Life / VA; C-SNP: Devoted's chronic-condition
+   plans and the Med-QUEST level that decides which one) and the 2027 Plans pages.
    Figures were gathered 26 Sep–26 Oct 2026 from each carrier's 2027 plan pages, Summaries of Benefits
    and Devoted's 2027 Plans-at-a-Glance. Check the Summary of Benefits before quoting a number. */
 window.MC_DATA = {
@@ -57,6 +58,132 @@ window.MC_DATA = {
       "On Oahu there are three of them this year, all $0 premium, and some put money back in your Social Security check every month, plus dental, vision and hearing.",
       "If you see a civilian doctor, the plan pays first and TRICARE picks up the rest. Your VA stays exactly the same.",
       "If you'd like, I'll take down your name and number and set a time to compare them side by side. It only takes a few minutes, and it's free.",
+    ],
+  },
+
+  csnp: {
+    updated: "2026-11-09",
+    area: "Oahu (Honolulu County)",
+    // The two Devoted C-SNPs on Oahu for 2027. Figures from plans2027.Devoted (Devoted's 2027 at-a-glance)
+    // and medicareplans.com's 2027 page for H5397-003. Check the Summary of Benefits before quoting.
+    plans: [
+      { name: "C-SNP Plus 003", type: "HMO C-SNP", id: "H5397-003-000", fit: "QMB / QMB Plus",
+        premium: "$0", giveback: null, deductible: "$990", pcp: "$0", specialist: "30%", inpatient: "$2,241 per stay",
+        er: "$115", moop: "$9,850", dental: "$2,500", eyewear: "$300", otc: "$50 a quarter", food: "$200 a month, if they qualify",
+        who: "Rich extras, heavy cost-sharing. Works when Med-QUEST pays the Medicare copays (QMB). Without QMB, the 30% specialist and $2,241 hospital stay land on the member." },
+      { name: "C-SNP Giveback Extras 006", type: "HMO C-SNP", id: "H5397-006-000", fit: "No Med-QUEST, or SLMB / QI", isNew: true,
+        premium: "$0", giveback: 90, deductible: "$0", pcp: null, specialist: "$50", inpatient: "$490/day, days 1–5",
+        er: null, moop: "$7,800", dental: "$2,250", eyewear: "$400", otc: "$102 a quarter", food: null,
+        who: "Chronic condition but no QMB: predictable copays, $90 a month back if they pay their own Part B, strong extras." },
+    ],
+    conditions: [
+      { c: "Diabetes", note: "Type 1 or type 2. Prediabetes or “borderline sugar” does not count.",
+        clues: "Metformin, glipizide, insulin, Jardiance, Farxiga, Trulicity, Ozempic or Mounjaro for sugar; a glucose meter; A1C checks." },
+      { c: "Chronic heart failure", note: "Also called CHF or a “weak heart”.",
+        clues: "A water pill (furosemide/Lasix), Entresto, swelling in the legs, a cardiologist watching the heart's pumping." },
+      { c: "Cardiac arrhythmia", note: "AFib, flutter and other irregular heartbeats.",
+        clues: "AFib, a pacemaker, Eliquis, Xarelto or warfarin, cardioversion or an ablation." },
+      { c: "Coronary artery disease", note: "Blocked heart arteries.",
+        clues: "A stent, bypass surgery, a past heart attack, nitroglycerin, Plavix." },
+      { c: "Peripheral vascular disease", note: "Poor circulation, usually in the legs.",
+        clues: "Leg pain when walking that eases with rest, leg stents, cilostazol." },
+      { c: "Chronic venous thromboembolic disorder", note: "Blood clots that keep coming back or need ongoing treatment.",
+        clues: "DVT or a pulmonary embolism, a long-term blood thinner for clots." },
+      { c: "Valvular heart disease", note: "A heart valve problem.",
+        clues: "A valve replacement or TAVR, a murmur the cardiologist is watching." },
+    ],
+    notCount: [
+      "High blood pressure on its own",
+      "High cholesterol on its own",
+      "Prediabetes or “borderline” sugar",
+      "Ozempic or Wegovy for weight loss only, with no diabetes diagnosis",
+      "A condition the person has but no doctor has diagnosed",
+    ],
+    levels: [
+      { lvl: "QMB / QMB Plus", pays: "Part A and B premiums, deductibles and copays", fit: "C-SNP Plus 003", tone: "ok",
+        why: "Med-QUEST picks up the plan's copays, so the heavy cost-sharing doesn't reach them, and they get the extras. Most people with full QUEST medical coverage are QMB Plus; confirm it." },
+      { lvl: "SLMB / SLMB Plus / QI", pays: "The Part B premium only", fit: "C-SNP Giveback Extras 006 (or Core 004)", tone: "warn",
+        why: "They'd owe the 30% specialist, $990 deductible and $2,241 hospital stay on 003 themselves. 006 has flat copays. Note: with the Part B premium paid by the state, the giveback won't reach them." },
+      { lvl: "No Med-QUEST", pays: "Nothing", fit: "C-SNP Giveback Extras 006", tone: "plan",
+        why: "Chronic condition, too much income for QUEST: money back on Part B, $0 deductible, $7,800 cap." },
+    ],
+    questions: [
+      { h: "1 · Med-QUEST (ask first; it decides the plan)", qs: [
+        "Do you get help from Med-QUEST? Which QUEST plan is on your card (AlohaCare, HMSA QUEST, Kaiser, 'Ohana, UnitedHealthcare Community Plan)?",
+        "Has Med-QUEST sent a letter that says QMB, SLMB or Medicare Savings Program?",
+        "Is the Part B premium still taken out of your Social Security check? (If it stopped, the state pays it: at least SLMB.)",
+        "When you see the doctor, do you get bills for copays? (No bills usually means QMB.)",
+      ] },
+      { h: "2 · The condition", qs: [
+        "Has a doctor told you that you have diabetes? Not borderline, actually diagnosed?",
+        "Any heart conditions: heart failure, an irregular heartbeat or AFib, a stent, bypass or heart attack, a valve problem?",
+        "Any circulation problems in your legs, or blood clots that needed a blood thinner?",
+        "Can we go over your medications? (Listen for the clues above; they point to the question to ask, they don't prove anything.)",
+      ] },
+      { h: "3 · The doctor (Devoted needs this to keep them enrolled)", qs: [
+        "Which doctor treats it, and when did you last see them?",
+        "What's the clinic's name and phone number?",
+        "Is that doctor in Devoted's network? (It's an HMO: check before you recommend.)",
+      ] },
+      { h: "4 · What they have now", qs: [
+        "What Medicare plan are you on now? Is it the same company as your QUEST plan? (If yes, it's likely an aligned D-SNP: see the FAQ before moving them.)",
+        "Do you get Extra Help with drug costs? (Everyone with Med-QUEST does automatically.)",
+      ] },
+    ],
+    steps: [
+      "Scope of Appointment first, with Medicare Advantage (and SNPs) checked. Ask the condition questions after it's signed.",
+      "Confirm the Med-QUEST level from the letter or the QUEST plan's member services. Don't guess from what they think they have.",
+      "Check the treating doctor is in Devoted's network, and write down the clinic's name and phone for the application.",
+      "Enroll. Outside Oct 15–Dec 7, use the chronic-condition SEP: once per qualifying condition, any time of year.",
+      "Tell them Devoted will contact their doctor to confirm the condition, and that the doctor must answer within 60 days or they'll be moved off the plan. Call the clinic yourself if you know the staff.",
+      "Expect Devoted's Health Risk Assessment call within 90 days. Ask them to take it: it unlocks the care team and the Food & Home Card check.",
+    ],
+    doctorLine: "For the doctor's office: Devoted C-SNP verification, fax 1-833-434-0535, or call 1-877-762-3515 (Mon–Fri, 8–5).",
+    find: [
+      { h: "Your own book", t: "People with Med-QUEST in their notes and diabetes or a heart condition in HEALTH. Start here: they already trust you." },
+      { h: "The Longs kiosk", t: "Pharmacy pickups for test strips, insulin pens and blood thinners. Open with the general question in the script; never read anyone's prescriptions." },
+      { h: "Age-ins on QUEST", t: "Turning 65 with Med-QUEST and diabetes or a heart condition: the C-SNP is one of the first plans to show them." },
+      { h: "Partners (ideas)", t: "Diabetes education classes, cardiology and primary care offices with many QUEST patients, community health centers, low-income senior housing, adult day programs. Educational talks, no sales at the event." },
+      { h: "Current clients", t: "A client who just qualified for Med-QUEST, or was just diagnosed: they can switch with the C-SNP SEP mid-year." },
+    ],
+    script: [
+      "Do you have diabetes, or a heart condition like AFib, heart failure or a stent?",
+      "There are Medicare plans built just for people managing those, with a care team that helps you stay on top of it, and some include extra help for healthy food.",
+      "Do you get any help from Med-QUEST? It matters, because it can cover your copays on these plans.",
+      "Your doctor has to confirm the condition for you to join, so I'll take down your doctor's name too.",
+      "Let me take your name and number and set a time to go over it. It's free, and you can join these any time of year, not just in open enrollment.",
+    ],
+    faq: [
+      { q: "What is a C-SNP?",
+        a: "A Chronic Condition Special Needs Plan: a Medicare Advantage plan only for people with certain diagnosed conditions. It has a care team built around the condition and extras chosen for it. Devoted's Hawaii C-SNPs are HMOs." },
+      { q: "Which conditions does Devoted accept?",
+        a: "All Devoted C-SNPs are CMS 'Group 4': diabetes, chronic heart failure, or a cardiovascular disorder (arrhythmia, coronary artery disease, peripheral vascular disease, chronic venous thromboembolic disorder, valvular heart disease). One is enough." },
+      { q: "Which condition will I see most?",
+        a: "Diabetes. It's the most common of the three nationally, about a quarter of people over 65 have it, and it's the easiest to confirm. AFib and a past stent are the next ones to listen for." },
+      { q: "Does high blood pressure count?",
+        a: "Not by itself. It isn't on Devoted's list. Neither is high cholesterol or prediabetes. Someone with high blood pressure and AFib qualifies through the AFib." },
+      { q: "What if the doctor never confirms?",
+        a: "Devoted must move them off the plan if the condition isn't verified within 60 days. They get a special enrollment period to pick another plan, but there can be a gap. That's why you get the doctor's name and network status before enrolling." },
+      { q: "Can they join outside open enrollment?",
+        a: "Yes. Anyone with a qualifying condition has a special enrollment period to join a C-SNP for it, any time of year. It's used up once they join. (The dual/LIS monthly SEP can't be used for this: it only moves people to Original Medicare with a drug plan or an integrated D-SNP.)" },
+      { q: "Do they keep their QUEST plan?",
+        a: "Yes. Their QUEST plan keeps covering Medicaid benefits, and Devoted covers Medicare. The 2027 rule that duals' Medicare plan must match their QUEST company applies to D-SNPs, not C-SNPs. Confirm with Devoted's agent support before your first one." },
+      { q: "Should I move someone out of their QUEST D-SNP?",
+        a: "Usually not. An aligned D-SNP (same company as their QUEST plan) already has $0 cost-sharing and one plan coordinating everything. Move them only for a clear reason they can name, such as a doctor or a benefit they need." },
+      { q: "What about their drugs?",
+        a: "Everyone with Med-QUEST gets Extra Help automatically, which keeps the drug premium at $0 and copays low on either C-SNP. Run their list in the quote anyway." },
+      { q: "What's the Food & Home Card?",
+        a: "C-SNP Plus 003 has a $200 a month card for healthy food and some home costs for members who qualify (a special benefit for the chronically ill). Devoted decides who qualifies after enrollment, so don't promise it." },
+    ],
+    checks: [
+      "Hospital and specialist figures for 003 come from a third-party 2027 page; confirm them in Devoted's Summary of Benefits before quoting.",
+      "Ask Devoted's agent support how QUEST copay coverage works with a C-SNP when the doctor isn't enrolled with Med-QUEST.",
+    ],
+    links: [
+      { t: "Devoted: C-SNP qualifying conditions and verification", u: "https://www.devoted.com/providers/snp-resources/" },
+      { t: "Med-QUEST: Dual Eligible Special Needs Plans in Hawaii", u: "https://medquest.hawaii.gov/en/members-applicants/Dual-Eligible-Special-Needs-Plan.html" },
+      { t: "Medicare.gov: Special Needs Plans", u: "https://www.medicare.gov/health-drug-plans/health-plans/your-coverage-options/SNP" },
+      { t: "Medicare.gov: Medicare Savings Programs (QMB, SLMB, QI)", u: "https://www.medicare.gov/basics/costs/help/medicare-savings-programs" },
     ],
   },
 

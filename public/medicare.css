@@ -202,6 +202,34 @@ details.form:not([open]) { padding-bottom: 0; }
 .pin-s { grid-area: s; font-size: 13px; color: var(--soft); }
 .pin-go { grid-area: go; align-self: center; font-size: 22px; color: var(--devoted); }
 
+/* specialized: switcher, C-SNP */
+.spec-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 0 0 26px; }
+.spec-card { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "t go" "s go"; gap: 4px 12px; text-decoration: none; border: 1px solid #D9D0EA; border-left: 4px solid var(--devoted); border-radius: 12px; padding: 14px 18px; background: #FAF8FD; }
+.spec-card:hover { border-color: var(--devoted); }
+.spec-t { grid-area: t; font-family: var(--serif); font-weight: 600; font-size: 20px; color: var(--ink); }
+.spec-s { grid-area: s; font-size: 13px; color: var(--soft); }
+.spec-cards.compact { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.spec-cards.compact .spec-card { display: inline-block; padding: 7px 14px; border-left-width: 1px; background: transparent; }
+.spec-cards.compact .spec-t { font-family: var(--sans); font-size: 13.5px; font-weight: 600; color: var(--soft); }
+.spec-cards.compact .spec-card.on { background: var(--devoted); border-color: var(--devoted); }
+.spec-cards.compact .spec-card.on .spec-t { color: #fff; }
+.cs-req { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.cs-req div { display: flex; gap: 10px; align-items: baseline; border: 1px solid var(--hair); border-radius: 10px; padding: 12px 14px; color: var(--ink); font-size: 14.5px; }
+.cs-req b { font-family: var(--serif); font-size: 22px; color: var(--devoted); }
+.cs-conds { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+.cs-cond { border: 1px solid var(--hair); border-radius: 10px; padding: 12px 14px; }
+.cs-cond h3, .cs-level h3, .cs-qgroup h3, .cs-find h3 { font-family: var(--serif); font-weight: 600; font-size: 16.5px; color: var(--ink); margin: 0 0 6px; }
+.cs-cond p, .cs-level p, .cs-find p { margin: 0 0 6px; font-size: 13.5px; }
+.cs-not { margin-top: 14px; border: 1px dashed var(--grey); border-radius: 10px; padding: 12px 14px; font-size: 13.5px; background: #F4F3EF; }
+.cs-not b { color: var(--ink); } .cs-not ul { margin: 6px 0 0; padding-left: 18px; }
+.cs-levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 16px; }
+.cs-level { border: 1px solid var(--hair); border-top: 3px solid var(--grey); border-radius: 12px; padding: 14px 16px; }
+.cs-level.t-ok { border-top-color: var(--ok); } .cs-level.t-warn { border-top-color: var(--clay); } .cs-level.t-plan { border-top-color: var(--devoted); }
+.cs-level h3 { margin-top: 8px; }
+.cs-qgroup { margin: 0 0 18px; }
+.cs-find { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.cs-find > div { border: 1px solid var(--hair); border-radius: 10px; padding: 12px 14px; }
+
 /* veterans */
 .vet-jump { display: flex; gap: 18px; flex-wrap: wrap; margin: 0 0 26px; font-size: 13px; }
 .vet-jump a { color: var(--soft); text-decoration: underline; text-decoration-color: var(--hair); text-underline-offset: 3px; }
