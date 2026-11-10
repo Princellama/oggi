@@ -581,6 +581,7 @@
 
     // bottom band
     const bot = h("div", { class: "wrap" });
+    if (!evening) bot.append(xteinkBlock());
     const open = openNeeds();
     bot.append(h("div", { class: "mapblock" },
       h("h2", { class: "sec", text: evening ? "Where the rest of it sits" : "Where today sits" }),
@@ -620,6 +621,28 @@
     }
     if (!isDesk()) bot.append(renderChanges());
     pane.append(h("div", null, bot));
+  }
+
+  // XTEINK: today's screens from JIRO, with a download for the reader (USB Mode → Pushed Images → Set as Wallpaper).
+  let xtScreens = null, xtLoading = false;
+  function xteinkBlock() {
+    const box = h("div", { class: "blk xt" }, h("h2", { class: "sec", text: "XTEINK" }));
+    if (!xtScreens) {
+      if (!xtLoading) { xtLoading = true; fetch("/api/xteink/screens", { credentials: "same-origin" }).then((r) => r.ok ? r.json() : []).catch(() => []).then((l) => { xtScreens = l; rerenderListOnly(); }); }
+      box.append(h("p", { class: "quiet", text: "Loading today's screens…" }));
+      return box;
+    }
+    if (!xtScreens.length) { box.append(h("p", { class: "quiet", text: "No screen yet. The 4:41 job makes it." })); return box; }
+    const row = h("div", { class: "xt-row" });
+    for (const s of xtScreens) {
+      const d = new Date(s.day + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+      row.append(h("figure", { class: "xt-card" },
+        h("img", { src: `/api/xteink/${s.kind}.png?d=${s.day}`, alt: `${s.label} for ${d}`, loading: "lazy" }),
+        h("figcaption", null, h("b", { text: s.label }), h("span", { class: "quiet", text: " · " + d })),
+        h("a", { class: "btn small", href: `/api/xteink/${s.kind}.bmp?d=${s.day}`, download: `${s.kind}-${s.day}.bmp`, text: "Download for the X4" })));
+    }
+    box.append(row, h("p", { class: "quiet xt-how", text: "Plug in the reader → USB Mode → drag into Pushed Images → eject → hold the file → Set as Wallpaper." }));
+    return box;
   }
 
   function areaStrip(items) {

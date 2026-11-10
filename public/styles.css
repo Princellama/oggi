@@ -909,3 +909,11 @@ ol.items li.child { margin-left: 22px; padding-left: 12px; border-left: 1px dash
 /* FLOWN: a task pulled into a focus block today */
 .flown-chip { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; letter-spacing: .03em; color: #8a5a9e; background: rgba(164,121,226,.10); border-radius: 999px; padding: 1px 8px; text-decoration: none; white-space: nowrap; }
 .flown-chip.deep { color: #9a6b12; background: rgba(231,183,92,.18); }
+
+/* XTEINK screens on Today */
+.xt-row { display: flex; gap: 18px; flex-wrap: wrap; }
+.xt-card { margin: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.xt-card img { width: 150px; height: 250px; object-fit: cover; border: 1px solid var(--hair, #ddd); border-radius: 8px; background: #fff; }
+.xt-card figcaption { font-size: 13px; }
+.xt-how { font-size: 12.5px; margin-top: 10px; }
+.btn.small { padding: 7px 12px; font-size: 13px; }

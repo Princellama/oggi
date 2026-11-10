@@ -315,6 +315,25 @@ app.post("/api/edits/clear", requireAuth, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ---------- XTEINK screens (images live on JIRO; proxied so the token stays server-side) ----------
+const XT_BASE = process.env.XTEINK_URL || "https://jiro.princellama.com/xt/" + (process.env.XTEINK_TOKEN || "zjxvj8Eulmkq");
+app.get("/api/xteink/screens", requireAuth, wrap(async (req, res) => {
+  const r = await fetch(XT_BASE + "/screens.json");
+  if (!r.ok) return res.json([]);
+  const list = await r.json();
+  res.set("Cache-Control", "no-cache").json(list.map((s) => ({ kind: s.kind, label: s.label, day: s.day })));
+}));
+app.get("/api/xteink/:kind.:ext", requireAuth, wrap(async (req, res) => {
+  const { kind, ext } = req.params;
+  if (!["dashboard", "prospecting"].includes(kind) || !["png", "bmp"].includes(ext)) return res.status(404).end();
+  const r = await fetch(`${XT_BASE}/${kind === "dashboard" ? "today" : kind}.${ext}`);
+  if (!r.ok) return res.status(r.status).end();
+  const buf = Buffer.from(await r.arrayBuffer());
+  res.set("Cache-Control", "no-cache").set("Content-Type", ext === "png" ? "image/png" : "image/bmp");
+  if (ext === "bmp") res.set("Content-Disposition", `attachment; filename="${kind}-${req.query.d || "today"}.bmp"`);
+  res.send(buf);
+}));
+
 // ---------- /medicare ----------
 const CARRIERS = ["Devoted", "UHC", "Humana", "HMSA", "CMS", "Other"];
 const strOrNull = (v, max) => (v == null || v === "" ? null : String(v).slice(0, max));
