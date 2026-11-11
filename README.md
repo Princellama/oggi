@@ -38,6 +38,8 @@ Claude (brief skill) ──writes──▶ Notion: Brief Days + Brief Items ◀�
 
 ## Fit (/fit)
 
+Both coaches talk: their lines print out at a talking pace (a beat at each full stop), and a tap on the bubble shows the whole line (`public/typewriter.js`; reduced-motion shows it at once, and a line types only once per visit).
+
 Eric's training, coached by **London** (a former European gymnastics champion in his fifties; portrait `public/icons/london.svg`, drawn to match Roger). Added 10 Nov 2026. Same sign-in; **Fit** in the bottom nav. Roger leaves workouts to him.
 
 - **Today** (`/fit`): the day's session from the Lean & Aesthetic plan (Upper A Mon, Lower A Tue, Upper B Thu, Lower B Fri; walks Wed and Sat; Sunday check-in). Every exercise shows last time's sets and London's call, worked out from the Workout Log: all sets at the top of the range → go up by the exercise's increment; first set under the range → drop; otherwise same weight, beat the total reps. Weeks 1–2 and the deload weeks (6, 12) are two sets. **How to do it** shows the cues, **Swap** cycles to an alternative (kept on the device). Ticking a set saves it and starts the rest timer (2½ min big lifts, 75 s small; +30s, Skip, a buzz at zero). **Finish session** ticks Workout on the Daily Log and London debriefs: new bests (estimated one-rep max), volume against last time, what's left today, the next session. On a walk day he offers to make up a session missed earlier in the week. Before 16 Nov it is the reset week: habits and a preview of Monday.

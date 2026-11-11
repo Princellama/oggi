@@ -33,7 +33,7 @@
   const S = { data: null, screens: [], mode: (() => { const hr = new Date().getHours(); return hr < 12 ? "morning" : hr < 18 ? "afternoon" : "evening"; })(), step: 0, draft: {} };
 
   function roger(text, label) {
-    return h("div", { class: "roger" }, h("img", { src: "/icons/roger.svg", alt: "Roger" }), h("div", { class: "say" }, h("small", { text: label || "Roger" }), text));
+    return h("div", { class: "roger" }, h("img", { src: "/icons/roger.svg", alt: "Roger" }), h("div", { class: "say" }, h("small", { text: label || "Roger" }), window.OggiSay ? window.OggiSay(text) : text));
   }
   function modes() {
     const m = $("#modes"); m.textContent = "";

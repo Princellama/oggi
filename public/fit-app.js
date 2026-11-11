@@ -44,7 +44,7 @@
   const S = { data: null, mode: modeFromPath(), pick: null, open: {}, swaps: keep("swaps") || {}, finished: false };
 
   function london(text, label) {
-    return h("div", { class: "roger" }, h("img", { src: "/icons/london.svg", alt: "London" }), h("div", { class: "say" }, h("small", { text: label || "London" }), text));
+    return h("div", { class: "roger" }, h("img", { src: "/icons/london.svg", alt: "London" }), h("div", { class: "say" }, h("small", { text: label || "London" }), window.OggiSay ? window.OggiSay(text) : text));
   }
   function modes() {
     const m = $("#modes"); m.textContent = "";

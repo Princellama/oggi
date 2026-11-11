@@ -55,3 +55,10 @@ input.co-field { min-height: 0; }
 .grind-clock { font: 600 64px/1.1 var(--serif); font-variant-numeric: tabular-nums; color: var(--ink); margin: 14px 0 4px; }
 @media (max-width: 420px) { .co-modes button { padding: 6px 10px; } }
 .pm-restart { margin-top: 28px; text-align: center; }
+/* the coaches talking: the full line is laid out invisibly so the bubble keeps its size, and the typed line sits on top */
+.tw { position: relative; display: block; }
+.tw-ghost { visibility: hidden; }
+.tw-live { position: absolute; inset: 0; }
+.tw:not(.done) .tw-live::after { content: ""; display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px; background: currentColor; opacity: .55; animation: tw-blink .9s steps(1) infinite; }
+.tw:not(.done) { cursor: pointer; }
+@keyframes tw-blink { 50% { opacity: 0; } }
