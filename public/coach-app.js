@@ -1,5 +1,5 @@
 /* Oggi · /coach — Roger, Eric's coach. Morning: his note, last night's win, the day's screens with his pick.
-   Afternoon: what's done since morning (read from today's brief), what's left, and one timed push on the next thing.
+   Afternoon: half-time with Roger. The one thing for today (a timed push if it isn't done), then one habit still in reach.
    Evening: a short checkout, one question at a time, saved to the Daily Log in Notion. Roger answers overnight. */
 (function () {
   "use strict";
@@ -30,7 +30,7 @@
   const HABITS = [["Bible reading", "Bible reading"], ["Walk", "Walk 30 min"], ["Workout", "Workout"], ["Italian", "Italian"],
     ["No phone first hour", "No phone 1st hour"], ["Bed by 10", "Bed by 10"], ["Reading", "Read my book"], ["Veg at 2 meals", "Veg at 2 meals"]];
   const GROW = /habit|discipline|mindset|productiv|leader|business|develop|sales|finance|money|focus|growth/i;
-  const S = { data: null, screens: [], mode: (() => { const hr = new Date().getHours(); return hr < 12 ? "morning" : hr < 18 ? "afternoon" : "evening"; })(), step: 0, draft: {}, brief: null };
+  const S = { data: null, screens: [], mode: (() => { const hr = new Date().getHours(); return hr < 12 ? "morning" : hr < 18 ? "afternoon" : "evening"; })(), step: 0, draft: {} };
 
   function roger(text, label) {
     return h("div", { class: "roger" }, h("img", { src: "/icons/roger.svg", alt: "Roger" }), h("div", { class: "say" }, h("small", { text: label || "Roger" }), text));
@@ -82,101 +82,108 @@
 
 
   // ---------------- afternoon check-in ----------------
-  // Reads today's brief (Brief Items + the day's events) and the Daily Log. Nothing new is stored:
-  // finishing the push marks the item done the same way Today does, so the evening brief sees it.
+  // Not another Today. Roger asks about two things only: the one thing Eric chose for today (his goal),
+  // and one habit still in reach this afternoon (his character). The habit tick saves to the Daily Log.
   const GRIND_KEY = "oggi.coach.grind";
-  const store = {
+  const keep = {
     get() { try { return JSON.parse(localStorage.getItem(GRIND_KEY) || "null"); } catch { return null; } },
     set(v) { try { v ? localStorage.setItem(GRIND_KEY, JSON.stringify(v)) : localStorage.removeItem(GRIND_KEY); } catch {} },
   };
-  const isJob = (i) => !String(i.key || "").startsWith("r-");
-  const fmtTime = (d) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  const AREA = { CPA: "CPA", Medicare: "Medicare", Money: "Money", Personal: "Personal" };
-  function dayState() {
-    const b = S.brief || { day: null, items: [] }, t = today();
-    const all = (b.items || []).concat(b.recent || []);
-    const doneToday = all.filter((i) => isJob(i) && i.status === "Closed" && (i.closedOn === t || (!i.closedOn && i.lastSeen === t && b.day && b.day.date === t)));
-    const closedForYou = (b.items || []).filter((i) => !isJob(i) && i.status === "Closed" && b.day && b.day.date === t);
-    const open = (b.items || []).filter((i) => isJob(i) && i.status !== "Closed" && i.list !== "Resolved" && !i.delegatedTo && i.decision !== "Let go");
-    const ready = open.filter((i) => !i.waitingOn);
-    const waiting = open.filter((i) => i.waitingOn);
-    const now = Date.now();
-    const events = ((b.day && b.day.events) || []).filter((e) => e.start && Date.parse(e.start) > now && !/optional/i.test(e.title || "")).sort((a, c) => Date.parse(a.start) - Date.parse(c.start));
-    return { doneToday, closedForYou, ready, waiting, next: events[0] || null, stale: !b.day || b.day.date !== t };
+  const fmtTime = (d) => d.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true }).replace(" ", "").toLowerCase();
+  // Habits that can still be kept after lunch, and how Roger raises each.
+  const PM = {
+    "Walk": "Have you had your walk today?",
+    "Workout": "Have you trained today?",
+    "Bible reading": "Have you had your Bible reading today?",
+    "Italian": "Have you done your Italian today?",
+    "Reading": "Have you read any of your book today?",
+    "Veg at 2 meals": "Have you had your veg at two meals today?",
+    "No sugary drinks": "Have you stayed off the sugary drinks today?",
+  };
+  const lc = (t) => t.replace(/[.\s]+$/, "").replace(/^([A-Z])(?=[a-z])/, (m) => m.toLowerCase());
+  function oneThing() {
+    const y = S.data.yesterday, t = S.data.today;
+    return (y && y.tomorrow ? y.tomorrow : "").trim() || (S.pmThing || "");
   }
-  // Roger's pick for the next push: a lit supernova first, then the brief's own order.
-  function suggest(ready) {
-    const lit = ready.filter((i) => i.novaStart && !i.novaCooled);
-    const pool = lit.length ? lit : ready;
-    return pool.slice().sort((a, b) => (a.order ?? 99) - (b.order ?? 99))[0] || null;
-  }
-  function names(list, n) {
-    const ts = list.slice(0, n).map((i) => i.mapLabel || i.title);
-    if (list.length > n) ts.push(`${list.length - n} more`);
-    return ts.length < 2 ? ts.join("") : ts.slice(0, -1).join(", ") + " and " + ts[ts.length - 1];
-  }
-  function afternoonNote(st) {
-    const y = S.data.yesterday, td = S.data.today;
-    const parts = ["Good afternoon, Eric."];
-    if (st.doneToday.length) parts.push(`${["", "One thing", "Two things", "Three things", "Four things", "Five things", "Six things"][st.doneToday.length] || st.doneToday.length + " things"} off the list since this morning: ${names(st.doneToday, 3)}. Splendid.`);
-    else if (td && td.win) parts.push(`You've a win on the board already: ${td.win}`);
-    else parts.push("Nothing crossed off yet, which only means the best of the day is still ahead of you.");
-    if (y && y.tomorrow) parts.push(`This morning's one thing was ${y.tomorrow.replace(/[.\s]+$/, "")}.`);
-    if (st.next) {
-      const mins = Math.round((Date.parse(st.next.start) - Date.now()) / 60000);
-      parts.push(mins >= 20 ? `You've clear runway until ${fmtTime(new Date(st.next.start))}. Let's spend it on one thing.` : `${st.next.title} is in ${mins} minutes, so let's keep the next push short.`);
-    } else if (st.ready.length) parts.push("Nothing else on the calendar today. One proper push now, and the evening is yours.");
-    return parts.join(" ");
-  }
-  function itemLine(i, extra) {
-    return h("li", null, h("span", { class: "t", text: i.mapLabel || i.title }), i.area ? h("span", { class: "tag", text: AREA[i.area] || i.area }) : null, extra || null);
+  function habitToAsk() {
+    const done = { ...((S.data.today && S.data.today.habits) || {}), ...(S.draft.habits || {}) };
+    const streaks = S.data.streaks || {};
+    const open = Object.keys(PM).filter((k) => !done[k] && !(S.pmSkipped || []).includes(k));
+    // the one with the longest chain to protect comes first; a habit at nought is still worth starting
+    return open.sort((a, b) => (streaks[b] || 0) - (streaks[a] || 0))[0] || null;
   }
   function afternoon(main) {
-    const st = dayState();
-    const g = store.get();
-    if (g && g.day === today()) { grind(main, g, st); return; }
-    main.append(roger(afternoonNote(st), "Roger · " + fmtTime(new Date())));
-    if (st.stale) main.append(h("p", { class: "quiet", style: "margin:-8px 0 18px", text: "Today's brief hasn't run yet, so I'm working from yesterday's list." }));
+    const g = keep.get();
+    if (g && g.day === today()) { grind(main, g); return; }
+    const step = S.pmStep || "goal", thing = oneThing(), y = S.data.yesterday || {};
+    const go = (k) => { S.pmStep = k; render(); window.scrollTo(0, 0); };
+    const box = h("div", { class: "step" });
 
-    const done = h("div", { class: "co-card co-win" }, h("h3", { text: "Done today" }));
-    if (st.doneToday.length) done.append(h("ul", { class: "co-list" }, ...st.doneToday.map((i) => itemLine(i, h("span", { class: "ok", text: "✓" })))));
-    else done.append(h("p", { class: "quiet", text: "Nothing marked done in Oggi yet. If you've finished something, tick it on Today and it shows here." }));
-    if (st.closedForYou.length) done.append(h("p", { class: "quiet", style: "margin-top:10px", text: `Also off your plate without you: ${names(st.closedForYou, 3)}.` }));
-    main.append(done);
-
-    const pick = suggest(st.ready);
-    const push = h("div", { class: "co-card co-push" }, h("h3", { text: "Next push" }));
-    if (!pick) {
-      push.append(h("p", { text: st.waiting.length ? `Everything left is waiting on someone else (${names(st.waiting, 3)}). Take a breather, or get ahead on tomorrow.` : "The list is clear. Well done, old chap." }));
-      main.append(push); return;
+    if (step === "goal") {
+      if (!thing) {
+        box.append(roger("Right then, Eric, it's half-time. Before the afternoon gets away from you: what's the one thing that would make today count?", "Roger · " + fmtTime(new Date())));
+        const ta = h("textarea", { class: "co-field", placeholder: "One thing. Type it, or tap the mic and say it." });
+        box.append(ta, h("div", { class: "co-acts" }, h("span"), h("button", { class: "btn", type: "button", text: "That's the one", onclick: () => { if (!ta.value.trim()) return; S.pmThing = ta.value.trim(); go("block"); } })));
+      } else {
+        box.append(roger(`Right then, Eric, it's half-time. This morning you said the one thing today was to ${lc(thing).replace(/^to /, "")}. Is it done?`, "Roger · " + fmtTime(new Date())));
+        box.append(h("div", { class: "pm-choices" },
+          h("button", { class: "btn", type: "button", text: "Yes, it's done", onclick: () => go("goal-done") }),
+          h("button", { class: "btn ghost", type: "button", text: "Not yet", onclick: () => go("block") })));
+      }
+    } else if (step === "goal-done") {
+      box.append(roger("Well done, you. That's the day earned, whatever else happens. Everything from here is a bonus, so let's spend a minute on the man rather than the list.", "Roger"));
+      box.append(h("div", { class: "co-acts" }, h("span"), h("button", { class: "btn", type: "button", text: "Go on", onclick: () => go("habit") })));
+    } else if (step === "block") {
+      box.append(roger("Then that's the whole afternoon, as far as I'm concerned. The rest can wait. What's in the way?", "Roger"));
+      const why = {
+        start: "That's usually all it is. Nobody feels like starting; you start, and then you feel like it. Twenty-five minutes, just the opening move.",
+        big: "Then we won't try to finish it. What's the first piece you could finish in twenty-five minutes? Do that piece, nothing more.",
+        pulled: "Things will always come up, and most of them can wait an hour. Close the other tabs, put the phone face down, and give this one twenty-five minutes before anything else.",
+      };
+      box.append(h("div", { class: "pm-choices col" },
+        ...[["start", "I just haven't started"], ["big", "It's bigger than I thought"], ["pulled", "Other things keep pulling at me"]].map(([k, t]) =>
+          h("button", { class: "btn ghost", type: "button", text: t, onclick: () => { S.pmWhy = why[k]; go("commit"); } }))));
+    } else if (step === "commit") {
+      box.append(roger(S.pmWhy || "Twenty-five minutes, just the opening move.", "Roger"));
+      box.append(h("div", { class: "co-card co-push" }, h("h3", { text: "The one thing" }), h("p", { class: "push-t", text: thing })));
+      box.append(h("div", { class: "pm-choices" },
+        ...[25, 45].map((m) => h("button", { class: m === 25 ? "btn" : "btn ghost", type: "button", text: `Start ${m} minutes`, onclick: () => { keep.set({ day: today(), thing, mins: m, start: Date.now() }); render(); } })),
+        h("button", { class: "textlink", type: "button", text: "Not now", onclick: () => go("habit") })));
+    } else if (step === "habit") {
+      const k = habitToAsk();
+      if (!k) { go("close"); return; }
+      const n = (S.data.streaks || {})[k] || 0;
+      const chain = n >= 2 ? ` You're ${n} days running on it. Shame to break the chain.` : n === 1 ? " You kept it yesterday. Two in a row is how a habit starts." : " It doesn't need to be much. A small one still counts.";
+      box.append(roger(PM[k] + chain, "Roger"));
+      const save = async (v) => {
+        if (v) { try { await saveDraft({ habits: { ...(S.draft.habits || {}), [k]: true } }); toast("Ticked on your Daily Log."); } catch { return; } }
+        else S.pmSkipped = (S.pmSkipped || []).concat(k);
+        go(v ? "close" : "habit-later");
+      };
+      box.append(h("div", { class: "pm-choices" },
+        h("button", { class: "btn", type: "button", text: "Yes, done", onclick: () => save(true) }),
+        h("button", { class: "btn ghost", type: "button", text: "Not yet", onclick: () => save(false) })));
+      S.pmHabit = k;
+    } else if (step === "habit-later") {
+      const later = { "Walk": "Do it before supper, then. Twenty minutes round the block clears the head better than another coffee.",
+        "Workout": "Fit it in before supper, then. Even a short session keeps the promise.",
+        "Bible reading": "Ten quiet minutes before supper, then. It steadies the rest of the evening.",
+        "Italian": "Ten minutes before supper, then. A little each day beats a lot on Saturday.",
+        "Reading": "A chapter tonight, then, and you can tell me about it at checkout.",
+        "Veg at 2 meals": "Make supper the one with the veg on it, then. That'll do nicely.",
+        "No sugary drinks": "Water or tea for the rest of the day, then. You'll sleep better for it." };
+      box.append(roger(later[S.pmHabit] || "Before supper, then.", "Roger"));
+      box.append(h("div", { class: "co-acts" }, h("span"), h("button", { class: "btn", type: "button", text: "Right", onclick: () => go("close") })));
+    } else {
+      const apply = (y.apply || "").trim();
+      box.append(roger(apply
+        ? `One last thing. Last night you said you'd put your reading to work: ${lc(apply)}. If the chance comes up this afternoon, take it. Now, get on with it, and I'll see you at checkout.`
+        : "That's all from me. Keep it simple this afternoon: the one thing first, then the habit. I'll see you at checkout.", "Roger"));
+      box.append(h("div", { class: "co-acts" }, h("button", { class: "textlink", type: "button", text: "← Start again", onclick: () => { S.pmStep = "goal"; S.pmSkipped = []; render(); } }), h("span")));
     }
-    let chosen = pick;
-    const title = h("p", { class: "push-t", text: pick.title });
-    const why = h("p", { class: "quiet", style: "margin-top:6px", text: pick.sentence || "" });
-    push.append(title, why);
-    const left = st.next ? Math.round((Date.parse(st.next.start) - Date.now()) / 60000) - 5 : 0;
-    const lens = [25, 45]; if (left >= 15 && !lens.includes(left) && left < 120) lens.push(left);
-    const row = h("div", { class: "push-go" }, ...lens.sort((a, b) => a - b).map((m) =>
-      h("button", { class: m === 25 ? "btn" : "btn ghost", type: "button", text: m === left ? `Until ${fmtTime(new Date(Date.parse(st.next.start) - 5 * 60000))}` : `${m} min`,
-        onclick: () => { store.set({ day: today(), id: chosen.id, title: chosen.title, mins: m, start: Date.now() }); render(); } })));
-    push.append(row);
-    if (st.ready.length > 1) {
-      const sel = h("select", { class: "co-field", "aria-label": "Choose another" },
-        ...st.ready.map((i) => { const o = h("option", { value: i.id, text: (i.mapLabel || i.title) + (i.area ? " · " + i.area : "") }); if (i.id === pick.id) o.selected = true; return o; }));
-      sel.addEventListener("change", () => { chosen = st.ready.find((i) => i.id === sel.value) || pick; title.textContent = chosen.title; why.textContent = chosen.sentence || ""; });
-      push.append(h("p", { class: "quiet", style: "margin:14px 0 6px", text: "Or pick another" }), sel);
-    }
-    main.append(push);
-
-    const rest = st.ready.filter((i) => i.id !== pick.id);
-    if (rest.length || st.waiting.length) {
-      const c = h("div", { class: "co-card" }, h("h3", { text: `Still open · ${st.ready.length}` }));
-      if (rest.length) c.append(h("ul", { class: "co-list" }, ...rest.map((i) => itemLine(i, i.carries > 2 ? h("span", { class: "carry", text: `carried ${i.carries} days` }) : null))));
-      if (st.waiting.length) c.append(h("p", { class: "quiet", style: "margin-top:10px", text: "Waiting on others: " + st.waiting.map((i) => `${i.mapLabel || i.title} (${i.waitingOn})`).join(", ") + "." }));
-      main.append(c);
-    }
+    main.append(box);
   }
-  function grind(main, g, st) {
+  function grind(main, g) {
     const end = g.start + g.mins * 60000;
     const over = Date.now() >= end;
     const clock = h("div", { class: "grind-clock", "aria-live": "off" });
@@ -186,22 +193,14 @@
       if (ms <= 0) { clearInterval(grind.t); if (!over) { try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch {} render(); } }
     };
     clearInterval(grind.t); tick(); if (!over) grind.t = setInterval(tick, 1000);
-    main.append(roger(over ? "Time, Eric. How did that go?" : g.mins >= 45 ? "Heads down. Phone face-down, one tab open. I'll keep the clock." : "Twenty-five good minutes. Just this one thing; everything else can wait. I'll keep the clock.", "Roger"));
-    main.append(h("div", { class: "co-card grind" }, h("h3", { text: over ? "Push finished" : `Pushing · ${g.mins} min` }), h("p", { class: "push-t", text: g.title }), over ? null : clock,
+    main.append(roger(over ? "Time's up, Eric. Did you get it done?" : "Heads down. Phone face down, one window open. I'll keep an eye on the clock.", "Roger"));
+    main.append(h("div", { class: "co-card grind" }, h("h3", { text: over ? "Time's up" : `${g.mins} minutes` }), h("p", { class: "push-t", text: g.thing }), over ? null : clock,
       h("p", { class: "quiet", style: "margin-top:6px", text: `Started ${fmtTime(new Date(g.start))} · ends ${fmtTime(new Date(end))}` })));
-    const finish = async () => {
-      try {
-        await api("PATCH", "/api/item/" + encodeURIComponent(g.id) + "?d=" + today(), { status: "Closed", dayId: S.brief && S.brief.day && S.brief.day.id, d: today() });
-        const it = (S.brief.items || []).find((i) => i.id === g.id); if (it) { it.status = "Closed"; it.closedOn = today(); }
-        store.set(null); clearInterval(grind.t); toast("Crossed off. Well done."); render(); window.scrollTo(0, 0);
-      } catch { toast("Couldn't reach Notion. Try again in a moment."); }
-    };
-    const stop = () => { store.set(null); clearInterval(grind.t); render(); };
-    const again = () => { store.set({ ...g, start: Date.now() }); render(); };
-    main.append(h("div", { class: "push-go" },
-      h("button", { class: "btn", type: "button", text: "Done, cross it off", onclick: finish }),
-      over ? h("button", { class: "btn ghost", type: "button", text: "Another round", onclick: again }) : null,
-      h("button", { class: "btn ghost", type: "button", text: over ? "Not yet, back to the list" : "Stop early", onclick: stop })));
+    const leave = (next) => { keep.set(null); clearInterval(grind.t); S.pmStep = next; render(); window.scrollTo(0, 0); };
+    main.append(h("div", { class: "pm-choices" },
+      h("button", { class: "btn", type: "button", text: over ? "Yes, done" : "Done already", onclick: () => leave("goal-done") }),
+      over ? h("button", { class: "btn ghost", type: "button", text: "Another round", onclick: () => { keep.set({ ...g, start: Date.now() }); render(); } }) : null,
+      h("button", { class: "textlink", type: "button", text: over ? "Not yet, and that's enough for now" : "Stop", onclick: () => leave("habit") })));
   }
 
   // ---------------- evening checkout ----------------
@@ -298,8 +297,8 @@
     try {
       const me = await (await fetch("/auth/me", { credentials: "same-origin" })).json();
       if (!me.signedIn) { location.href = "/"; return; }
-      const [d, sc, br] = await Promise.all([api("GET", "/api/coach?d=" + today()), api("GET", "/api/xteink/screens").catch(() => []), api("GET", "/api/brief?d=" + today()).catch(() => null)]);
-      S.data = d; S.screens = sc; S.brief = br;
+      const [d, sc] = await Promise.all([api("GET", "/api/coach?d=" + today()), api("GET", "/api/xteink/screens").catch(() => [])]);
+      S.data = d; S.screens = sc;
     } catch (e) { if (e.message !== "signin") S.data = { error: "load" }; }
     render();
   }
