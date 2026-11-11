@@ -151,14 +151,14 @@
         h("button", { class: "textlink", type: "button", text: "Not now", onclick: () => go("habit") })));
     } else if (step === "habit") {
       const k = habitToAsk();
-      if (!k) { go("close"); return; }
+      if (!k) { go("book"); return; }
       const n = (S.data.streaks || {})[k] || 0;
       const chain = n >= 2 ? ` You're ${n} days running on it. Shame to break the chain.` : n === 1 ? " You kept it yesterday. Two in a row is how a habit starts." : " It doesn't need to be much. A small one still counts.";
       box.append(roger(PM[k] + chain, "Roger"));
       const save = async (v) => {
         if (v) { try { await saveDraft({ habits: { ...(S.draft.habits || {}), [k]: true } }); toast("Ticked on your Daily Log."); } catch { return; } }
         else S.pmSkipped = (S.pmSkipped || []).concat(k);
-        go(v ? "close" : "habit-later");
+        go(v ? "book" : "habit-later");
       };
       box.append(h("div", { class: "pm-choices" },
         h("button", { class: "btn", type: "button", text: "Yes, done", onclick: () => save(true) }),
@@ -173,10 +173,27 @@
         "Veg at 2 meals": "Make supper the one with the veg on it, then. That'll do nicely.",
         "No sugary drinks": "Water or tea for the rest of the day, then. You'll sleep better for it." };
       box.append(roger(later[S.pmHabit] || "Before supper, then.", "Roger"));
-      box.append(h("div", { class: "co-acts" }, h("span"), h("button", { class: "btn", type: "button", text: "Right", onclick: () => go("close") })));
+      box.append(h("div", { class: "co-acts" }, h("span"), h("button", { class: "btn", type: "button", text: "Right", onclick: () => go("book") })));
+    } else if (step === "book") {
+      // One idea from the chapter he's on, in Roger's words, and a light nudge to use it today.
+      const b = (S.data.books || []).find((x) => x.takeaways && x.takeaways.length);
+      if (!b) { go("close"); return; }
+      const day = Math.floor(Date.now() / 864e5), tk = b.takeaways[day % b.takeaways.length];
+      const lead = ["The point I keep coming back to", "The bit I liked", "What stuck with me"][day % 3];
+      box.append(roger(`You're on chapter ${b.chapterNo} of ${b.title}, I see. ${lead}: ${tk.charAt(0).toLowerCase() + tk.slice(1)} So, where could you put that to work before the day's out? Something small will do.`, "Roger"));
+      const ta = h("textarea", { class: "co-field", placeholder: "One small thing, today. Type it, or tap the mic and say it." }, (S.draft.apply || (S.data.today && S.data.today.apply) || ""));
+      box.append(ta, h("div", { class: "co-acts" },
+        h("button", { class: "textlink", type: "button", text: "Not today", onclick: () => { S.pmApplied = false; go("close"); } }),
+        h("button", { class: "btn", type: "button", text: "That's my vote", onclick: async () => {
+          const v = ta.value.trim(); if (!v) return;
+          try { await saveDraft({ apply: v, book: b.title, chapter: "Ch. " + b.chapterNo }); } catch { return; }
+          S.pmApplied = v; go("close");
+        } })));
     } else {
       const apply = (y.apply || "").trim();
-      box.append(roger(apply
+      box.append(roger(S.pmApplied
+        ? `Good man. That's the vote cast: ${lc(S.pmApplied)}. Now crack on, and tell me at checkout how it went.`
+        : apply
         ? `One last thing. Last night you said you'd put your reading to work: ${lc(apply)}. If the chance comes up this afternoon, take it. Now, get on with it, and I'll see you at checkout.`
         : "That's all from me. Keep it simple this afternoon: the one thing first, then the habit. I'll see you at checkout.", "Roger"));
       box.append(h("div", { class: "co-acts" }, h("button", { class: "textlink", type: "button", text: "← Start again", onclick: () => { S.pmStep = "goal"; S.pmSkipped = []; render(); } }), h("span")));

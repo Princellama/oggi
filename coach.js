@@ -6,6 +6,7 @@ const { _call: call, _read: baseRead, _rich: rich, _queryDS: queryDS } = N;
 const DS = {
   log: process.env.NOTION_DAILYLOG_DS || "08faadad-0899-4b6e-ac63-46094d86303d",
   books: process.env.NOTION_BOOKS_DS || "18172872-c5a3-4efc-9592-0de4ea449261",
+  quotes: process.env.NOTION_QUOTES_DS || "fe6d0f14-dbba-4863-9a2c-4f19be9cffe5",
 };
 const HABITS = ["Bible reading", "Walk", "Workout", "Italian", "No phone first hour", "Bed by 10", "Reading", "Veg at 2 meals", "No sugary drinks"];
 const TEXT = { win: "Win", grateful: "Grateful for", book: "Book", chapter: "Chapter", notes: "Book notes", apply: "Apply", tomorrow: "Tomorrow" };
@@ -42,17 +43,29 @@ async function streaks(today) {
   }
   return s;
 }
+// The chapter number in Eric's words ("Chapter 2: how habits shape identity", "Ch. 3") → "2".
+const chapterNo = (t) => { const m = String(t || "").match(/(\d+)/); return m ? m[1] : ""; };
+// Chapter takeaways (Kind Takeaway, in Claude's own words) for the book Eric is reading, so Roger can raise one.
+async function takeaways(book) {
+  const ch = chapterNo(book.chapter);
+  if (!ch) return [];
+  const r = await queryDS(DS.quotes, { filter: { and: [
+    { property: "Kind", select: { equals: "Takeaway" } },
+    { property: "Book", relation: { contains: book.id } },
+    { property: "Chapter", rich_text: { equals: ch } },
+  ] }, page_size: 20 });
+  return r.results.map((q) => read(q.properties["Quote"]) || "").filter(Boolean);
+}
 async function getAll(today) {
   const [t, y, books, st] = await Promise.all([
     findDay(today), findDay(minus(today, 1)),
     queryDS(DS.books, { filter: { property: "Status", select: { equals: "Reading" } }, page_size: 10 }).catch(() => ({ results: [] })),
     streaks(today).catch(() => ({})),
   ]);
-  return {
-    today: toDay(t), yesterday: toDay(y), streaks: st,
-    books: books.results.map((b) => ({ id: b.id, title: read(b.properties["Title"]) || "", author: read(b.properties["Author"]) || "",
-      chapter: read(b.properties["Current chapter"]) || "", themes: read(b.properties["Themes"]) || [] })),
-  };
+  const list = books.results.map((b) => ({ id: b.id, title: read(b.properties["Title"]) || "", author: read(b.properties["Author"]) || "",
+    chapter: read(b.properties["Current chapter"]) || "", chapterChecked: read(b.properties["Chapter checked"]) || null, themes: read(b.properties["Themes"]) || [] }));
+  await Promise.all(list.map(async (b) => { b.chapterNo = chapterNo(b.chapter); b.takeaways = await takeaways(b).catch((e) => { console.error("takeaways", e.message); return []; }); }));
+  return { today: toDay(t), yesterday: toDay(y), streaks: st, books: list };
 }
 async function save(today, f) {
   const props = {};
