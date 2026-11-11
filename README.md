@@ -38,7 +38,7 @@ Claude (brief skill) ──writes──▶ Notion: Brief Days + Brief Items ◀�
 
 ## Fit (/fit)
 
-Both coaches talk: their lines print out at a talking pace (a beat at each full stop), and a tap on the bubble shows the whole line (`public/typewriter.js`; reduced-motion shows it at once, and a line types only once per visit).
+Both coaches talk: their lines print out at a talking pace (a beat at each full stop), and a tap on the bubble shows the whole line (`public/typewriter.js`; reduced-motion shows it at once, and a line types again each time a tab is opened, but not when the same tab redraws).
 
 Eric's training, coached by **London** (a former European gymnastics champion in his fifties; portrait `public/icons/london.svg`, drawn to match Roger). Added 10 Nov 2026. Same sign-in; **Fit** in the bottom nav. Roger leaves workouts to him.
 

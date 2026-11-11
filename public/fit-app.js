@@ -50,8 +50,8 @@
     const m = $("#modes"); m.textContent = "";
     for (const [k, t] of MODES) m.append(h("button", { type: "button", "aria-pressed": String(S.mode === k), text: t, onclick: () => go(k) }));
   }
-  function go(k) { S.mode = k; history.pushState(null, "", k === "today" ? "/fit" : "/fit/" + k); render(); window.scrollTo(0, 0); }
-  addEventListener("popstate", () => { S.mode = modeFromPath(); render(); });
+  function go(k) { if (window.OggiSay) OggiSay.again(); S.mode = k; history.pushState(null, "", k === "today" ? "/fit" : "/fit/" + k); render(); window.scrollTo(0, 0); }
+  addEventListener("popstate", () => { if (window.OggiSay) OggiSay.again(); S.mode = modeFromPath(); render(); });
 
   // ---------------- reading the log ----------------
   const sets = () => S.data.sets || [];

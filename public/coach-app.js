@@ -38,7 +38,7 @@
   function modes() {
     const m = $("#modes"); m.textContent = "";
     for (const [k, t] of [["morning", "Morning"], ["afternoon", "Afternoon"], ["evening", "Evening"]])
-      m.append(h("button", { type: "button", "aria-pressed": String(S.mode === k), text: t, onclick: () => { S.mode = k; S.step = 0; render(); } }));
+      m.append(h("button", { type: "button", "aria-pressed": String(S.mode === k), text: t, onclick: () => { if (window.OggiSay) OggiSay.again(); S.mode = k; S.step = 0; render(); } }));
   }
 
   // ---------------- morning ----------------

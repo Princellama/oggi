@@ -1,6 +1,6 @@
 /* Oggi · the coaches' voice. London's and Roger's lines print out as if they're talking;
-   a tap on the bubble shows the whole line at once. Each line types once per visit (a re-render
-   shows it whole), and people who ask for reduced motion get it whole straight away.
+   a tap on the bubble shows the whole line at once. A line types again whenever a tab is opened
+   (the pages call OggiSay.again()), not when the same tab redraws after a tap; people who ask for reduced motion get it whole straight away.
    The bubble keeps its full size from the start, so nothing below it jumps while it types. */
 (function () {
   "use strict";
@@ -39,5 +39,7 @@
     const tw = bubble.querySelector(".tw:not(.done)");
     if (tw && tw.finish) tw.finish();
   });
+  // opening a tab: let every line on it type again
+  say.again = () => seen.clear();
   window.OggiSay = say;
 })();
