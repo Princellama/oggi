@@ -125,7 +125,7 @@
         const ta = h("textarea", { class: "co-field", placeholder: "One thing. Type it, or tap the mic and say it." });
         box.append(ta, h("div", { class: "co-acts" }, h("span"), h("button", { class: "btn", type: "button", text: "That's the one", onclick: () => { if (!ta.value.trim()) return; S.pmThing = ta.value.trim(); go("block"); } })));
       } else {
-        box.append(roger(`Right then, Eric, it's half-time. This morning you said the one thing today was to ${lc(thing).replace(/^to /, "")}. Is it done?`, "Roger · " + fmtTime(new Date())));
+        box.append(roger(`Right then, Eric, it's half-time. This morning you chose one thing for today: ${lc(thing)}. Is it done?`, "Roger · " + fmtTime(new Date())));
         box.append(h("div", { class: "pm-choices" },
           h("button", { class: "btn", type: "button", text: "Yes, it's done", onclick: () => go("goal-done") }),
           h("button", { class: "btn ghost", type: "button", text: "Not yet", onclick: () => go("block") })));
