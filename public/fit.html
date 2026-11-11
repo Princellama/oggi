@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#F9F9F7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Oggi">
+  <title>Fit · Oggi</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/london.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/london.png">
+  <link rel="preload" href="/fonts/fraunces-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/coach.css">
+  <link rel="stylesheet" href="/fit.css">
+</head>
+<body class="co fit">
+  <header class="co-top"><div class="co-wrap co-bar"><a class="co-back" href="/">← Oggi</a><nav class="co-modes" id="modes"></nav></div></header>
+  <main class="co-wrap co-main" id="main"><p class="quiet">One moment…</p></main>
+  <div class="fit-rest" id="rest" hidden><span>Rest</span><span class="clk" id="clk">0:00</span><button type="button" id="restPlus">+30s</button><button type="button" id="restSkip">Skip</button></div>
+  <p class="co-toast" id="toast" role="status" aria-live="polite" hidden></p>
+  <script src="/fit-data.js"></script>
+  <script src="/fit-app.js"></script>
+</body>
+</html>

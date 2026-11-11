@@ -91,9 +91,9 @@
   };
   const fmtTime = (d) => d.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true }).replace(" ", "").toLowerCase();
   // Habits that can still be kept after lunch, and how Roger raises each.
+  // Training is London's (/fit), so Roger leaves Workout alone.
   const PM = {
     "Walk": "Have you had your walk today?",
-    "Workout": "Have you trained today?",
     "Bible reading": "Have you had your Bible reading today?",
     "Italian": "Have you done your Italian today?",
     "Reading": "Have you read any of your book today?",

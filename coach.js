@@ -8,7 +8,7 @@ const DS = {
   books: process.env.NOTION_BOOKS_DS || "18172872-c5a3-4efc-9592-0de4ea449261",
   quotes: process.env.NOTION_QUOTES_DS || "fe6d0f14-dbba-4863-9a2c-4f19be9cffe5",
 };
-const HABITS = ["Bible reading", "Walk", "Workout", "Italian", "No phone first hour", "Bed by 10", "Reading", "Veg at 2 meals", "No sugary drinks"];
+const HABITS = ["Bible reading", "Walk", "Workout", "Italian", "No phone first hour", "Bed by 10", "Reading", "Veg at 2 meals", "No sugary drinks", "Protein every meal"];
 const TEXT = { win: "Win", grateful: "Grateful for", book: "Book", chapter: "Chapter", notes: "Book notes", apply: "Apply", tomorrow: "Tomorrow" };
 
 function read(p) {
@@ -72,6 +72,7 @@ async function save(today, f) {
   const props = {};
   for (const [k, name] of Object.entries(TEXT)) if (k in f) props[name] = { rich_text: rich(String(f[k] || "").slice(0, 4000)) };
   if (f.habits) for (const h of HABITS) if (h in f.habits) props[h] = { checkbox: !!f.habits[h] };
+  if ("walkMin" in f) props["Walk minutes"] = { number: f.walkMin == null || f.walkMin === "" ? null : Number(f.walkMin) };
   if ("water" in f) props["Water glasses"] = { number: f.water == null || f.water === "" ? null : Number(f.water) };
   if ("mood" in f) props["Mood"] = { select: f.mood ? { name: f.mood } : null };
   if ("checkedOut" in f) props["Checked out"] = { checkbox: !!f.checkedOut };

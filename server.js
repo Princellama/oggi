@@ -20,6 +20,7 @@ const fstore = DEMO ? require("./flown-demo") : require("./flown");
 const istore = DEMO ? require("./italian-demo") : require("./italian");
 const coach = require("./coach");
 const feedstore = DEMO ? require("./feeding-demo") : require("./feeding");
+const fitstore = DEMO ? require("./fit-demo") : require("./fit");
 
 const PORT = process.env.PORT || 8080;
 const SECRET = process.env.SESSION_SECRET || (DEMO ? "demo-secret" : null);
@@ -568,6 +569,52 @@ app.post("/api/coach", requireAuth, wrap(async (req, res) => {
 app.get(["/coach", "/coach/*"], (req, res) => {
   res.set("Cache-Control", "no-cache");
   res.sendFile(path.join(__dirname, "public", "coach.html"));
+});
+
+// ---------- /fit (London) ----------
+// Eric's training: one Workout Log row per set, a Sunday check-in (waist, photos taken, never weight),
+// and the fitness habits on the Daily Log row Roger also reads. The program is public/fit-data.js.
+const FIT_SESSIONS = ["Upper A", "Lower A", "Upper B", "Lower B", "Extra"];
+const FIT_HABITS = ["Workout", "Walk", "Protein every meal", "No sugary drinks", "Veg at 2 meals", "Bed by 10"];
+const isoDay = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || "")) ? String(v) : null);
+const num = (v, lo, hi) => { if (v === "" || v == null) return null; const x = Number(v); if (!Number.isFinite(x)) throw bad("number"); return Math.max(lo, Math.min(hi, x)); };
+app.get("/api/fit", requireAuth, wrap(async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  try { res.json(await fitstore.getAll(localDate(req))); }
+  catch (e) { if (e.status === 404 || e.status === 403) return res.json({ error: "share" }); throw e; }
+}));
+app.post("/api/fit/set", requireAuth, wrap(async (req, res) => {
+  const b = req.body || {};
+  const date = isoDay(b.date) || localDate(req);
+  const ex = clip(b.ex, 60).replace(/[^a-z0-9-]/g, "");
+  if (!ex || !FIT_SESSIONS.includes(b.session)) throw bad("ex and session");
+  const set = Math.round(num(b.set, 1, 10) || 0); if (!set) throw bad("set");
+  const reps = num(b.reps, 0, 100); if (reps == null) throw bad("reps");
+  res.json(await fitstore.saveSet({ date, ex, session: b.session, exercise: clip(b.exercise, 80), set, weight: num(b.weight, -400, 2000) ?? 0, reps: Math.round(reps), week: Math.round(num(b.week, 0, 99) || 0) }));
+}));
+app.post("/api/fit/set/remove", requireAuth, wrap(async (req, res) => {
+  const key = clip(req.body && req.body.key, 120);
+  if (!/^\d{4}-\d{2}-\d{2}__[a-z0-9-]+__\d+$/.test(key)) throw bad("key");
+  res.json(await fitstore.removeSet(key));
+}));
+app.post("/api/fit/checkin", requireAuth, wrap(async (req, res) => {
+  const b = req.body || {}, f = {};
+  const day = isoDay(b.day) || localDate(req);
+  if ("waist" in b) f.waist = num(b.waist, 15, 80);
+  if ("photos" in b) f.photos = !!b.photos;
+  if ("note" in b) f.note = clip(b.note, 1000);
+  res.json(await fitstore.saveCheckin(day, f));
+}));
+app.post("/api/fit/habits", requireAuth, wrap(async (req, res) => {
+  const b = req.body || {}, f = {};
+  if (b.habits && typeof b.habits === "object") { f.habits = {}; for (const h of FIT_HABITS) if (h in b.habits) f.habits[h] = !!b.habits[h]; }
+  if ("water" in b) f.water = num(b.water, 0, 20);
+  if ("walkMin" in b) f.walkMin = num(b.walkMin, 0, 600);
+  res.json(await fitstore.saveHabits(localDate(req), f));
+}));
+app.get(["/fit", "/fit/*"], (req, res) => {
+  res.set("Cache-Control", "no-cache");
+  res.sendFile(path.join(__dirname, "public", "fit.html"));
 });
 
 // ---------- /italian ----------

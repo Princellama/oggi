@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<defs><clipPath id="c"><circle cx="256" cy="256" r="240"/></clipPath></defs>
+<circle cx="256" cy="256" r="240" fill="#DDE7E2"/>
+<g clip-path="url(#c)" stroke="#2A2420" stroke-linejoin="round" stroke-linecap="round">
+  <!-- heather slate V-neck tee -->
+  <path d="M60 520 Q70 400 172 370 Q214 360 256 362 Q298 360 340 370 Q442 400 452 520 Z" fill="#5E6F7E" stroke-width="11"/>
+  <path d="M128 520 Q132 470 150 440 M384 520 Q380 470 362 440" stroke="#2A2420" stroke-width="4" opacity=".25" fill="none"/>
+  <!-- neck -->
+  <path d="M216 296 L216 352 Q256 372 296 352 L296 296" fill="#E9B996" stroke-width="11"/>
+  <!-- V neckline -->
+  <path d="M212 352 L256 428 L300 352 Z" fill="#E9B996" stroke="none"/>
+  <path d="M206 350 L256 438 L306 350" fill="none" stroke="#4E5D6B" stroke-width="16" stroke-linejoin="miter"/>
+  <path d="M198 350 L256 448 L314 350 M214 350 L256 424 L298 350" fill="none" stroke-width="7"/>
+  <!-- lanyard + stopwatch -->
+  <path d="M220 352 Q222 420 236 456" stroke="#C6613F" stroke-width="8" fill="none"/>
+  <circle cx="240" cy="478" r="22" fill="#F4F1E8" stroke-width="8"/>
+  <path d="M240 478 L240 466 M240 478 L249 484" stroke-width="5" fill="none"/>
+  <rect x="234" y="448" width="12" height="8" rx="2" fill="#B4B3A8" stroke-width="5"/>
+  <!-- ears -->
+  <ellipse cx="170" cy="238" rx="15" ry="24" fill="#E9B996" stroke-width="10"/>
+  <ellipse cx="342" cy="238" rx="15" ry="24" fill="#E9B996" stroke-width="10"/>
+  <!-- face, squarer jaw -->
+  <path d="M174 204 Q174 128 256 126 Q338 128 338 204 L336 266 Q332 312 296 330 Q256 344 216 330 Q180 312 176 266 Z" fill="#F2C9A8" stroke-width="11"/>
+  <!-- short, neat salt-and-pepper beard along the jaw -->
+  <path d="M177 244 L176 266 Q180 312 216 330 Q256 344 296 330 Q332 312 336 266 L335 244 Q330 272 314 284 Q298 292 290 300 Q286 324 256 326 Q226 324 222 300 Q214 292 198 284 Q182 272 177 244 Z" fill="#A39B94" stroke="#2A2420" stroke-width="5"/>
+  <path d="M196 300 l3 4 M214 316 l2 5 M298 316 l-2 5 M316 300 l-3 4 M244 334 l0 4 M268 334 l0 4 M232 330 l1 4 M280 330 l-1 4" stroke="#D6D0C8" stroke-width="3" fill="none"/>
+  <!-- hair: short sides, swept-up quiff -->
+  <path d="M172 214 Q162 150 194 118 Q228 88 280 92 Q330 96 344 140 Q350 176 340 212 Q334 178 318 164 Q296 150 262 150 Q240 132 212 150 Q190 168 180 206 Z" fill="#6E6660" stroke-width="11"/>
+  <path d="M214 120 Q248 96 290 104" stroke="#B9B3AC" stroke-width="6" fill="none"/>
+  <path d="M234 136 Q266 116 306 126" stroke="#B9B3AC" stroke-width="6" fill="none"/>
+  <path d="M180 200 Q178 176 188 160" stroke="#C9C3BB" stroke-width="7" fill="none"/>
+  <path d="M334 200 Q338 176 330 158" stroke="#C9C3BB" stroke-width="7" fill="none"/>
+  <!-- brows -->
+  <path d="M198 210 Q218 202 240 208" stroke="#4A433E" stroke-width="10" fill="none"/>
+  <path d="M272 208 Q294 202 314 210" stroke="#4A433E" stroke-width="10" fill="none"/>
+  <!-- eyes -->
+  <path d="M202 236 Q220 224 238 236 Q220 246 202 236 Z" fill="#fff" stroke-width="6"/>
+  <path d="M274 236 Q292 224 310 236 Q292 246 274 236 Z" fill="#fff" stroke-width="6"/>
+  <circle cx="221" cy="235.5" r="7" fill="#4F6E86" stroke="none"/>
+  <circle cx="291" cy="235.5" r="7" fill="#4F6E86" stroke="none"/>
+  <circle cx="223.5" cy="233" r="2.3" fill="#fff" stroke="none"/>
+  <circle cx="293.5" cy="233" r="2.3" fill="#fff" stroke="none"/>
+  <path d="M197 233 l-7 -3 M197 240 l-7 2 M315 233 l7 -3 M315 240 l7 2" stroke-width="3" fill="none"/>
+  <path d="M226 176 Q256 168 286 176" stroke="#D29F80" stroke-width="4" fill="none"/>
+  <!-- nose -->
+  <path d="M258 240 Q254 268 242 282 Q256 290 268 284" stroke-width="7" fill="none"/>
+  <!-- smile, a half-grin -->
+  <!-- moustache -->
+  <path d="M220 296 Q226 282 242 280 Q252 280 256 284 Q260 280 270 280 Q286 282 292 296 Q276 290 256 292 Q236 290 220 296 Z" fill="#A39B94" stroke-width="4"/>
+  <path d="M234 303 Q256 322 278 303 Q256 308 234 303 Z" fill="#fff" stroke-width="4"/>
+  
+</g>
+</svg>
