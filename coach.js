@@ -59,10 +59,10 @@ async function takeaways(book) {
 async function getAll(today) {
   const [t, y, books, st] = await Promise.all([
     findDay(today), findDay(minus(today, 1)),
-    queryDS(DS.books, { filter: { property: "Status", select: { equals: "Reading" } }, page_size: 10 }).catch(() => ({ results: [] })),
+    queryDS(DS.books, { filter: { property: "Status", status: { equals: "Reading" } }, page_size: 10 }).catch((e) => { console.error("books", e.message); return { results: [] }; }),
     streaks(today).catch(() => ({})),
   ]);
-  const list = books.results.map((b) => ({ id: b.id, title: read(b.properties["Title"]) || "", author: read(b.properties["Author"]) || "",
+  const list = (books.results || []).map((b) => ({ id: b.id, title: read(b.properties["Title"]) || "", author: read(b.properties["Author"]) || "",
     chapter: read(b.properties["Current chapter"]) || "", chapterChecked: read(b.properties["Chapter checked"]) || null, themes: read(b.properties["Themes"]) || [] }));
   await Promise.all(list.map(async (b) => { b.chapterNo = chapterNo(b.chapter); b.takeaways = await takeaways(b).catch((e) => { console.error("takeaways", e.message); return []; }); }));
   return { today: toDay(t), yesterday: toDay(y), streaks: st, books: list };
