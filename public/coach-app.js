@@ -113,7 +113,8 @@
     return open.sort((a, b) => (streaks[b] || 0) - (streaks[a] || 0))[0] || null;
   }
   function afternoon(main) {
-    const g = keep.get();
+    let g = keep.get();
+    if (g && !g.thing) { keep.set(null); g = null; }   // a push saved by the first version of this tab
     if (g && g.day === today()) { grind(main, g); return; }
     const step = S.pmStep || "goal", thing = oneThing(), y = S.data.yesterday || {};
     const go = (k) => { S.pmStep = k; render(); window.scrollTo(0, 0); };
@@ -196,9 +197,10 @@
         : apply
         ? `One last thing. Last night you said you'd put your reading to work: ${lc(apply)}. If the chance comes up this afternoon, take it. Now, get on with it, and I'll see you at checkout.`
         : "That's all from me. Keep it simple this afternoon: the one thing first, then the habit. I'll see you at checkout.", "Roger"));
-      box.append(h("div", { class: "co-acts" }, h("button", { class: "textlink", type: "button", text: "← Start again", onclick: () => { S.pmStep = "goal"; S.pmSkipped = []; render(); } }), h("span")));
+      box.append(h("div", { class: "co-acts" }, h("button", { class: "textlink", type: "button", text: "↺ Start over", onclick: () => { S.pmStep = "goal"; S.pmSkipped = []; render(); } }), h("span")));
     }
     main.append(box);
+    if (step !== "goal" && step !== "close") main.append(h("p", { class: "pm-restart" }, h("button", { class: "textlink", type: "button", text: "↺ Start over", onclick: () => { S.pmStep = "goal"; S.pmSkipped = []; S.pmApplied = null; render(); } })));
   }
   function grind(main, g) {
     const end = g.start + g.mins * 60000;

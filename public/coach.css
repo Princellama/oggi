@@ -54,3 +54,4 @@ input.co-field { min-height: 0; }
 .grind { text-align: center; }
 .grind-clock { font: 600 64px/1.1 var(--serif); font-variant-numeric: tabular-nums; color: var(--ink); margin: 14px 0 4px; }
 @media (max-width: 420px) { .co-modes button { padding: 6px 10px; } }
+.pm-restart { margin-top: 28px; text-align: center; }
