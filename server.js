@@ -612,6 +612,24 @@ app.post("/api/fit/habits", requireAuth, wrap(async (req, res) => {
   if ("walkMin" in b) f.walkMin = num(b.walkMin, 0, 600);
   res.json(await fitstore.saveHabits(localDate(req), f));
 }));
+// Meals: one Fuel Log row each, with London's note written by the page and stored beside it.
+const FIT_MEALS = ["Breakfast", "Lunch", "Dinner", "Snack", "Shake"], FIT_HOWS = ["Plate", "Numbers", "Saved", "Claude"];
+const FIT_MACROS = { cal: [0, 5000], protein: [0, 400], carbs: [0, 800], fat: [0, 400], fiber: [0, 200], sugar: [0, 600], added: [0, 600] };
+function mealFields(b, creating) {
+  const f = {};
+  if ("name" in b || creating) { f.name = clip(b.name, 120); if (!f.name) throw bad("name"); }
+  if ("at" in b || creating) { const at = String(b.at || ""); if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?([+-]\d{2}:\d{2}|Z)$/.test(at)) throw bad("at"); f.at = at; }
+  if ("meal" in b) { if (b.meal && !FIT_MEALS.includes(b.meal)) throw bad("meal"); f.meal = b.meal || null; }
+  if ("how" in b) { if (b.how && !FIT_HOWS.includes(b.how)) throw bad("how"); f.how = b.how || null; }
+  if ("items" in b) f.items = clip(b.items, 1500);
+  if ("london" in b) f.london = clip(b.london, 1000);
+  if ("saved" in b) f.saved = !!b.saved;
+  for (const [k, [lo, hi]] of Object.entries(FIT_MACROS)) if (k in b) f[k] = num(b[k], lo, hi);
+  return f;
+}
+app.post("/api/fit/meal", requireAuth, wrap(async (req, res) => res.json(await fitstore.addMeal(mealFields(req.body || {}, true)))));
+app.patch("/api/fit/meal/:id", requireAuth, wrap(async (req, res) => res.json(await fitstore.updateMeal(req.params.id, mealFields(req.body || {}, false)))));
+app.delete("/api/fit/meal/:id", requireAuth, wrap(async (req, res) => res.json(await fitstore.removeMeal(req.params.id))));
 app.get(["/fit", "/fit/*"], (req, res) => {
   res.set("Cache-Control", "no-cache");
   res.sendFile(path.join(__dirname, "public", "fit.html"));

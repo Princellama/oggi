@@ -12,7 +12,11 @@ const DS = {
   sets: process.env.NOTION_WORKOUT_LOG_DS || "7fca910a-ec4e-4e00-8e73-c324499ec5da",
   checkins: process.env.NOTION_FIT_CHECKINS_DS || "023b3518-48ec-4a97-9266-4d7267f2235e",
   log: process.env.NOTION_DAILYLOG_DS || "08faadad-0899-4b6e-ac63-46094d86303d",
+  fuel: process.env.NOTION_FUEL_LOG_DS || "964f3b3d-0da1-4071-a069-38c9d5cee37d",
 };
+const MEALS = ["Breakfast", "Lunch", "Dinner", "Snack", "Shake"];
+const HOWS = ["Plate", "Numbers", "Saved", "Claude"];
+const MACROS = { cal: "Calories", protein: "Protein", carbs: "Carbs", fat: "Fat", fiber: "Fiber", sugar: "Sugar", added: "Added sugar" };
 const SESSIONS = ["Upper A", "Lower A", "Upper B", "Lower B", "Extra"];
 // The Daily Log habits /fit shows; Roger's checkout still owns the rest.
 const FIT_HABITS = ["Workout", "Walk", "Protein every meal", "No sugary drinks", "Veg at 2 meals", "Bed by 10"];
@@ -34,6 +38,12 @@ function toCheckin(pg) {
   return { id: pg.id, day: read(p["Day"]) || "", date: read(p["Date"]), waist: read(p["Waist"]), photos: read(p["Photos taken"]) || false,
     note: read(p["Note"]) || "", london: read(p["London"]) || "" };
 }
+function toMeal(pg) {
+  const p = pg.properties, m = { id: pg.id, url: pg.url, name: read(p["Name"]) || "", at: read(p["Date"]), meal: read(p["Meal"]), items: read(p["Items"]) || "",
+    london: read(p["London"]) || "", saved: read(p["Saved"]) || false, how: read(p["How"]) };
+  for (const [k, name] of Object.entries(MACROS)) m[k] = read(p[name]);
+  return m;
+}
 function toLogDay(pg) {
   const p = pg.properties, habits = {};
   for (const h of FIT_HABITS) habits[h] = read(p[h]) || false;
@@ -42,14 +52,22 @@ function toLogDay(pg) {
 
 async function getAll(today) {
   const since = minus(today, 120);
-  const [sets, checkins, logs] = await Promise.all([
+  const [sets, checkins, logs, meals, saved] = await Promise.all([
     queryAll(DS.sets, { filter: { property: "Date", date: { on_or_after: since } }, sorts: [{ property: "Date", direction: "ascending" }] }),
     queryAll(DS.checkins, { sorts: [{ property: "Date", direction: "ascending" }] }),
     queryDS(DS.log, { filter: { property: "Day", title: { is_not_empty: true } }, sorts: [{ property: "Day", direction: "descending" }], page_size: 21 })
       .then((r) => r.results).catch((e) => { console.error("fit daily log", e.message); return []; }),
+    queryAll(DS.fuel, { filter: { property: "Date", date: { on_or_after: minus(today, 14) } }, sorts: [{ property: "Date", direction: "ascending" }] })
+      .catch((e) => { console.error("fuel", e.message); return []; }),
+    queryDS(DS.fuel, { filter: { property: "Saved", checkbox: { equals: true } }, sorts: [{ property: "Date", direction: "descending" }], page_size: 40 })
+      .then((r) => r.results).catch(() => []),
   ]);
   const days = logs.map(toLogDay).filter((d) => d.day <= today);
-  return { sets: sets.map(toSet), checkins: checkins.map(toCheckin), today: days.find((d) => d.day === today) || null, days, version: "fit-1" };
+    // a usual is the latest row of each saved name
+  const usual = [], seen = new Set();
+  for (const m of saved.map(toMeal)) { const k = m.name.toLowerCase(); if (!seen.has(k)) { seen.add(k); usual.push(m); } }
+  return { sets: sets.map(toSet), checkins: checkins.map(toCheckin), today: days.find((d) => d.day === today) || null, days,
+    meals: meals.map(toMeal), usual, version: "fit-2" };
 }
 
 async function findBy(ds, prop, value, type) {
@@ -88,7 +106,24 @@ async function saveCheckin(day, f) {
         properties: { ...props, Day: { title: rich(day) }, Date: { date: { start: day } } } });
   return toCheckin(page);
 }
+function mealProps(f) {
+  const props = {};
+  if ("name" in f) props.Name = { title: rich(f.name) };
+  if ("at" in f) props.Date = { date: { start: f.at } };
+  if ("meal" in f) props.Meal = { select: f.meal ? { name: f.meal } : null };
+  if ("items" in f) props.Items = { rich_text: rich(f.items) };
+  if ("london" in f) props.London = { rich_text: rich(f.london) };
+  if ("saved" in f) props.Saved = { checkbox: !!f.saved };
+  if ("how" in f) props.How = { select: f.how ? { name: f.how } : null };
+  for (const [k, name] of Object.entries(MACROS)) if (k in f) props[name] = { number: f[k] };
+  return props;
+}
+async function addMeal(f) {
+  return toMeal(await call("POST", "/pages", { parent: { type: "data_source_id", data_source_id: DS.fuel }, properties: mealProps(f) }));
+}
+async function updateMeal(id, f) { return toMeal(await call("PATCH", `/pages/${id}`, { properties: mealProps(f) })); }
+async function removeMeal(id) { await call("PATCH", `/pages/${id}`, { in_trash: true }); return { ok: true }; }
 // Habits and water go to the Daily Log row Roger reads; coach.save creates the row if the day has none.
 async function saveHabits(today, f) { return coach.save(today, f); }
 
-module.exports = { getAll, saveSet, removeSet, saveCheckin, saveHabits, SESSIONS, FIT_HABITS };
+module.exports = { getAll, saveSet, removeSet, saveCheckin, saveHabits, addMeal, updateMeal, removeMeal, SESSIONS, FIT_HABITS, MEALS, HOWS, MACROS };

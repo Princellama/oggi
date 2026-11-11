@@ -3,7 +3,7 @@ const FIT = require("./public/fit-data");
 
 const iso = (d) => d.toISOString().slice(0, 10);
 const add = (s, n) => { const d = new Date(s + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return iso(d); };
-let sets = [], checkins = [], logDays = {}, n = 0, start = null;
+let sets = [], checkins = [], logDays = {}, meals = [], n = 0, start = null;
 
 function seed(today) {
   // Start the demo program on the Monday 15–21 days ago, so today sits in week 3.
@@ -33,12 +33,20 @@ function seed(today) {
     { id: "c2", day: add(start, 6), date: add(start, 6), waist: 36.25, photos: true, note: "", london: "" },
     { id: "c3", day: add(start, 13), date: add(start, 13), waist: 36, photos: false, note: "", london: "" },
   ].filter((c) => c.day < today);
+  const shake = { name: "Banana PB protein shake", meal: "Shake", items: "Wyman's protein blend 1 cup; oat milk 1 cup; EarthChimp 2 scoops; creatine 5 g", cal: 490, protein: 32, carbs: 61, fat: 15.5, fiber: 11, sugar: 43, added: 16, how: "Claude", saved: true,
+    london: "Good protein, too much sugar for a fat-loss shake. Unsweetened milk and half the fruit blend makes it about 300 calories with nearly the same protein." };
+  meals = [
+    { id: "m1", ...shake, at: add(today, -1) + "T08:10:00-10:00" },
+    { id: "m2", name: "Poke bowl, half rice", meal: "Lunch", items: "2 palms protein, 1 fist veg, 1 hand carbs, 1 thumb fat", cal: 485, protein: 48, carbs: 25, fat: 9, fiber: 2, sugar: 0, added: 0, how: "Plate", saved: true, london: "48 grams of protein. That's a meal.", at: add(today, -1) + "T12:30:00-10:00" },
+    { id: "m3", ...shake, at: today + "T07:45:00-10:00", saved: false },
+  ];
 }
 
 async function getAll(today) {
   if (!start) seed(today);
   const days = Object.values(logDays).filter((d) => d.day <= today).sort((a, b) => (a.day < b.day ? 1 : -1));
-  return { sets: [...sets].sort((a, b) => (a.date < b.date ? -1 : 1)), checkins, today: logDays[today] || null, days, start, version: "fit-demo" };
+  const usual = [...meals].reverse().filter((m, i, a) => m.saved && a.findIndex((x) => x.saved && x.name === m.name) === i);
+  return { sets: [...sets].sort((a, b) => (a.date < b.date ? -1 : 1)), checkins, today: logDays[today] || null, days, start, meals: [...meals].sort((a, b) => (a.at < b.at ? -1 : 1)), usual, version: "fit-demo" };
 }
 async function saveSet(f) {
   const key = `${f.date}__${f.ex}__${f.set}`;
@@ -59,4 +67,7 @@ async function saveHabits(today, f) {
   if ("water" in f) d.water = f.water; if ("walkMin" in f) d.walkMin = f.walkMin;
   return d;
 }
-module.exports = { getAll, saveSet, removeSet, saveCheckin, saveHabits };
+async function addMeal(f) { const m = { id: "m" + ++n, ...f }; meals.push(m); return m; }
+async function updateMeal(id, f) { const m = meals.find((x) => x.id === id); if (!m) throw Object.assign(new Error("not found"), { status: 404 }); Object.assign(m, f); return m; }
+async function removeMeal(id) { meals = meals.filter((x) => x.id !== id); return { ok: true }; }
+module.exports = { getAll, saveSet, removeSet, saveCheckin, saveHabits, addMeal, updateMeal, removeMeal };

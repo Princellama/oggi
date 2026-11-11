@@ -39,7 +39,7 @@
 
   const FIT = window.FIT;
   const LIFT = ["UA", "LA", "UB", "LB"];
-  const MODES = [["today", "Today"], ["week", "Week"], ["progress", "Progress"]];
+  const MODES = [["today", "Today"], ["meals", "Meals"], ["week", "Week"], ["progress", "Progress"]];
   const modeFromPath = () => { const m = location.pathname.split("/")[2]; return MODES.some(([k]) => k === m) ? m : "today"; };
   const S = { data: null, mode: modeFromPath(), pick: null, open: {}, swaps: keep("swaps") || {}, finished: false };
 
@@ -321,7 +321,7 @@
     if (week <= 0 && !S.early) {
       const days = Math.round((new Date(FIT.start + "T12:00:00") - new Date(t + "T12:00:00")) / 86400000);
       main.append(london(`Welcome back, Eric. This week is the reset: walk every day, protein at every meal, eight glasses of water, no sugary drinks. Most of what the cruise put on is water and salt, and it leaves on its own. We lift ${days <= 1 ? "tomorrow" : "on Monday"}: Upper A, two easy sets of everything.`, label));
-      main.append(habitsCard());
+      main.append(fuelStrip(), habitsCard());
       const prev = h("div", { class: "co-card" }, h("h3", null, "Monday · Upper A", h("span", { text: "preview" })));
       for (const e of FIT.sessions.UA.ex) prev.append(h("p", { style: "margin:0 0 6px" }, h("b", { text: e.name }), h("span", { class: "fit-sub", text: ` · 2 × ${e.lo}–${e.hi}` })));
       prev.append(h("div", { class: "co-acts" }, h("span", { class: "quiet", text: "Itching to start?" }), h("button", { class: "btn ghost small", type: "button", text: "Train today anyway", onclick: () => { S.pick = "UA"; S.early = true; render(); } })));
@@ -343,7 +343,7 @@
       }
       if (plan === "checkin") main.append(h("div", { class: "co-card" }, h("h3", { text: "Sunday check-in" }), h("p", { text: "Waist and photos take two minutes." }),
         h("div", { class: "co-acts" }, h("span"), h("button", { class: "btn teal", type: "button", text: "Open the check-in", onclick: () => go("progress") }))));
-      main.append(habitsCard());
+      main.append(fuelStrip(), habitsCard());
       talk(main); return;
     }
     const finishedNow = S.finished || (setsOn(t).length && habitsToday()["Workout"]);
@@ -352,7 +352,7 @@
     const card = h("div", { class: "co-card" }, h("h3", null, "Lift", h("span", { text: "tick a set to start the rest" })));
     exercisesFor(sk).forEach((e, i) => card.append(exerciseCard(sk, e, eff, i)));
     main.append(card);
-    main.append(habitsCard());
+    main.append(fuelStrip(), habitsCard());
     main.append(h("div", { class: "co-acts" },
       S.pick && !setsOn(t).length ? h("button", { class: "textlink", type: "button", text: "Not today", onclick: () => { S.pick = null; S.early = false; render(); } }) : h("span"),
       h("button", { class: "btn teal", type: "button", text: finishedNow ? "Session saved ✓" : "Finish session", onclick: async () => {
@@ -483,6 +483,190 @@
   }
   function liftsUp() { const r = liftRows(); return r.length && r.filter((x) => x.up).length >= Math.ceil(r.length / 2); }
 
+  // ---------------- meals ----------------
+  // One Fuel Log row per meal. Plate rules first (hand-size portions), numbers when he has them, usuals in one tap.
+  // London's note is written here when the meal is logged and saved on the row, so Notion carries it too.
+  const FUEL = FIT.fuel;
+  const MEAL_KINDS = ["Breakfast", "Lunch", "Dinner", "Snack", "Shake"];
+  const MAC = [["cal", "Calories", ""], ["protein", "Protein", "g"], ["carbs", "Carbs", "g"], ["fat", "Fat", "g"], ["fiber", "Fiber", "g"], ["sugar", "Sugar", "g"], ["added", "Added sugar", "g"]];
+  function nowIso() {
+    const d = new Date(), off = -d.getTimezoneOffset(), sg = off >= 0 ? "+" : "-", a = Math.abs(off);
+    return `${isoOf(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:00${sg}${pad(Math.floor(a / 60))}:${pad(a % 60)}`;
+  }
+  const mealDay = (m) => String(m.at || "").slice(0, 10);
+  const mealTime = (m) => { const t = String(m.at || "").slice(11, 16); if (!t) return ""; const [hh, mm] = t.split(":").map(Number); return `${hh % 12 || 12}:${pad(mm)}${hh < 12 ? "am" : "pm"}`; };
+  const mealsOn = (iso) => (S.data.meals || []).filter((m) => mealDay(m) === iso).sort((a, b) => (a.at < b.at ? -1 : 1));
+  const sum = (list, k) => Math.round(list.reduce((a, m) => a + (Number(m[k]) || 0), 0) * 10) / 10;
+  const guessMeal = () => { const hr = new Date().getHours() + new Date().getMinutes() / 60; return hr < 10.5 ? "Breakfast" : hr < 14.5 ? "Lunch" : hr < 17 ? "Snack" : "Dinner"; };
+  const isMain = (m) => m.meal !== "Snack";
+
+  function londonOnMeal(m, before) {
+    const p = Number(m.protein) || 0, add = Number(m.added) || 0, cal = Number(m.cal) || 0, carbs = Number(m.carbs) || 0;
+    const out = [];
+    if (m.meal === "Snack") out.push(p >= 15 ? `${p} grams of protein in a snack. That's how a snack earns its place.` : "Snack's fine. Protein makes it count: Greek yogurt, eggs, jerky, a shake.");
+    else if (p >= 30) out.push(`${p} grams of protein. That's a meal.`);
+    else if (p >= 20) out.push(`${p} grams. Fine; aim for 30. An egg or half a scoop gets you there.`);
+    else out.push(`Only ${p} grams of protein. Add a palm next time: chicken, fish, eggs, tofu, Greek yogurt.`);
+    if (add >= 12) out.push(`${add} grams of added sugar. Find where it hides: sweetened milk, sauces, drinks.`);
+    else if ((Number(m.sugar) || 0) >= 35) out.push(`${m.sugar} grams of sugar, mostly fruit. Halve the fruit and nothing is lost.`);
+    if (m.how === "Plate" && m.hands && !m.hands.veg && isMain(m) && m.meal !== "Shake") out.push("No veg on the plate. Two fists next time.");
+    else if (m.how !== "Plate" && isMain(m) && m.meal !== "Shake" && m.fiber != null && m.fiber < 4) out.push("Light on fibre. Add vegetables.");
+    if (cal >= 850) out.push(setsOn(today()).length ? "Big meal, but you trained today. Well spent." : "Big one. On a rest day, one hand of carbs is enough.");
+    else if (setsOn(today()).length && carbs >= 40 && out.length < 2) out.push("Carbs after training are well spent.");
+    const total = sum(before, "protein") + p;
+    if (sum(before, "protein") < FUEL.proteinGoal && total >= FUEL.proteinGoal) out.push(`That's ${Math.round(total)} grams today. Protein done.`);
+    return out.slice(0, 3).join(" ");
+  }
+  function londonOnDay(list) {
+    const hr = new Date().getHours(), p = sum(list, "protein"), goal = FUEL.proteinGoal, left = Math.max(0, goal - p);
+    if (!list.length) return hr < 11 ? `Breakfast first, and make it protein: ${Math.round(goal / 4)} grams or so. Log it here and I'll keep count.` : `Nothing logged yet today. Log what you've eaten; even a guess with your hands is better than nothing.`;
+    let line = `${Math.round(p)} grams of protein so far, ${Math.round(left)} to go.`;
+    if (left <= 0) line = `${Math.round(p)} grams of protein today. Done. Everything from here is about keeping it clean.`;
+    else if (hr >= 17) line += left > 50 ? ` Make dinner the big protein meal: two palms, and a shake after if you're still short.` : " Dinner covers it.";
+    else line += ` That's about ${Math.max(1, Math.round(left / 35))} more meal${Math.round(left / 35) > 1 ? "s" : ""} like that.`;
+    const add = sum(list, "added");
+    if (add >= 25) line += ` Added sugar is at ${Math.round(add)} grams. That's the number to watch today.`;
+    return line;
+  }
+  async function logMeal(f) {
+    const t = today(), before = mealsOn(t);
+    const m = { ...f, at: f.at || nowIso() };
+    m.london = londonOnMeal(m, before);
+    const body = { ...m }; delete body.hands;
+    const row = await api("POST", "/api/fit/meal?d=" + t, body);
+    S.data.meals = (S.data.meals || []).concat(row);
+    if (row.saved && !(S.data.usual || []).some((u) => u.name.toLowerCase() === row.name.toLowerCase())) S.data.usual = [row].concat(S.data.usual || []);
+    // three main meals with 25 g or more each ticks Protein every meal
+    const mains = mealsOn(t).filter(isMain);
+    if (mains.length >= 3 && mains.every((x) => (Number(x.protein) || 0) >= 25) && !habitsToday()["Protein every meal"]) { saveHabits({ habits: { "Protein every meal": true } }); toast("Ticked: protein every meal."); }
+    S.lastMeal = row.id;
+    return row;
+  }
+  function macroLine(m) {
+    const bits = [];
+    if (m.protein != null) bits.push(`${m.protein} g protein`);
+    if (m.cal != null) bits.push(`${m.cal} cal`);
+    if (m.added) bits.push(`${m.added} g added sugar`);
+    return bits.join(" · ");
+  }
+  function mealRow(m) {
+    return h("div", { class: "fm" + (S.lastMeal === m.id ? " fresh" : "") },
+      h("div", { class: "fm-h" }, h("span", { class: "fm-n" }, h("span", { class: "fm-k", text: (m.meal || "Meal") + " · " + mealTime(m) }), m.name),
+        h("span", { class: "fm-acts" },
+          h("button", { class: "fm-star" + (m.saved ? " on" : ""), type: "button", title: m.saved ? "Saved as a usual" : "Save as a usual", "aria-label": m.saved ? "Remove from usuals" : "Save as a usual", text: m.saved ? "★" : "☆", onclick: async () => {
+            try { const r = await api("PATCH", "/api/fit/meal/" + m.id, { saved: !m.saved }); Object.assign(m, r);
+              S.data.usual = m.saved ? [m].concat((S.data.usual || []).filter((u) => u.name.toLowerCase() !== m.name.toLowerCase())) : (S.data.usual || []).filter((u) => u.name.toLowerCase() !== m.name.toLowerCase());
+              toast(m.saved ? "Saved as a usual." : "Removed from usuals."); render(); } catch { toast("Couldn't save that."); }
+          } }),
+          h("button", { class: "fm-x", type: "button", "aria-label": "Remove this meal", text: "×", onclick: async () => {
+            if (!confirm(`Remove ${m.name}?`)) return;
+            try { await api("DELETE", "/api/fit/meal/" + m.id); S.data.meals = S.data.meals.filter((x) => x.id !== m.id); render(); } catch { toast("Couldn't remove it."); }
+          } }))),
+      h("div", { class: "fm-mac", text: macroLine(m) }),
+      m.items ? h("div", { class: "fm-items", text: m.items }) : null,
+      m.london ? h("div", { class: "fx-tip", style: "margin:8px 0 0", text: m.london }) : null);
+  }
+  function totalsCard(list) {
+    const p = sum(list, "protein"), pct = Math.min(100, Math.round((p / FUEL.proteinGoal) * 100));
+    const cell = (label, v, unit) => h("div", { class: "ft-c" }, h("b", { text: v == null ? "—" : Math.round(v) + (unit || "") }), h("span", { text: label }));
+    return h("div", { class: "co-card" }, h("h3", null, "Today so far", h("span", { text: `${list.length} logged` })),
+      h("div", { class: "ft-p" }, h("div", { class: "fbig" }, `${Math.round(p)} g`, h("small", { text: `protein of ${FUEL.proteinGoal}` })),
+        h("div", { class: "ft-bar" }, h("i", { style: `width:${pct}%` }))),
+      h("div", { class: "ft-grid" }, cell("calories", sum(list, "cal")), cell("carbs", sum(list, "carbs"), " g"), cell("fat", sum(list, "fat"), " g"),
+        cell("fibre", sum(list, "fiber"), " g"), cell("added sugar", sum(list, "added"), " g")),
+      list.length ? h("div", { class: "fm-list" }, ...list.map(mealRow)) : null);
+  }
+  function logCard() {
+    const D = S.mealDraft || (S.mealDraft = { meal: guessMeal(), mode: "plate", hands: { protein: 2, veg: 2, carbs: 1, fat: 1 }, nums: {}, name: "", items: "", saved: false });
+    const card = h("div", { class: "co-card", id: "logmeal" }, h("h3", null, "Log a meal", h("span", { text: "saves to Notion" })));
+    card.append(h("div", { class: "fchips" }, ...MEAL_KINDS.map((k) => h("button", { type: "button", "aria-pressed": String(D.meal === k), text: k, onclick: () => { D.meal = k; render(); } }))));
+    const usual = S.data.usual || [];
+    if (usual.length) {
+      card.append(h("p", { class: "fl-lab", text: "Your usuals · one tap logs it" }));
+      card.append(h("div", { class: "fusual" }, ...usual.slice(0, 8).map((u) => h("button", { type: "button", onclick: async (ev) => {
+        ev.currentTarget.disabled = true;
+        try {
+          const f = { name: u.name, meal: u.meal && u.meal !== "Shake" ? D.meal : u.meal || D.meal, items: u.items, how: "Saved", saved: false };
+          for (const [k] of MAC) if (u[k] != null) f[k] = u[k];
+          await logMeal(f); toast(`Logged ${u.name}.`); render();
+        } catch { toast("Couldn't log it. Try again."); ev.currentTarget.disabled = false; }
+      } }, h("b", { text: u.name }), h("span", { text: [u.protein != null ? u.protein + " g protein" : "", u.cal != null ? u.cal + " cal" : ""].filter(Boolean).join(" · ") })))));
+    }
+    card.append(h("div", { class: "co-modes fmode" }, ...[["plate", "With my hands"], ["numbers", "From a label"]].map(([k, t]) => h("button", { type: "button", "aria-pressed": String(D.mode === k), text: t, onclick: () => { D.mode = k; render(); } }))));
+    const name = h("input", { class: "co-field", type: "text", placeholder: "What was it? e.g. chicken, rice and salad", value: D.name, oninput: (e) => (D.name = e.target.value) });
+    card.append(name);
+    if (D.mode === "plate") {
+      const box = h("div", { class: "fhands" });
+      for (const [k, v] of Object.entries(FUEL.hand)) {
+        const n = D.hands[k] || 0;
+        box.append(h("div", { class: "fh-row" }, h("span", { class: "lab" }, v.label, h("small", { text: `${v.unit}s` })),
+          h("div", { class: "step-n" }, h("button", { type: "button", "aria-label": "Less " + v.label, text: "−", onclick: () => { D.hands[k] = Math.max(0, n - 0.5); render(); } }),
+            h("output", { text: String(n) }), h("button", { type: "button", "aria-label": "More " + v.label, text: "+", onclick: () => { D.hands[k] = Math.min(6, n + 0.5); render(); } }))));
+      }
+      const est = plateEstimate(D.hands);
+      box.append(h("p", { class: "fl-est", text: `About ${est.protein} g protein · ${est.cal} cal` }));
+      card.append(box);
+    } else {
+      const grid = h("div", { class: "fnums" });
+      for (const [k, label, unit] of MAC) grid.append(h("label", null, h("span", { text: label + (unit ? ` (${unit})` : "") }),
+        h("input", { type: "text", inputmode: "decimal", value: D.nums[k] != null ? String(D.nums[k]) : "", oninput: (e) => { const v = e.target.value.replace(/[^\d.]/g, ""); D.nums[k] = v === "" ? null : Number(v); } })));
+      card.append(grid);
+      card.append(h("textarea", { class: "co-field", style: "min-height:64px;margin-top:10px", placeholder: "What went in (optional): 1 cup oat milk, 2 scoops protein…", oninput: (e) => (D.items = e.target.value) }, D.items));
+    }
+    const sv = h("input", { type: "checkbox" }); sv.checked = !!D.saved; sv.onchange = () => (D.saved = sv.checked);
+    card.append(h("label", { class: "cb fl-save" }, sv, "Save as a usual (one tap next time)"));
+    card.append(h("div", { class: "co-acts" }, h("a", { class: "textlink", href: "https://claude.ai/new?q=" + encodeURIComponent(labelPrompt(D.meal)), target: "_blank", rel: "noopener", text: "Photo of the labels? Ask Claude" }),
+      h("button", { class: "btn teal", type: "button", text: "Log it", onclick: async (ev) => {
+        const nm = (D.name || "").trim();
+        if (!nm) { toast("Give it a name first."); name.focus(); return; }
+        const f = { name: nm, meal: D.meal, saved: !!D.saved };
+        if (D.mode === "plate") { Object.assign(f, plateEstimate(D.hands), { how: "Plate", hands: { ...D.hands }, items: handsText(D.hands) }); }
+        else { for (const [k] of MAC) if (D.nums[k] != null) f[k] = D.nums[k]; f.how = "Numbers"; f.items = (D.items || "").trim(); if (f.protein == null && f.cal == null) { toast("Put in at least protein or calories."); return; } }
+        ev.currentTarget.disabled = true;
+        try { await logMeal(f); S.mealDraft = null; toast("Logged."); render(); window.scrollTo(0, 0); }
+        catch { toast("Couldn't save to Notion. Try again in a moment."); ev.currentTarget.disabled = false; }
+      } })));
+    return card;
+  }
+  function plateEstimate(hd) {
+    const out = { cal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
+    for (const [k, v] of Object.entries(FUEL.hand)) for (const m of Object.keys(out)) out[m] += (hd[k] || 0) * v[m];
+    for (const m of Object.keys(out)) out[m] = Math.round(out[m]);
+    return out;
+  }
+  function handsText(hd) {
+    return Object.entries(FUEL.hand).filter(([k]) => hd[k]).map(([k, v]) => `${hd[k]} ${v.unit}${hd[k] === 1 ? "" : "s"} ${v.label.toLowerCase()}`).join(", ") + " (hand-size estimate)";
+  }
+  function labelPrompt(meal) {
+    return [
+      "I'm logging a meal for my Oggi Fit page. I'll attach photos of the nutrition labels and say how much of each I had.",
+      "Add up the totals (calories, protein, carbs, fat, fibre, sugar, added sugar) for what I actually had, show me a small table, then add one row to the Notion Fuel Log (collection://964f3b3d-0da1-4071-a069-38c9d5cee37d) with Name, Date (now, my local time with offset), Meal (" + meal + " unless I say otherwise), Items, the numbers, How = Claude, and Saved ticked if I say it's a usual.",
+      "Fill London with one to three sentences as London, my fitness coach (a former European gymnastics champion in his fifties: calm, direct, numbers first, no hype). My plan is plate rules with about " + FUEL.proteinGoal + " g of protein a day, no sugary drinks, and losing body fat. If there's a better way to make it, say how in his note.",
+    ].join("\n\n");
+  }
+  function lastDays() {
+    const t = today(), rows = [];
+    for (let i = 1; i <= 7; i++) { const d = addDays(t, -i), list = mealsOn(d); if (list.length) rows.push({ d, list }); }
+    if (!rows.length) return null;
+    return h("div", { class: "co-card flifts" }, h("h3", null, "Last 7 days", h("span", { text: "protein · calories" })),
+      ...rows.map(({ d, list }) => { const p = sum(list, "protein");
+        return h("p", null, h("span", { text: fmtDay(d) + ` · ${list.length} logged` }), h("em", { class: p >= FUEL.proteinGoal ? "" : "short", text: `${Math.round(p)} g · ${Math.round(sum(list, "cal"))}` })); }));
+  }
+  function meals_(main) {
+    const t = today(), list = mealsOn(t);
+    main.append(london(londonOnDay(list), "London · Meals"));
+    main.append(totalsCard(list));
+    main.append(logCard());
+    const ld = lastDays(); if (ld) main.append(ld);
+    main.append(h("p", { class: "quiet", style: "text-align:center", text: "Hand sizes are estimates, and that's fine. Being consistent matters more than being exact." }));
+    talk(main);
+  }
+  function fuelStrip() {
+    const list = mealsOn(today()), p = sum(list, "protein");
+    return h("div", { class: "co-card fstrip" }, h("div", null, h("b", { text: `${Math.round(p)} g protein` }), h("span", { text: ` of ${FUEL.proteinGoal} · ${list.length} meal${list.length === 1 ? "" : "s"} logged` })),
+      h("button", { class: "btn ghost small", type: "button", text: "Log a meal", onclick: () => go("meals") }));
+  }
+
   // ---------------- talk to London ----------------
   function talkPrompt() {
     const t = today(), week = FIT.weekOf(t), ph = FIT.phase(week), mon = mondayOf(t);
@@ -496,12 +680,14 @@
     const cs = (S.data.checkins || []).filter((c) => c.waist != null).sort((a, b) => (a.day < b.day ? -1 : 1));
     const waist = cs.length ? cs.map((c) => `${fmtShort(c.day)} ${c.waist}″`).join(", ") : "no check-ins yet";
     const missed = missedThisWeek(t).map((m) => `${FIT.sessions[m.key].name} (${dayName(m.day)})`).join(", ") || "none";
+    const ml = mealsOn(t), mealStr = ml.length ? ml.map((m) => `${m.meal || "Meal"} ${mealTime(m)}: ${m.name} (${macroLine(m)})`).join("; ") + `. Total ${Math.round(sum(ml, "protein"))} g protein of ${FUEL.proteinGoal}.` : "nothing logged yet";
     return [
       "You are London, Eric's fitness coach in his Oggi app: a former European gymnastics champion in his fifties, now a coach. Calm, direct, warm underneath, short sentences, numbers first, no hype and no emojis.",
       `Eric is on the Lean & Aesthetic 4-day plan (Notion: Health and Wellness → "Lean & Aesthetic: 4-Day Plan"): Upper A Monday, Lower A Tuesday, Upper B Thursday, Lower B Friday, walks Wednesday and Saturday (45 min), Sunday check-in with waist and photos, never the scale. Food is plate rules: 2 palms protein, 2 fists veg, 1–2 cupped hands carbs, 1 thumb fat.`,
       `Today is ${fmtDay(t)}, program week ${week} (${ph.label}). Sessions done this week: ${done}. Missed this week: ${missed}.`,
       `Last session: ${lastStr}.`,
       `Waist check-ins: ${waist}.`,
+      `Meals today: ${mealStr}`,
       "Answer Eric's question as London. If the advice changes the program (an exercise, sets, reps, schedule), say exactly what to change so Claude can update public/fit-data.js in the oggi repo. If he describes pain beyond normal soreness, tell him to stop that movement and see a doctor.",
       "Eric's question: ",
     ].join("\n\n");
@@ -518,7 +704,7 @@
     if (!S.data) { main.append(h("p", { class: "quiet", text: "One moment…" })); return; }
     if (S.data.error === "share") { main.append(london("I can't see the Workout Log yet. In Notion, open Medicare Marketing → Fit → ••• → Connections → add oggi, then refresh.")); return; }
     if (S.data.error) { main.append(london("I couldn't reach Notion just now. Pull to refresh in a moment.")); return; }
-    if (S.mode === "week") week_(main); else if (S.mode === "progress") progress_(main); else today_(main);
+    if (S.mode === "week") week_(main); else if (S.mode === "progress") progress_(main); else if (S.mode === "meals") meals_(main); else today_(main);
   }
   async function load() {
     try {

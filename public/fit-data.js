@@ -15,6 +15,18 @@
     // getDay(): 0 Sunday … 6 Saturday
     schedule: { 1: "UA", 2: "LA", 3: "walk", 4: "UB", 5: "LB", 6: "walk45", 0: "checkin" },
     walkGoal: (dow) => (dow === 6 ? 45 : 30),
+    // Meals. Plate rules first; numbers only when he has them. proteinGoal is a starting default
+    // (about four 30–40 g meals); change it here if Eric's doctor or a weigh-in says otherwise.
+    fuel: {
+      proteinGoal: 140,
+      // one hand-size portion, roughly: palm of protein, fist of veg, cupped hand of carbs, thumb of fat
+      hand: {
+        protein: { label: "Protein", unit: "palm", cal: 120, protein: 24, carbs: 0, fat: 3, fiber: 0 },
+        veg: { label: "Veg", unit: "fist", cal: 25, protein: 1, carbs: 5, fat: 0, fiber: 2 },
+        carbs: { label: "Carbs", unit: "cupped hand", cal: 110, protein: 3, carbs: 25, fat: 1, fiber: 2 },
+        fat: { label: "Fat", unit: "thumb", cal: 100, protein: 0, carbs: 0, fat: 11, fiber: 0 },
+      },
+    },
     sessions: {
       UA: { name: "Upper A", focus: "Chest and shoulders", minutes: 55, ex: [
         X("incline-db-press", "Incline dumbbell press", 3, 6, 10, "big", 5,
