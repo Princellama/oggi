@@ -179,9 +179,13 @@
       // One idea from the chapter he's on, in Roger's words, and a light nudge to use it today.
       const b = (S.data.books || []).find((x) => x.takeaways && x.takeaways.length);
       if (!b) { go("close"); return; }
-      const day = Math.floor(Date.now() / 864e5), tk = b.takeaways[day % b.takeaways.length];
+      const day = Math.floor(Date.now() / 864e5), t = b.takeaways[day % b.takeaways.length];
+      const tk = typeof t === "string" ? { text: t, mine: false } : t;
       const lead = ["The point I keep coming back to", "The bit I liked", "What stuck with me"][day % 3];
-      box.append(roger(`You're on chapter ${b.chapterNo} of ${b.title}, I see. ${lead}: ${tk.charAt(0).toLowerCase() + tk.slice(1)} So, where could you put that to work before the day's out? Something small will do.`, "Roger"));
+      const point = tk.mine
+        ? `You marked this one yourself: “${tk.text.replace(/^["“]|["”]$/g, "")}” Rather good, that.`
+        : `${lead}: ${tk.text.charAt(0).toLowerCase() + tk.text.slice(1)}`;
+      box.append(roger(`You're on chapter ${b.chapterNo} of ${b.title}, I see. ${point} So, where could you put that to work before the day's out? Something small will do.`, "Roger"));
       const ta = h("textarea", { class: "co-field", placeholder: "One small thing, today. Type it, or tap the mic and say it." }, (S.draft.apply || (S.data.today && S.data.today.apply) || ""));
       box.append(ta, h("div", { class: "co-acts" },
         h("button", { class: "textlink", type: "button", text: "Not today", onclick: () => { S.pmApplied = false; go("close"); } }),

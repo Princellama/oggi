@@ -551,7 +551,7 @@ app.get("/feeding", (req, res) => {
 app.get("/api/coach", requireAuth, wrap(async (req, res) => {
   res.set("Cache-Control", "no-store");
   if (DEMO) return res.json({ today: null, yesterday: { day: "", win: "Two enrollments: Henry and Thelma.", rogerMorning: "", rogerPick: "", habits: {} }, streaks: {}, books: [{ title: "Atomic Habits", author: "James Clear", chapter: "Chapter 2: how habits shape identity", chapterNo: "2", themes: ["Habits"],
-    takeaways: ["Every small action is a vote for the kind of person you are becoming. You don't need a unanimous vote, just a majority."] }] });
+    takeaways: [{ text: "Every small action is a vote for the kind of person you are becoming. You don't need a unanimous vote, just a majority.", mine: false }] }] });
   try { res.json(await coach.getAll(localDate(req))); }
   catch (e) { if (e.status === 404 || e.status === 403) return res.json({ error: "share" }); throw e; }
 }));

@@ -45,16 +45,17 @@ async function streaks(today) {
 }
 // The chapter number in Eric's words ("Chapter 2: how habits shape identity", "Ch. 3") → "2".
 const chapterNo = (t) => { const m = String(t || "").match(/(\d+)/); return m ? m[1] : ""; };
-// Chapter takeaways (Kind Takeaway, in Claude's own words) for the book Eric is reading, so Roger can raise one.
+// For the chapter Eric is on: Claude's takeaways (Kind Takeaway, Claude's own words) and the lines Eric
+// captured himself (Kind Eric captured). Roger raises one; Eric's own lines are shown in quote marks as his.
 async function takeaways(book) {
   const ch = chapterNo(book.chapter);
   if (!ch) return [];
   const r = await queryDS(DS.quotes, { filter: { and: [
-    { property: "Kind", select: { equals: "Takeaway" } },
+    { or: [{ property: "Kind", select: { equals: "Takeaway" } }, { property: "Kind", select: { equals: "Eric captured" } }] },
     { property: "Book", relation: { contains: book.id } },
     { property: "Chapter", rich_text: { equals: ch } },
-  ] }, page_size: 20 });
-  return r.results.map((q) => read(q.properties["Quote"]) || "").filter(Boolean);
+  ] }, page_size: 30 });
+  return r.results.map((q) => ({ text: read(q.properties["Quote"]) || "", mine: read(q.properties["Kind"]) === "Eric captured" })).filter((t) => t.text);
 }
 async function getAll(today) {
   const [t, y, books, st] = await Promise.all([
