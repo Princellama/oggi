@@ -680,6 +680,21 @@
   PROMPTS.scriptAll = (day) => `/script-builder — build call scripts for everyone on my ${day} Medicare Calls list who has no Script yet, or only an Oggi draft. Use Plaud, Notion People and GHL for each person, and write Type, Context, Missing, Script and Voicemail on each row (Script by: Claude).`;
   PROMPTS.scriptNew = (name) => `/script-builder — ${name} isn't on my Medicare Calls list yet. Find them in Notion People, GHL and Plaud, add them to my next calling day's list, and write their Type, Context, Missing, Script and Voicemail.`;
 
+  // Filipino phrases for the script: Tagalog by default, Ilocano when Eric says they're Ilocano.
+  const PHRASES = {
+    Tagalog: [
+      ["Greet", "“Magandang umaga po!” (morning) or “Magandang hapon po!” (afternoon), then “Kumusta po kayo?”"],
+      ["If you're late", "“Pasensya na po, natagalan ako.” (Sorry, I took a while.)"],
+      ["Reassure", "“Huwag po kayong mag-alala, tutulungan ko po kayo.” (Don't worry, I'll help you.)"],
+      ["Close", "“Maraming salamat po. Ingat po kayo!” (Thank you very much. Take care!)"],
+    ],
+    Ilocano: [
+      ["Greet", "“Naimbag nga bigat yo!” (morning) or “Naimbag nga malem yo!” (afternoon), then “Kumusta kayo?”"],
+      ["Reassure", "“Dikay agdanag.” (Don't worry.)"],
+      ["Close", "“Agyamanak unay! Ag-annad kayo.” (Thank you very much! Take care.)"],
+    ],
+  };
+  const LANGS = [[null, "Not Filipino"], ["Tagalog", "Filipino: Tagalog"], ["Ilocano", "Ilocano"]];
   const firstName = (n) => { const s = String(n || "").trim(); return (s.includes(",") ? s.split(",")[1] : s).trim().split(/\s+/)[0] || "there"; };
   const callbackNo = () => { try { return localStorage.getItem("oggi.callback") || ""; } catch { return ""; } };
   function roger(text, label, small) {
@@ -729,6 +744,7 @@
     P.push("OPEN\n“Hi, is this " + first + "? Aloha " + first + ", this is Eric Barayuga, a licensed Medicare agent. We met at " + met + ". Did I catch you at an okay time for a few minutes?”"
       + "\nIf not: “No problem. What's better, later today or tomorrow morning?”"
       + "\nIf yes: “Just so you know, I record my calls for quality and compliance.”");
+    if (w.lang && PHRASES[w.lang]) P.push("FILIPINO TOUCH (" + w.lang + ")\n" + PHRASES[w.lang].map(([k, t]) => k + ": " + t).join("\n") + "\nUse one or two, warmly; then back to English.");
     if (w.personal) P.push("PERSONAL TOUCH\nKeep it light, one line: " + w.personal);
     const bridge = {
       Direct: topic ? "“You mentioned " + topic + ". Is that still on your mind?”" : "“You asked me to follow up on your coverage for next year. Still something you want to sort out?”",
@@ -768,7 +784,7 @@
     const first = firstName(c.name), met = cleanMet(w.met || defaultMet(c)) || "the Longs", no = callbackNo() || "[your number]";
     const k = CONCERNS.find(([key]) => w.concerns.includes(key));
     return "Hi " + first + ", this is Eric Barayuga, a licensed Medicare agent. We met at " + met + ". I'm following up like I promised"
-      + (k ? " on your question about " + k[2] : "") + ". Please call or text me at " + no + ". Again, that's Eric at " + no + ". Mahalo.";
+      + (k ? " on your question about " + k[2] : "") + ". Please call or text me at " + no + ". Again, that's Eric at " + no + "." + (w.lang === "Ilocano" ? " Agyamanak, mahalo." : w.lang ? " Salamat po, mahalo." : " Mahalo.");
   }
   function contextText(w) {
     const lines = [];
@@ -777,6 +793,7 @@
     if (w.other) cs.push(w.other);
     if (cs.length) lines.push("Concerns: " + cs.join(", "));
     if (w.personal) lines.push("Personal: " + w.personal);
+    if (w.lang) lines.push("Language: " + w.lang);
     if (w.met) lines.push("Met: " + w.met);
     return lines.join("\n");
   }
@@ -786,7 +803,7 @@
     const named = (ctx.concerns || "").split(/,\s*/);
     return { step: 1, callId: c.id, type: c.type || null, carrier: ON_NOW.includes(ctx.carrier) ? ctx.carrier : null,
       concerns: CONCERNS.filter((x) => named.includes(x[1])).map((x) => x[0]), other: named.filter((n) => n && !CONCERNS.some((x) => x[1] === n)).join(", "),
-      personal: ctx.personal || "", met: ctx.met || defaultMet(c), gather: [] };
+      personal: ctx.personal || "", met: ctx.met || defaultMet(c), gather: [], lang: PHRASES[ctx.language] ? ctx.language : null };
   }
 
   function tools(main) {
@@ -875,7 +892,10 @@
       per.addEventListener("input", () => { w.personal = per.value; });
       const met = h("input", { type: "text", class: "rg-input", value: w.met || defaultMet(c) });
       met.addEventListener("input", () => { w.met = met.value; });
-      box.append(h("div", { class: "rg-set col" }, h("label", { text: "Personal" }), per, h("label", { text: "Where you met (finishes “We met at …”)" }), met));
+      const langs = h("div", { class: "rg-chips" }, ...LANGS.map(([v, label]) => h("button", { type: "button", class: "rg-chip" + ((w.lang || null) === v ? " on" : ""), "aria-pressed": String((w.lang || null) === v),
+        onclick: () => { w.lang = v; for (const b of langs.children) { const on = b.textContent === label; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); } } }, label)));
+      box.append(h("div", { class: "rg-set col" }, h("label", { text: "Personal" }), per, h("label", { text: "Where you met (finishes “We met at …”)" }), met,
+        h("label", { text: "Filipino phrases (Tagalog unless they're Ilocano)" }), langs));
       return box.append(nav(rgBtn("Next", () => { w.step = 5; render(); })));
     }
     if (w.step === 5) {
