@@ -420,6 +420,7 @@ app.patch("/api/medicare/portal/:id", requireAuth, wrap(async (req, res) => {
 
 // Medicare Calls: Eric's call log from the Calls tab. The list itself is written by Claude; only the
 // log fields are accepted here. The first outcome stamps Called at.
+const CALL_TYPES = ["Direct", "Gentle", "Analytical", "Not now"];
 const CALL_OUTCOMES = ["Reached", "Left voicemail", "No answer", "Wrong number", "Call back later", "Booked appointment", "Enrolled", "Staying put", "Not interested"];
 app.patch("/api/medicare/call/:id", requireAuth, wrap(async (req, res) => {
   const b = req.body, f = {};
@@ -433,7 +434,11 @@ app.patch("/api/medicare/call/:id", requireAuth, wrap(async (req, res) => {
   if ("session" in b) { const k = String(b.session || ""); if (k && !/^sess-\d{8}-\d{4}$/.test(k)) return res.status(400).json({ error: "session" }); f.session = k; }
   for (const k of ["recording", "verified", "disclaimer", "soa", "plaud"]) if (k in b) f[k] = !!b[k];
   if ("nextDate" in b) { if (!isDay(b.nextDate || null)) return res.status(400).json({ error: "nextDate" }); f.nextDate = b.nextDate || null; }
-  for (const [k, max] of [["nextStep", 300], ["notes", 1900], ["newEmail", 200], ["newAddress", 300], ["newPhone", 40]]) if (k in b) f[k] = String(b[k] || "").slice(0, max);
+  for (const [k, max] of [["nextStep", 300], ["notes", 1900], ["newEmail", 200], ["newAddress", 300], ["newPhone", 40],
+    ["context", 1500], ["script", 3800], ["voicemail", 600], ["missing", 300]]) if (k in b) f[k] = String(b[k] || "").slice(0, max);
+  // The script wizard in Agent Tools sets the call type and marks its draft.
+  if ("type" in b) { if (b.type && !CALL_TYPES.includes(b.type)) return res.status(400).json({ error: "type" }); f.type = b.type || null; }
+  if ("scriptBy" in b) { if (b.scriptBy && !["Oggi draft", "Claude"].includes(b.scriptBy)) return res.status(400).json({ error: "scriptBy" }); f.scriptBy = b.scriptBy || null; }
   res.json(await mstore.updateCall(req.params.id, f));
 }));
 

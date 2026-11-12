@@ -145,6 +145,9 @@ function toCall(pg) {
     calledAt: read(p["Called at"]), filed: read(p["Filed"]),
     plaud: read(p["Plaud note"]), dialedAt: read(p["Dialed at"]), session: read(p["Session"]) || "",
     plaudMatch: read(p["Plaud match"]) || "", claudeNext: read(p["Claude next"]) || "",
+    // The script for this person (Agent Tools wizard or Claude's script-builder skill).
+    type: read(p["Type"]) || null, context: read(p["Context"]) || "", script: read(p["Script"]) || "",
+    voicemail: read(p["Voicemail"]) || "", missing: read(p["Missing"]) || "", scriptBy: read(p["Script by"]) || null,
   };
 }
 async function getCalls(today) {
@@ -154,13 +157,16 @@ async function getCalls(today) {
   });
   return rows.map(toCall);
 }
-const CALL_TEXT = [["nextStep", "Next step"], ["notes", "Notes"], ["newEmail", "New email"], ["newAddress", "New address"], ["newPhone", "New phone"]];
+const CALL_TEXT = [["nextStep", "Next step"], ["notes", "Notes"], ["newEmail", "New email"], ["newAddress", "New address"], ["newPhone", "New phone"],
+  ["context", "Context"], ["script", "Script"], ["voicemail", "Voicemail"], ["missing", "Missing"]];
 const CALL_BOX = [["recording", "Recording on"], ["verified", "Identity verified"], ["disclaimer", "Disclaimer read"], ["soa", "SOA"], ["plaud", "Plaud note"]];
 async function updateCall(id, f) {
   const props = {};
   for (const [k, name] of CALL_TEXT) if (k in f) props[name] = { rich_text: rich(f[k] || "") };
   for (const [k, name] of CALL_BOX) if (k in f) props[name] = { checkbox: !!f[k] };
   if ("outcome" in f) props["Outcome"] = { select: f.outcome ? { name: f.outcome } : null };
+  if ("type" in f) props["Type"] = { select: f.type ? { name: f.type } : null };
+  if ("scriptBy" in f) props["Script by"] = { select: f.scriptBy ? { name: f.scriptBy } : null };
   if ("nextDate" in f) props["Next date"] = { date: f.nextDate ? { start: f.nextDate } : null };
   if ("calledAt" in f) props["Called at"] = { date: f.calledAt ? { start: f.calledAt } : null };
   if ("dialedAt" in f) props["Dialed at"] = { date: f.dialedAt ? { start: f.dialedAt } : null };

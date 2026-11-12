@@ -410,3 +410,70 @@ ol.script li { margin-bottom: 10px; }
 .cl-follow p { margin: 0; font-size: 14px; }
 .cl-claude-line { color: var(--ink); }
 @media (max-width: 560px) { .cl-step, .cl-row { grid-template-columns: 1fr; gap: 2px; } }
+
+/* ---------- Agent Tools: Roger, the script builder, and the calling-session brief ---------- */
+.roger { display: flex; gap: 14px; align-items: flex-start; margin: 0 0 18px; }
+.roger img { width: 64px; height: 64px; flex: none; border-radius: 50%; }
+.roger .say { position: relative; flex: 1; min-width: 0; background: #fff; border: 1px solid var(--hair); border-radius: 16px; padding: 13px 16px; color: var(--ink); font: 16.5px/1.5 var(--serif); }
+.roger .say::before { content: ""; position: absolute; left: -8px; top: 24px; width: 14px; height: 14px; background: #fff; border-left: 1px solid var(--hair); border-bottom: 1px solid var(--hair); transform: rotate(45deg); }
+.roger .say small { display: block; font: 600 11px/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--soft); margin-bottom: 6px; }
+@media (max-width: 480px) { .roger img { width: 48px; height: 48px; } .roger .say { font-size: 15.5px; } }
+.tw { position: relative; display: block; }
+.tw-ghost { visibility: hidden; }
+.tw-live { position: absolute; inset: 0; }
+.rg { max-width: 720px; }
+.rg-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin: 0 0 18px; }
+.rg-tool { text-align: left; border: 1px solid var(--hair); border-radius: 12px; background: #fff; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; color: var(--ink); }
+.rg-tool:hover { border-color: var(--grey); }
+.rg-tool b { font: 600 16px/1.3 var(--serif); }
+.rg-tool span { font-size: 13px; color: var(--soft); }
+.rg-note { font-size: 13.5px; color: var(--soft); margin: 0 0 14px; }
+.rg-set { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 14px; }
+.rg-set.col { flex-direction: column; align-items: stretch; }
+.rg-set label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--grey); }
+.rg-input { flex: 1 1 220px; font: 15px/1.5 var(--sans); color: var(--ink); background: #fff; border: 1px solid var(--hair); border-radius: 10px; padding: 9px 12px; }
+.rg-input:focus { outline: none; border-color: var(--grey); }
+textarea.rg-input { resize: vertical; }
+.rg-script { font-size: 14.5px; min-height: 340px; }
+.rg-acts { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 16px 0 8px; }
+.rg-save { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.rg-choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.rg-choices.col { flex-direction: column; }
+.rg-choice { text-align: left; border: 1px solid var(--hair); border-radius: 12px; background: #fff; padding: 11px 14px; cursor: pointer; color: var(--ink); display: flex; flex-direction: column; gap: 2px; }
+.rg-choice b { font-size: 15px; }
+.rg-choice span { font-size: 13px; color: var(--soft); }
+.rg-choice:hover, .rg-chip:hover { border-color: var(--grey); }
+.rg-choice.on { border-color: var(--clay); box-shadow: inset 3px 0 0 var(--clay); }
+.rg-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.rg-chip { border: 1px solid var(--hair); border-radius: 99px; background: #fff; padding: 7px 13px; font-size: 14px; color: var(--ink); cursor: pointer; }
+.rg-chip.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.rg-people { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rg-people button { width: 100%; text-align: left; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; border: 1px solid var(--hair); border-radius: 10px; background: #fff; padding: 10px 14px; cursor: pointer; color: var(--ink); }
+.rg-people button:hover { border-color: var(--grey); }
+.rg-people b { font-size: 15px; }
+.prog { display: flex; gap: 5px; margin: 0 0 16px; max-width: 720px; }
+.prog i { flex: 1; height: 4px; border-radius: 4px; background: var(--hair); }
+.prog i.on { background: var(--clay); }
+.rg-brief { border: 1px solid #CFE2D3; background: #F7FAF7; border-radius: 12px; padding: 16px 16px 6px; margin: 0 0 22px; }
+.rg-brief .roger .say { background: #fff; }
+.rg-plan { display: flex; flex-direction: column; gap: 8px; margin: 0 0 4px 78px; }
+@media (max-width: 480px) { .rg-plan { margin-left: 0; } }
+.rg-plan p { margin: 0; font-size: 14.5px; color: var(--ink); display: grid; grid-template-columns: 90px 1fr; gap: 8px; }
+.rg-plan b { padding-top: 3px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ok); }
+.chip.t-Direct { color: #A03A2C; border-color: #EBCFC2; }
+.chip.t-Gentle { color: var(--ok); border-color: #CFE2D3; }
+.chip.t-Analytical { color: #2C5E9E; border-color: #CCD9EC; }
+.chip.t-Notnow { color: var(--grey); }
+.cl-ask p { color: var(--clay-h); }
+.cl-linkbtn { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: 13px; }
+.cl-own { border: 1px solid var(--hair); border-radius: 8px; padding: 10px 14px; background: var(--wash); }
+.cl-own summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--ink); }
+.cl-own summary small { font-weight: 400; color: var(--grey); }
+.cl-own-body { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.cl-own-text { margin: 0; white-space: pre-line; font-size: 14.5px; line-height: 1.55; color: var(--ink); }
+.cl-vm { border-left: 2px solid var(--clay); background: var(--bg); padding: 8px 12px; border-radius: 0 6px 6px 0; }
+.cl-vm b { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--clay-h); }
+.cl-vm p { margin: 4px 0 6px; font-size: 14px; color: var(--ink); }
+.tw:not(.done) .tw-live::after { content: ""; display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px; background: currentColor; opacity: .55; animation: tw-blink .9s steps(1) infinite; }
+.tw:not(.done) { cursor: pointer; }
+@keyframes tw-blink { 50% { opacity: 0; } }

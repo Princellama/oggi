@@ -63,7 +63,7 @@
 
   // ---------------- state ----------------
   const S = { data: null, err: null, msg: null, tab: "overview", pulseScope: "All", pulseCarrier: "All", partnerFilter: "All", draft: { kind: "In the field" } };
-  const TABS = ["overview", "calls", "pulse", "carriers", "specialized", "campaigns", "content", "partners", "log"];
+  const TABS = ["overview", "calls", "tools", "pulse", "carriers", "specialized", "campaigns", "content", "partners", "log"];
   const PROMPTS = {
     scan: "/medicare-marketing scan — scan Hawaii and national Medicare news and the four carriers (Devoted, UHC, Humana, HMSA), and add what's new to Medicare Pulse.",
     count: "/medicare-marketing count — count leads, appointments and enrollments in GHL for each running campaign in Medicare Campaigns, and sync my kiosk and event schedule from Google Calendar into Medicare Field Days.",
@@ -99,7 +99,7 @@
   $("#tabs").addEventListener("click", (e) => {
     const a = e.target.closest("a[data-tab]");
     if (!a || e.metaKey || e.ctrlKey) return;
-    e.preventDefault(); if (a.dataset.tab === "specialized") S.spec = null; go(a.dataset.tab);
+    e.preventDefault(); if (a.dataset.tab === "specialized") S.spec = null; if (a.dataset.tab === "tools") { S.tool = null; S.wiz = null; } go(a.dataset.tab);
   });
   window.addEventListener("popstate", () => { const t = routeFromPath(); go(t, false, S.sub); });
 
@@ -150,7 +150,7 @@
     for (const [k, v] of otherErrors()) main.append(h("p", { class: "mc-err", text: `${k}: ${v.error}` }));
     if (S.msg) main.append(h("p", { class: "mc-msg", text: S.msg }));
     if (S.tab === "carriers" && S.sub === "plans") return plans2027(main);
-    ({ overview, calls, pulse, carriers, specialized, campaigns, content, partners, log })[S.tab](main);
+    ({ overview, calls, tools, pulse, carriers, specialized, campaigns, content, partners, log })[S.tab](main);
   }
 
   // ---------------- overview ----------------
@@ -498,6 +498,7 @@
     const li = h("li", { class: "cl-card" },
       h("div", { class: "cl-top" },
         h("span", { class: "cl-name", text: c.name }), status, plaudChip,
+        c.type ? chip(c.type, "t-" + c.type.replace(/\s/g, "")) : null,
         h("span", { class: "cl-tag", text: c.tag }),
         people ? ext(h("a", { class: "textlink", href: people, text: "People row" })) : null),
       h("div", { class: "cl-facts" },
@@ -509,9 +510,32 @@
       c.say ? h("div", { class: "cl-row" }, h("span", { text: "Say" }), h("p", { text: c.say })) : null,
       c.ready ? h("div", { class: "cl-row" }, h("span", { text: "Have ready" }), h("p", { text: c.ready })) : null,
       c.claudeNext ? h("div", { class: "cl-row cl-claude" }, h("span", { text: "Claude" }), h("p", { text: c.claudeNext })) : null,
+      askFor(c),
+      scriptBox(c),
       log);
     paint();
     return li;
+  }
+  // What to collect on this call: what Claude or the wizard listed, plus any gap in the row itself.
+  function askFor(c) {
+    const items = String(c.missing || "").split(/,\s*/).filter(Boolean);
+    if (!c.email && !items.some((x) => /email/i.test(x))) items.unshift("email");
+    if ((!c.address || /city only|unconfirmed/i.test(c.address)) && !items.some((x) => /address/i.test(x))) items.unshift("address");
+    return items.length ? h("div", { class: "cl-row cl-ask" }, h("span", { text: "Ask for" }), h("p", { text: items.join(", ") })) : null;
+  }
+  // The person's own script and voicemail, from the Agent Tools wizard or Claude's script-builder.
+  function scriptBox(c) {
+    const build = () => { S.tool = "script"; S.wiz = c.script ? wizFrom(c) : { step: 1, callId: c.id, type: null, carrier: null, concerns: [], other: "", personal: "", met: defaultMet(c), gather: [] }; go("tools"); };
+    if (!c.script) return h("div", { class: "cl-row" }, h("span", { text: "Script" }),
+      h("p", {}, h("button", { type: "button", class: "textlink cl-linkbtn", text: "Build " + firstName(c.name) + "'s script with Roger", onclick: build }), " · ",
+        ext(h("a", { class: "textlink", href: claude(PROMPTS.script(c)), text: "or with Claude from Plaud" }))));
+    return h("details", { class: "cl-own", open: activeSession() ? true : null },
+      h("summary", {}, (c.type ? c.type + " script" : "Script") + " for " + firstName(c.name), h("small", { text: c.scriptBy === "Claude" ? " · by Claude" : c.scriptBy ? " · Oggi draft" : "" })),
+      h("div", { class: "cl-own-body" },
+        h("p", { class: "cl-own-text", text: c.script }),
+        c.voicemail ? h("div", { class: "cl-vm" }, h("b", { text: "Voicemail" }), h("p", { text: c.voicemail }), copyBtn(() => c.voicemail)) : null,
+        h("p", { class: "cl-meta" }, copyBtn(() => c.script, "Copy script"), h("button", { type: "button", class: "textlink cl-linkbtn", text: "Edit with Roger", onclick: build }),
+          ext(h("a", { class: "textlink", href: claude(PROMPTS.script(c)), text: "Rewrite with Claude" })))));
   }
   function calls(main) {
     const { day, days, list } = callDay();
@@ -532,6 +556,7 @@
       return;
     }
     main.append(sessionBar(list));
+    if (S.rogerBrief && activeSession()) main.append(rogerBrief(list));
     const dash = h("div", { class: "cl-dash" });
     refreshDash = () => paintDash(dash, list);
     refreshDash();
@@ -553,7 +578,7 @@
     const sess = activeSession();
     if (!sess) {
       const b = h("button", { class: "btn cl-start", type: "button", text: "Start calling session" });
-      b.addEventListener("click", () => { b.disabled = true; b.textContent = "Starting…"; startSession(); });
+      b.addEventListener("click", () => { b.disabled = true; b.textContent = "Starting…"; S.rogerBrief = true; startSession(); });
       const last = rows("callSessions").find((x) => x.ended);
       return h("div", { class: "cl-session" }, b,
         h("p", { class: "cl-sub", text: "Marks this as a prospecting session: every dial, outcome and note is stamped with the time, and Claude matches your Plaud recordings to it." + (last ? ` Last session: ${last.name.replace(/^Calls · /, "")}, ${last.dialed ?? 0} dialed, ${last.reached ?? 0} talked, ${last.minutes ?? 0} min.` : "") }));
@@ -595,6 +620,339 @@
           h("span", { class: "cl-tag", text: c.calledAt ? "Called " + fmtWeekday(c.calledAt) + " " + fmtClock(c.calledAt) : "" })),
         c.claudeNext ? h("p", { class: "cl-claude-line", text: c.claudeNext }) : null,
         c.nextStep && c.nextStep !== c.claudeNext ? h("p", { class: "cl-tag", text: "You: " + c.nextStep }) : null)))));
+  }
+
+  // ---------------- agent tools ----------------
+  // Roger runs this tab: a script builder (a short wizard that types the prospect and assembles a draft
+  // script and voicemail onto their Medicare Calls row), a mindset check, objection replies and the
+  // playbook. Claude's script-builder skill writes the same fields from Plaud and Notion.
+  const PLAYBOOK = "https://claude.ai/artifact/NWYDwmhiot1DE6Ap9e7CZq";
+  const CALL_TYPES = [
+    ["Direct", "Knew what they wanted. Short answers, a problem to solve."],
+    ["Gentle", "Chatty and warm, a bit worried or wary of salespeople."],
+    ["Analytical", "Lots of questions, took brochures, likes to compare."],
+    ["Not now", "Happy with their plan, or just looking."],
+  ];
+  const ON_NOW = ["Devoted", "UHC", "Humana", "HMSA", "Kaiser", "AlohaCare", "Original Medicare only", "Medicare Supplement", "Employer or retiree plan", "Med-QUEST or dual", "Turning 65", "Not sure"];
+  const CONCERNS = [
+    ["dental", "Dental", "dental", "“Which dentist do you see, and is there any dental work coming up next year?”"],
+    ["doctors", "Keeping their doctors", "keeping your doctors", "“Which doctors do you need to keep? I check those first.”"],
+    ["drugs", "Prescriptions", "your prescriptions", "“About how many prescriptions do you take? If you read me the names, I'll check how they're covered.”"],
+    ["cost", "Monthly cost", "what you're paying", "“What are you paying now each month, and did anything cost more than you expected this year?”"],
+    ["vision", "Vision", "vision", "“When was your last eye exam, and do you wear glasses?”"],
+    ["hearing", "Hearing", "hearing", "“Have you had your hearing checked, or do you use hearing aids?”"],
+    ["travel", "Travel off-island", "coverage off-island", "“Do you spend time off-island or on the mainland? Coverage away from home matters.”"],
+    ["specialists", "Specialists, referrals", "seeing specialists", "“Do you see any specialists, and have referrals been a hassle?”"],
+    ["fitness", "Fitness", "a fitness program", "“Do you use a gym or a fitness program now?”"],
+    ["confused", "Confused by the mail", "all the Medicare mail", "“What's been the most confusing part of the mail you've been getting?”"],
+  ];
+  const ASK_FOR = [
+    ["email", "Email", "“What's the best email to send you a short summary?”"],
+    ["address", "Mailing address", "“What's your mailing address, so I have it right?”"],
+    ["doctors", "Doctors' names", "“Could you jot down your doctors' names before we meet?”"],
+    ["prescriptions", "Medication list", "“Could you have your medication list handy, names and doses?”"],
+    ["plan", "Current plan name", "“What's the plan name on the front of your card?”"],
+    ["time", "Best time to call", "“When's the best time of day to reach you?”"],
+  ];
+  const REFRAMES = [
+    "You're not asking for anything, Eric. You're returning a conversation they started at your table.",
+    "Your job today is to sort, not to sell. Ready now, not yet, or no. Every answer clears the list.",
+    "They'll choose a plan for next year either way. Doing nothing is a choice too. You're simply the local chap they've already met.",
+    "A no is information about timing or fit. It isn't a verdict on you.",
+    "If their plan is already right, telling them so is a win. That's how referrals begin.",
+    "Be the agent you'd want your own parents to ring. Slow down, ask, listen.",
+    "Count the dials, not the yeses. The yeses follow the dials; they always have.",
+    "Desperation talks fast and fills silences. Calm asks a question and waits. Be calm.",
+  ];
+  const REJECTION = "Is it rejection? Partly. Mostly it's the fear of sounding like a salesman. That feeling comes from making the call about your result. Make it about theirs: a good decision before December 7, with someone local who'll still answer the phone in March. They gave you their number, so they're interested. Interested isn't ready, though, and finding out which they are is the whole job.";
+  const OBJECTIONS = [
+    ["“I'm happy with my plan.”", "Agree first: “If it's working, staying put may be right.” Then offer a check-up against the Annual Notice of Change their plan mailed in the fall."],
+    ["“I'm too busy.”", "“I completely understand. What's easier, 15 minutes on Saturday or a quick call one evening?”"],
+    ["“Just send me information.”", "“Happy to. So I send what's actually relevant, may I ask two quick questions?”"],
+    ["“I need to talk to my spouse or kids.”", "“Of course. Let's pick a time when they can join us.”"],
+    ["“I don't want to change doctors.”", "“That's the first thing I check. Which doctors matter most to you?”"],
+    ["“I get calls all the time.”", "“I hear that a lot. I'm only ringing because you asked me to at Longs. If you'd rather I didn't, I'll take you off my list right now.” Mean it."],
+    ["“Does it cost anything to meet?”", "“No, there's no cost to you for my help.”"],
+    ["“Are you with Devoted?”", "“I work with [#] organizations, and Devoted is one of them.” Then read the disclaimer."],
+    ["“I'm not interested.”", "“Thank you for telling me straight. Is it the timing, or is Medicare just not on your radar right now?” Respect the answer either way."],
+  ];
+  PROMPTS.script = (c) => `/script-builder — build the call script for ${c.name} on my Medicare Calls list${c.key ? " (Key " + c.key + ")" : ""}. Read their Plaud recordings, their Notion People row and GHL, decide the Type, and write Type, Context, Missing, Script and Voicemail on the row (Script by: Claude).${c.context ? " What I told Oggi: " + c.context.replace(/\n/g, "; ") + "." : ""}`;
+  PROMPTS.scriptAll = (day) => `/script-builder — build call scripts for everyone on my ${day} Medicare Calls list who has no Script yet, or only an Oggi draft. Use Plaud, Notion People and GHL for each person, and write Type, Context, Missing, Script and Voicemail on each row (Script by: Claude).`;
+  PROMPTS.scriptNew = (name) => `/script-builder — ${name} isn't on my Medicare Calls list yet. Find them in Notion People, GHL and Plaud, add them to my next calling day's list, and write their Type, Context, Missing, Script and Voicemail.`;
+
+  const firstName = (n) => { const s = String(n || "").trim(); return (s.includes(",") ? s.split(",")[1] : s).trim().split(/\s+/)[0] || "there"; };
+  const callbackNo = () => { try { return localStorage.getItem("oggi.callback") || ""; } catch { return ""; } };
+  function roger(text, label, small) {
+    return h("div", { class: "roger" + (small ? " small" : "") }, h("img", { src: "/icons/roger.svg", alt: "Roger" }),
+      h("div", { class: "say" }, h("small", { text: label || "Roger" }), window.OggiSay ? window.OggiSay(text) : text));
+  }
+  const rgBtn = (text, onclick, ghost) => h("button", { type: "button", class: "btn" + (ghost ? " ghost" : ""), text, onclick });
+  // The calls a script can go on: today's list (or the next one), then anything else from the week not yet called.
+  function scriptable() {
+    const { list } = callDay(), ids = new Set(list.map((c) => c.id));
+    const rest = rows("calls").filter((c) => !ids.has(c.id) && !c.outcome && (c.date || "").slice(0, 10) >= todayISO());
+    return [...list.filter((c) => !c.outcome), ...rest];
+  }
+  // Two calling days at least 48 hours out (an agent-initiated plan review needs the Scope first).
+  function twoDays() {
+    const out = [], d = new Date(todayISO() + "T12:00:00Z");
+    d.setUTCDate(d.getUTCDate() + 2);
+    while (out.length < 2) {
+      if (d.getUTCDay() % 6 !== 0) out.push(new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "long" }).format(d) + (out.length ? " afternoon" : " morning"));
+      d.setUTCDate(d.getUTCDate() + 1);
+    }
+    return out;
+  }
+  // Where they were met, from the wizard or the card's tag, without carrier names (they stay off voicemail).
+  const cleanMet = (m) => String(m || "").replace(/,?\s*(the\s+)?(Devoted|UHC|United\w*|Humana|HMSA|Kaiser|AlohaCare)\s*(table|booth|kiosk)?/gi, "").replace(/\s+/g, " ").trim();
+  function defaultMet(c) {
+    const t = String(c.tag || "");
+    const m = t.match(/Longs[^·,]*/i) || t.match(/([A-Z][\w ]+) kiosk/);
+    if (m) return /longs/i.test(m[0]) ? "the " + m[0].replace(/Longs( Drugs)?/i, "Longs").replace(/Longs\s+(?!in\b)/, "Longs in ").trim() : "the kiosk in " + m[1].trim();
+    return "the Longs";
+  }
+  function missingFor(c, w) {
+    const miss = [];
+    if (!c.email) miss.push("email");
+    if (!c.address || /city only|unconfirmed/i.test(c.address)) miss.push("address");
+    for (const k of (w && w.gather) || []) if (!miss.includes(k)) miss.push(k);
+    return miss;
+  }
+  // The draft script, assembled from the call type and what Eric told the wizard. Compliant by design:
+  // no plan names as recommendations, no benefit figures, no deadline beyond the real December 7.
+  function draftScript(c, w) {
+    const first = firstName(c.name), met = w.met || defaultMet(c), left = dayDiff("2026-12-07", todayISO());
+    const cons = CONCERNS.filter(([k]) => w.concerns.includes(k));
+    const topic = cons.length ? cons.map((x) => x[2]).slice(0, 2).join(" and ") : (w.other || "");
+    const [dA, dB] = twoDays();
+    const P = [];
+    P.push("OPEN\n“Hi, is this " + first + "? Aloha " + first + ", this is Eric Barayuga, a licensed Medicare agent. We met at " + met + ". Did I catch you at an okay time for a few minutes?”"
+      + "\nIf not: “No problem. What's better, later today or tomorrow morning?”"
+      + "\nIf yes: “Just so you know, I record my calls for quality and compliance.”");
+    if (w.personal) P.push("PERSONAL TOUCH\nKeep it light, one line: " + w.personal);
+    const bridge = {
+      Direct: topic ? "“You mentioned " + topic + ". Is that still on your mind?”" : "“You asked me to follow up on your coverage for next year. Still something you want to sort out?”",
+      Gentle: "“I'm not calling to sign you up for anything today. A lot of folks I meet at Longs just want someone to help make sense of the Medicare mail." + (topic ? " You mentioned " + topic + "." : "") + " Would it help to talk it through, or are you feeling pretty settled?”",
+      Analytical: "“You had good questions at the table" + (topic ? ", especially about " + topic : "") + ", so let me tell you how I work. I'll ask about your doctors, prescriptions and what you pay now, then compare your current plan with the plans I represent, line by line, and you decide. Sound reasonable?”",
+      "Not now": "“Last time you said you're happy with your plan, and staying put may be the right call. Did you get a chance to read the Annual Notice of Change your plan mailed in the fall? A quick review just checks your doctors and drugs are covered the same way next year.”",
+    }[w.type];
+    P.push("BRIDGE\n" + bridge);
+    const carrier = {
+      "Original Medicare only": "“You mentioned you have Parts A and B. Do you have drug coverage anywhere else right now?”",
+      "Medicare Supplement": "“You have a Medicare Supplement now. How have the premiums been treating you?”",
+      "Employer or retiree plan": "“You're on coverage from work or a retirement plan. Are you keeping it next year?” (Any change can affect that coverage: they check with the plan before deciding.)",
+      "Med-QUEST or dual": "“You mentioned Med-QUEST. Which Med-QUEST plan or level do you have, so I look at the right options?”",
+      "Turning 65": "“Your Medicare is starting soon. Do you have your Part A and Part B start dates yet?”",
+      "Not sure": "“Which Medicare plan are you on now? The name on the front of your card is enough.”",
+    }[w.carrier] || (w.carrier ? "“You're with " + w.carrier + " now. What do you like about it, and is there anything you'd change?”" : "");
+    const qs = [carrier, ...cons.map((x) => x[3])];
+    if (w.type === "Gentle") qs.push("“How has your plan treated you this year?”");
+    if (w.type === "Analytical") qs.push("“How would you rank these: monthly premium, out-of-pocket maximum, doctor network, drug costs, and extras like dental or vision?”");
+    if (w.type === "Direct") qs.push("“If you could change one thing about your coverage, what would it be?”");
+    P.push("ASK\n" + qs.filter(Boolean).join("\n") + "\nThen summarize their top two: “So it sounds like … and … matter most. Did I get that right?”");
+    const miss = missingFor(c, w);
+    if (miss.length) P.push("GET WHILE YOU HAVE THEM\n" + ASK_FOR.filter(([k]) => miss.includes(k)).map((g) => g[2]).join("\n"));
+    P.push("DISCLAIMER\nOnce plans come up, inside the first minute: read the TPMO line (on the Calls tab).");
+    const soa = "“Medicare asks me to note what we'll talk about on a short form. It doesn't sign you up for anything. I'll text you the link now.”";
+    const close = {
+      Direct: "“The next step is a 30 to 45 minute review: your plan side by side with the options I can offer, and you decide. I can come to you, meet at the Longs, or do it by phone. Is " + dA + " or " + dB + " better?”\n" + soa + "\n“Please have your Medicare card, your medication list and your doctors' names. Will anyone else help you decide? Invite them too.”"
+        + (left > 2 ? "\n“Annual Enrollment closes December 7, so meeting by then gives you room either way.”" : ""),
+      Gentle: "“Would it help if I sat down with you, and family too if you'd like, just to look at what you have and make sure it still fits next year? No pressure either way.”\nIf yes: " + dA + " or " + dB + ", then " + soa + "\nIf hesitant: “That's completely fair. May I check back with you next week? I'll text you my number so you have a local person to call.”",
+      Analytical: "“If you text or email me your drug list and doctors ahead of time, I'll have the comparison ready. Would " + dA + " or " + dB + " work for a 45-minute review?”\n" + soa,
+      "Not now": "“Would it be a bad idea to take 20 minutes before December 7 to double-check?”\nIf yes: " + dA + " or " + dB + ", then " + soa + "\nIf still no: “Fair enough. May I reach out next September, before the next enrollment period? You have my number if anything comes up.”\nReferral: “Do you know anyone turning 65, or frustrated with their coverage? I'd be glad to help them the same way.”",
+    }[w.type];
+    P.push("CLOSE\n" + close);
+    return P.join("\n\n");
+  }
+  function draftVoicemail(c, w) {
+    const first = firstName(c.name), met = cleanMet(w.met || defaultMet(c)) || "the Longs", no = callbackNo() || "[your number]";
+    const k = CONCERNS.find(([key]) => w.concerns.includes(key));
+    return "Hi " + first + ", this is Eric Barayuga, a licensed Medicare agent. We met at " + met + ". I'm following up like I promised"
+      + (k ? " on your question about " + k[2] : "") + ". Please call or text me at " + no + ". Again, that's Eric at " + no + ". Mahalo.";
+  }
+  function contextText(w) {
+    const lines = [];
+    if (w.carrier) lines.push("Carrier: " + w.carrier);
+    const cs = CONCERNS.filter(([k]) => w.concerns.includes(k)).map((x) => x[1]);
+    if (w.other) cs.push(w.other);
+    if (cs.length) lines.push("Concerns: " + cs.join(", "));
+    if (w.personal) lines.push("Personal: " + w.personal);
+    if (w.met) lines.push("Met: " + w.met);
+    return lines.join("\n");
+  }
+  // A wizard reopened on someone already scripted starts from what was saved.
+  function wizFrom(c) {
+    const ctx = Object.fromEntries(String(c.context || "").split("\n").map((l) => l.split(/:\s*/)).filter((p) => p.length > 1).map(([k, ...v]) => [k.toLowerCase(), v.join(": ")]));
+    const named = (ctx.concerns || "").split(/,\s*/);
+    return { step: 1, callId: c.id, type: c.type || null, carrier: ON_NOW.includes(ctx.carrier) ? ctx.carrier : null,
+      concerns: CONCERNS.filter((x) => named.includes(x[1])).map((x) => x[0]), other: named.filter((n) => n && !CONCERNS.some((x) => x[1] === n)).join(", "),
+      personal: ctx.personal || "", met: ctx.met || defaultMet(c), gather: [] };
+  }
+
+  function tools(main) {
+    main.append(h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Agent Tools" }),
+      h("div", { class: "chips" }, ext(h("a", { class: "btn small ghost", href: PLAYBOOK, text: "Callback playbook" })))));
+    const box = h("div", { class: "rg" });
+    main.append(box);
+    if (S.tool === "script") return scriptWizard(box);
+    if (S.tool === "mind") return mindset(box);
+    if (S.tool === "obj") return objections(box);
+    toolsHome(box);
+  }
+  function toolsHome(box) {
+    const { list, day } = callDay(), open = list.filter((c) => !c.outcome), noScript = open.filter((c) => !c.script);
+    const left = dayDiff("2026-12-07", todayISO()), hr = Number(new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", hourCycle: "h23" }).format(new Date()));
+    const hello = hr < 12 ? "Good morning, Eric." : hr < 18 ? "Afternoon, Eric." : "Evening, Eric.";
+    const bits = [hello];
+    if (left >= 0) bits.push(`${left} day${left === 1 ? "" : "s"} left in Annual Enrollment.`);
+    if (open.length) bits.push(`${open.length} call${open.length === 1 ? "" : "s"} on ${day === todayISO() ? "today's" : "the"} list` + (noScript.length ? `, and ${noScript.length} without a script yet.` : ", every one with a script. Splendid."));
+    else bits.push("No calls waiting on the list just now.");
+    bits.push("What shall we work on?");
+    box.append(roger(bits.join(" "), "Roger · Agent Tools"));
+    const card = (title, sub, onclick) => h("button", { type: "button", class: "rg-tool", onclick }, h("b", { text: title }), h("span", { text: sub }));
+    box.append(h("div", { class: "rg-tools" },
+      card("Start a calling session", "I'll brief you on the list, then off you go.", () => { S.rogerBrief = true; go("calls"); if (!activeSession()) startSession(); }),
+      card("Build a script", "Tell me who and how they came across. I'll draft the script and the voicemail.", () => { S.tool = "script"; S.wiz = { step: 0 }; render(); }),
+      card("Mindset check", "When the phone feels heavy.", () => { S.tool = "mind"; S.mind = 0; render(); }),
+      card("Handle an objection", "What to say when they push back.", () => { S.tool = "obj"; render(); })));
+    if (noScript.length) box.append(h("p", { class: "rg-note" }, "Rather Claude wrote them all from your Plaud recordings? ",
+      ext(h("a", { class: "textlink", href: claude(PROMPTS.scriptAll(day)), text: `Build ${noScript.length} script${noScript.length === 1 ? "" : "s"} with Claude` }))));
+    const cb = h("input", { type: "tel", class: "rg-input", placeholder: "e.g. 808-555-0100", value: callbackNo(), "aria-label": "Your callback number" });
+    cb.addEventListener("change", () => { try { localStorage.setItem("oggi.callback", cb.value.trim()); } catch {} });
+    box.append(h("div", { class: "rg-set" }, h("label", { text: "Callback number for voicemails" }), cb));
+  }
+  function backHome() { return rgBtn("← Agent Tools", () => { S.tool = null; S.wiz = null; render(); }, true); }
+
+  function scriptWizard(box) {
+    const w = S.wiz, c = w.callId ? rows("calls").find((x) => x.id === w.callId) : null;
+    const steps = 6;
+    const nav = (extra) => h("div", { class: "rg-acts" }, w.step > 0 ? rgBtn("← Back", () => { w.step--; render(); }, true) : backHome(), extra || null);
+    box.append(h("div", { class: "prog" }, ...Array.from({ length: steps }, (_, i) => h("i", { class: i <= w.step ? "on" : "" }))));
+    const first = c ? firstName(c.name) : "";
+    if (w.step === 0) {
+      const list = scriptable();
+      box.append(roger(list.length ? "Right. Who are we ringing? Pick someone from the list." : "There's nobody on the call list yet. Give me a name and Claude will add them with a script.", "Roger · Script builder"));
+      box.append(h("ul", { class: "rg-people" }, ...list.map((p) => h("li", {}, h("button", { type: "button", onclick: () => { S.wiz = p.script ? wizFrom(p) : { step: 1, callId: p.id, type: null, carrier: null, concerns: [], other: "", personal: "", met: defaultMet(p), gather: [] }; render(); } },
+        h("b", { text: p.name }), h("span", { class: "cl-tag", text: p.tag || p.band }),
+        p.type ? chip(p.type, "t-" + p.type.replace(/\s/g, "")) : null,
+        p.script ? chip(p.scriptBy === "Claude" ? "Claude script" : "Draft script", p.scriptBy === "Claude" ? "claude" : "") : chip("No script", "warn"))))));
+      const nm = h("input", { type: "text", class: "rg-input", placeholder: "Someone not on the list" });
+      const goNew = ext(h("a", { class: "btn small ghost", href: "#", text: "Ask Claude" }));
+      goNew.addEventListener("click", (e) => { if (!nm.value.trim()) { e.preventDefault(); nm.focus(); return; } goNew.href = claude(PROMPTS.scriptNew(nm.value.trim())); });
+      box.append(h("div", { class: "rg-set" }, nm, goNew));
+      return box.append(nav());
+    }
+    if (!c) { S.wiz = { step: 0 }; return render(); }
+    if (w.step === 1) {
+      box.append(roger(`${c.name}. How did ${first} come across at the table? Go with your gut; it's usually right.`, "Roger · 1 of 5"));
+      box.append(h("div", { class: "rg-choices col" }, ...CALL_TYPES.map(([t, sub]) => h("button", { type: "button", class: "rg-choice" + (w.type === t ? " on" : ""), onclick: () => { w.type = t; w.step = 2; render(); } },
+        h("b", { text: t }), h("span", { text: sub }))),
+        h("button", { type: "button", class: "rg-choice", onclick: () => { w.type = "Gentle"; w.unsure = true; w.step = 2; render(); } }, h("b", { text: "Can't remember" }), h("span", { text: "We'll start gentle. They'll show you within a minute." }))));
+      box.append(h("p", { class: "rg-note" }, "Or let Claude decide from the Plaud recording: ", ext(h("a", { class: "textlink", href: claude(PROMPTS.script(c)), text: "build " + first + "'s script with Claude" }))));
+      return box.append(nav());
+    }
+    if (w.step === 2) {
+      box.append(roger((w.unsure ? "Gentle it is, then. " : `${w.type}. Good. `) + `What is ${first} on now?`, "Roger · 2 of 5"));
+      box.append(h("div", { class: "rg-chips" }, ...ON_NOW.map((k) => h("button", { type: "button", class: "rg-chip" + (w.carrier === k ? " on" : ""), "aria-pressed": String(w.carrier === k), onclick: () => { w.carrier = k; w.step = 3; render(); } }, k))));
+      return box.append(nav(rgBtn("Skip", () => { w.step = 3; render(); }, true)));
+    }
+    if (w.step === 3) {
+      box.append(roger(`What was on ${first}'s mind? Tap all that apply.`, "Roger · 3 of 5"));
+      const chips = h("div", { class: "rg-chips" }, ...CONCERNS.map(([k, label]) => {
+        const b = h("button", { type: "button", class: "rg-chip" + (w.concerns.includes(k) ? " on" : ""), "aria-pressed": String(w.concerns.includes(k)), text: label });
+        b.addEventListener("click", () => { w.concerns = w.concerns.includes(k) ? w.concerns.filter((x) => x !== k) : [...w.concerns, k]; b.classList.toggle("on"); b.setAttribute("aria-pressed", String(w.concerns.includes(k))); });
+        return b;
+      }));
+      const other = h("input", { type: "text", class: "rg-input", placeholder: "Anything else they asked about", value: w.other || "" });
+      other.addEventListener("input", () => { w.other = other.value; });
+      box.append(chips, h("div", { class: "rg-set" }, other));
+      return box.append(nav(rgBtn("Next", () => { w.step = 4; render(); })));
+    }
+    if (w.step === 4) {
+      box.append(roger(`Anything personal to open with? A dog, the grandchildren, where ${first} lives. People remember the agent who remembered them.`, "Roger · 4 of 5"));
+      const per = h("textarea", { class: "rg-input", rows: "3", placeholder: "e.g. has a dog named Koa; lives in Salt Lake; just back from Vegas" });
+      per.value = w.personal || "";
+      per.addEventListener("input", () => { w.personal = per.value; });
+      const met = h("input", { type: "text", class: "rg-input", value: w.met || defaultMet(c) });
+      met.addEventListener("input", () => { w.met = met.value; });
+      box.append(h("div", { class: "rg-set col" }, h("label", { text: "Personal" }), per, h("label", { text: "Where you met (finishes “We met at …”)" }), met));
+      return box.append(nav(rgBtn("Next", () => { w.step = 5; render(); })));
+    }
+    if (w.step === 5) {
+      const auto = missingFor(c, { gather: [] });
+      const names = auto.map((k) => (ASK_FOR.find((g) => g[0] === k) || [k, k])[1].toLowerCase());
+      box.append(roger((auto.length ? `I notice we haven't got ${first}'s ${names.join(" or ")}. I'll put asking for ${auto.length === 1 ? "it" : "those"} into the script. ` : `${first}'s email and address are on file. `)
+        + "Anything else to collect while you have them on the phone?", "Roger · 5 of 5"));
+      if (w.gather.length === 0 && !w.gatherSet) {
+        if (w.concerns.includes("doctors")) w.gather.push("doctors");
+        if (w.concerns.includes("drugs")) w.gather.push("prescriptions");
+        if (!w.carrier || w.carrier === "Not sure") w.gather.push("plan");
+        w.gatherSet = true;
+      }
+      box.append(h("div", { class: "rg-chips" }, ...ASK_FOR.filter(([k]) => !auto.includes(k)).map(([k, label]) => {
+        const b = h("button", { type: "button", class: "rg-chip" + (w.gather.includes(k) ? " on" : ""), "aria-pressed": String(w.gather.includes(k)), text: label });
+        b.addEventListener("click", () => { w.gather = w.gather.includes(k) ? w.gather.filter((x) => x !== k) : [...w.gather, k]; b.classList.toggle("on"); b.setAttribute("aria-pressed", String(w.gather.includes(k))); });
+        return b;
+      })));
+      return box.append(nav(rgBtn("Write the script", () => { w.script = draftScript(c, w); w.voicemail = draftVoicemail(c, w); w.step = 6; render(); })));
+    }
+    // step 6: the draft, editable, saved to the call's row
+    box.append(roger(`Here's ${first}'s script, ${w.type.toLowerCase()} in tone. Change anything that doesn't sound like you, then save it to the call list.` + (callbackNo() ? "" : " Add your callback number on the Agent Tools page and the voicemail fills it in."), "Roger · Done"));
+    const sc = h("textarea", { class: "rg-input rg-script", rows: "18" }); sc.value = w.script;
+    const vm = h("textarea", { class: "rg-input", rows: "4" }); vm.value = w.voicemail;
+    const flag = h("span", { class: "cl-flag", "aria-live": "polite" });
+    const save = rgBtn("Save to " + first + "'s call", async () => {
+      save.disabled = true; flag.textContent = "Saving…";
+      const f = { type: w.type, context: contextText(w), script: sc.value, voicemail: vm.value, missing: missingFor(c, w).map((k) => (ASK_FOR.find((g) => g[0] === k) || [k, k])[1].toLowerCase()).join(", "), scriptBy: "Oggi draft" };
+      try {
+        Object.assign(c, await api("PATCH", "/api/medicare/call/" + c.id, f));
+        flag.textContent = "Saved. It's on the Calls tab.";
+        const next = scriptable().find((p) => !p.script);
+        box.querySelector(".rg-acts").append(next ? rgBtn("Next without a script: " + next.name, () => { S.wiz = { step: 1, callId: next.id, type: null, carrier: null, concerns: [], other: "", personal: "", met: defaultMet(next), gather: [] }; render(); }, true) : rgBtn("See the Calls tab", () => go("calls"), true));
+      } catch { flag.textContent = "Couldn't save to Notion. Your text is still here."; save.disabled = false; }
+    });
+    box.append(h("div", { class: "rg-set col" }, h("label", { text: "Script" }), sc, h("label", { text: "Voicemail" }), vm,
+      h("p", { class: "rg-note" }, "Want it written from what " + first + " actually said on Plaud? ", ext(h("a", { class: "textlink", href: claude(PROMPTS.script({ ...c, context: contextText(w) })), text: "Have Claude polish it" })))));
+    box.append(nav(h("span", { class: "rg-save" }, save, flag)));
+  }
+
+  function mindset(box) {
+    const i = S.mind || 0;
+    box.append(roger(i === 0 ? REJECTION : REFRAMES[(i - 1) % REFRAMES.length], "Roger · Mindset"));
+    box.append(h("div", { class: "rg-acts" }, backHome(),
+      rgBtn("Another one", () => { S.mind = i + 1; render(); }, true),
+      rgBtn("Right, let's dial", () => { S.rogerBrief = true; go("calls"); if (!activeSession()) startSession(); })));
+  }
+  function objections(box) {
+    const pick = S.objPick;
+    box.append(roger(pick == null ? "What did they say? Tap it and I'll give you the line. Acknowledge, ask, offer a smaller step. Never argue." : OBJECTIONS[pick][1], pick == null ? "Roger · Objections" : "Roger · " + OBJECTIONS[pick][0]));
+    box.append(h("div", { class: "rg-choices col" }, ...OBJECTIONS.map(([q], k) => h("button", { type: "button", class: "rg-choice" + (pick === k ? " on" : ""), onclick: () => { S.objPick = k; render(); } }, h("b", { text: q })))));
+    box.append(h("div", { class: "rg-acts" }, backHome()));
+  }
+
+  // Roger's briefing when a calling session starts: the list, the first call, the target and one reframe.
+  function rogerBrief(list) {
+    const open = list.filter((c) => !c.outcome);
+    const n = (b) => open.filter((c) => c.band === b).length;
+    const left = dayDiff("2026-12-07", todayISO()), last = rows("callSessions").find((x) => x.ended);
+    const types = CALL_TYPES.map(([t]) => [t, open.filter((c) => c.type === t).length]).filter(([, k]) => k);
+    const noScript = open.filter((c) => !c.script).length, firstUp = open[0];
+    const reframe = REFRAMES[new Date().getDate() % REFRAMES.length];
+    const talk = Math.max(1, Math.ceil(open.length / 3));
+    const say = `Right then, Eric, let's make some calls. ${open.length} on the list: ${n("You promised")} you promised, ${n("Waiting on them")} waiting on them, ${n("Lead")} new lead${n("Lead") === 1 ? "" : "s"}. `
+      + (left >= 0 ? `Annual Enrollment closes in ${left} day${left === 1 ? "" : "s"}, so every review you book this week still has room for the Scope. ` : "")
+      + reframe;
+    const item = (k, v) => v ? h("p", {}, h("b", { text: k }), v) : null;
+    const card = h("div", { class: "rg-brief" },
+      roger(say, "Roger · Calling session"),
+      h("div", { class: "rg-plan" },
+        item("First up", firstUp ? `${firstUp.name}${firstUp.why ? ": " + firstUp.why : ""}` : null),
+        item("Target", `Dial all ${open.length}, talk to ${talk}, book 1. Count the dials, not the yeses.` + (last && last.dialed ? ` Last session: ${last.dialed} dialed, ${last.reached ?? 0} talked.` : "")),
+        item("The mood", types.length ? types.map(([t, k]) => `${k} ${t.toLowerCase()}`).join(", ") + (noScript ? `, ${noScript} not typed yet (start those gentle)` : "") + "." : "No types set yet. Start gentle; they'll show you."),
+        item("Scripts", noScript ? `${noScript} without a script. Use the playbook opener, or build them in Agent Tools.` : "Every call has a script. Open it on the card."),
+        item("Every call", "Plaud on. Disclaimer when plans come up. Scope before any plan talk. Close with a day and a time.")),
+      h("div", { class: "rg-acts" }, rgBtn("Right, let's go", () => { S.rogerBrief = false; render(); })));
+    return card;
   }
 
   // ---------------- campaigns ----------------
