@@ -234,7 +234,7 @@
       { k: "win", say: "What was today's win? One thing that moved the needle. Small counts." },
     ];
     if (book) {
-      list.push({ k: "book", say: `And ${book.title}. How was it tonight? Tell me as you would at a book club: what did the chapter say, and what stuck with you?` });
+      list.push({ k: "book", say: `${book.title} tonight? Go on then, what was the big idea?` });
       if (GROW.test((book.themes || []).join(" ") + " " + book.title)) list.push({ k: "apply", say: "Splendid. Now, how will you put that to work this week? And is there someone you could try it with: Hazel, a client, a friend?" });
     }
     list.push({ k: "habits", say: "Let's tick the chain. What did you get done today?" });
