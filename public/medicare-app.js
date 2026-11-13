@@ -294,10 +294,51 @@
         ul.append(h("li", {}, a, h("span", { class: "d", text: [fmtDay(r.date), r.scope, r.kind].filter(Boolean).join(" · ") })));
       }
       card.append(ul);
+      if (c.k === "Devoted") card.append(devotedFinder());
       grid.append(card);
     }
     main.append(grid);
     portals(main);
+  }
+
+  // ---------------- Devoted provider search (kiosk: "is my doctor in network?") ----------------
+  // devoted.com/search-providers keeps its search in the URL hash (c = county FIPS, s, y, zip, p = HMO/PPO,
+  // pn = plan name as Devoted spells it, rl = contract-plan, q = search). pn and rl are both required,
+  // or the page drops back to its setup form. Honolulu County only; default plan year 2027.
+  const DEVOTED_SEARCH = "https://www.devoted.com/search-providers/";
+  const DEVOTED_PLANS_HI = [ // 2027 Honolulu, as Devoted's own plan picker lists them
+    ["H5397-004", "CORE 004 HI", "HMO"], ["H5397-001", "Giveback 001 HI", "HMO"], ["H5397-008", "Giveback Extras 008 HI", "HMO"],
+    ["H5397-003", "C-SNP Plus 003 HI", "HMO"], ["H5397-006", "C-SNP Giveback Extras 006 HI", "HMO"],
+    ["H2686-004", "Choice 004 HI", "PPO"], ["H2686-005", "Choice Giveback 005 HI", "PPO"], ["H2686-006", "Choice Premium 006 HI", "PPO"], ["H2686-007", "Choice MA Only 007 HI", "PPO"],
+  ];
+  const devotedUrl = (q, rl, year = "2027", zip = "96818") => {
+    const [id, name, type] = DEVOTED_PLANS_HI.find((p) => p[0] === rl) || DEVOTED_PLANS_HI[0];
+    const ps = new URLSearchParams({ c: "12020", p: type, pn: `DEVOTED ${name.toUpperCase()} (${type})`, rl: id, s: "HI", y: year, zip });
+    if (q) ps.set("q", q);
+    return DEVOTED_SEARCH + "#" + ps.toString().replace(/\+/g, "%20");
+  };
+  function devotedFinder() {
+    if (!S.dvPlan) S.dvPlan = "H5397-004";
+    const q = h("input", { class: "field", type: "search", placeholder: "Doctor, practice or hospital", "aria-label": "Doctor to look up", enterkeyhint: "search", value: S.dvQ || "" });
+    const plan = h("select", { class: "field", "aria-label": "Devoted plan" },
+      ...DEVOTED_PLANS_HI.map(([id, name, type]) => h("option", { value: id, text: `${name.replace(/ HI$/, "")} · ${type}`, selected: id === S.dvPlan })));
+    const look = ext(h("a", { class: "btn small", text: "Search Devoted" }));
+    const ask = ext(h("a", { class: "btn small ghost", text: "Ask Claude" }));
+    const sync = () => {
+      S.dvQ = q.value.trim(); S.dvPlan = plan.value;
+      look.href = devotedUrl(S.dvQ, S.dvPlan);
+      const name = (DEVOTED_PLANS_HI.find((p) => p[0] === S.dvPlan) || [])[1];
+      ask.href = claude(S.dvQ
+        ? `Is ${S.dvQ} in network with Devoted for 2027 in Honolulu? I'm at the kiosk with someone. Use ${DEVOTED_SEARCH} in my Chrome: plan year 2027, ZIP 96818, Honolulu County. Check ${name} first, then one HMO and one PPO plan if the answer differs by network. Tell me in a few lines: in or out on each, the exact name, specialty, address and phone as Devoted lists them, and whether they are accepting new patients. If there's no match or more than one, say so and list the close ones. Remind me to have the person confirm with the doctor's office. Don't enroll or contact anyone.`
+        : `I'm at the Devoted kiosk with someone. Ask me which doctor to look up, then check whether they're in network on ${DEVOTED_SEARCH} in my Chrome (plan year 2027, ZIP 96818, Honolulu County, starting with ${name}).`);
+    };
+    q.addEventListener("input", sync); plan.addEventListener("change", sync);
+    q.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); look.click(); } });
+    sync();
+    return h("div", { class: "dv-find" },
+      h("p", { class: "dv-k", text: "Is their doctor in network? · 2027" }),
+      q, plan,
+      h("div", { class: "mc-acts", style: "margin-top:4px" }, look, ask, ext(h("a", { class: "dv-plain", href: DEVOTED_SEARCH, text: "Open Search Providers" }))));
   }
 
   // ---------------- carrier portals: the sites you sign in to ----------------
