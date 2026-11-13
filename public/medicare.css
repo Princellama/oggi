@@ -481,3 +481,17 @@ textarea.rg-input { resize: vertical; }
 .tw:not(.done) .tw-live::after { content: ""; display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px; background: currentColor; opacity: .55; animation: tw-blink .9s steps(1) infinite; }
 .tw:not(.done) { cursor: pointer; }
 @keyframes tw-blink { 50% { opacity: 0; } }
+
+/* veterans · resources */
+.vet-doc { display: grid; gap: 2px; text-decoration: none; border: 1px solid #D9D0EA; border-left: 4px solid var(--devoted); border-radius: 12px; padding: 14px 18px; margin: 0 0 18px; background: #FAF8FD; }
+.vet-doc:hover { border-color: var(--devoted); }
+.vet-doc .vd-k { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--devoted); }
+.vet-doc .vd-t { font-family: var(--serif); font-weight: 600; font-size: 19px; color: var(--ink); }
+.vet-doc .vd-s { font-size: 13px; color: var(--soft); }
+#vet-resources .vet-checks { margin: 0 0 20px; }
+#vet-resources .vet-checks li { margin-bottom: 6px; }
+.vet-rh { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--grey); margin: 18px 0 6px; }
+.vet-links { list-style: none; margin: 0; padding: 0; }
+.vet-links li { padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.vet-links li:last-child { border-bottom: 0; }
+.vet-links .d { margin-left: 8px; font-size: 12px; color: var(--grey); }

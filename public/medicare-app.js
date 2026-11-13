@@ -1358,7 +1358,7 @@
   function veterans(main) {
     const V = MC_DATA.veterans;
     main.append(h("p", { class: "mc-lede", text: "For veterans with TRICARE For Life or VA care: Medicare Advantage plans with no drug coverage, how they fit with the VA, and what to say. Show the plans only after a signed Scope." }));
-    main.append(h("nav", { class: "vet-jump" }, ...[["vet-options", "Options"], ["vet-diagram", "Diagram"], ["vet-faq", "FAQ"], ["vet-script", "Script"], ["vet-email", "Email"]].map(([id, t]) =>
+    main.append(h("nav", { class: "vet-jump" }, ...[["vet-options", "Options"], ["vet-diagram", "Diagram"], ["vet-faq", "FAQ"], ["vet-script", "Script"], ["vet-email", "Email"], ["vet-resources", "Resources"]].map(([id, t]) =>
       h("a", { href: "#" + id, text: t, onclick: (e) => { e.preventDefault(); document.getElementById(id).scrollIntoView({ behavior: "smooth", block: "start" }); } }))));
 
     // Options
@@ -1416,7 +1416,51 @@
       h("a", { class: "btn small", href: "mailto:?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(text), text: "Open in Mail" }),
       copyBtn(() => subject + "\n\n" + text, "Copy all")));
     main.append(em);
+
+    // Resources: Devoted's broker training on VA and TRICARE, and the official links it cites
+    const res = h("section", { class: "mc-sec", id: "vet-resources" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Resources" })));
+    res.append(h("a", { class: "vet-doc", href: VET_RESOURCES.guide.url, target: "_blank", rel: "noopener noreferrer" },
+      h("span", { class: "vd-k", text: "Devoted · broker training" }),
+      h("span", { class: "vd-t", text: VET_RESOURCES.guide.title }),
+      h("span", { class: "vd-s", text: VET_RESOURCES.guide.sub })));
+    res.append(h("p", { class: "mc-lede", text: "What the guide says, for you (not a handout):" }));
+    res.append(h("ul", { class: "vet-checks" }, ...VET_RESOURCES.points.map((p) => h("li", { text: p }))));
+    for (const [group, links] of VET_RESOURCES.links) {
+      res.append(h("h3", { class: "vet-rh", text: group }));
+      res.append(h("ul", { class: "vet-links" }, ...links.map(([t, u, s]) =>
+        h("li", {}, ext(h("a", { href: u, text: t })), s ? h("span", { class: "d", text: s }) : null))));
+    }
+    main.append(res);
   }
+  const VET_RESOURCES = {
+    guide: { title: "Veteran Coverage and Medicare Advantage Prescription Drug Plans", sub: "VA, CHAMPVA and TRICARE For Life with a Devoted plan · 6-page PDF", url: "https://assets.devoted.com/broker/broker_VA_Tricare" },
+    points: [
+      "Joining a Devoted plan doesn't change VA benefits; VA care is outside Devoted's network.",
+      "After enrollment, a Devoted vendor mails veterans a letter asking a few health questions and permission to get their VA records. Tell them to expect it.",
+      "VA drug coverage, CHAMPVA and TRICARE For Life all count as creditable, so no Part D late penalty.",
+      "TRICARE For Life pays last, after Medicare or the Medicare Advantage plan.",
+      "Using TRICARE For Life at a VA facility for non-service-connected care: TRICARE pays at most 20%, so the person can owe a lot.",
+      "CHAMPVA (spouses and dependents of permanently disabled or deceased veterans): Medicare pays first, they must keep Part B, they can't use a VA medical center with Medicare, and CHAMPVA covers drug copays plus 75% of drugs the Part D plan doesn't. Joining an MAPD doesn't drop CHAMPVA, but they must tell CHAMPVA.",
+      "An MAPD fits a TRICARE For Life person who qualifies for Extra Help, wants the extras (dental, vision, hearing, OTC, rides, fitness) or care coordination, and picks low cost-sharing. They have an SEP to go back to Original Medicare anytime.",
+    ],
+    links: [
+      ["VA and CHAMPVA", [
+        ["VA health care", "https://www.va.gov/health-care/"],
+        ["CHAMPVA benefits", "https://www.va.gov/family-and-caregiver-benefits/health-and-disability/champva/"],
+        ["VA prescriptions", "https://www.va.gov/health-care/manage-prescriptions-medications/"],
+        ["CHAMPVA and Medicare: which pays first", "https://www.healthline.com/health/medicare/champva-and-medicare#coverage", "Healthline"],
+      ]],
+      ["TRICARE", [
+        ["TRICARE and Medicare Part D", "https://www.tricare.mil/CoveredServices/Pharmacy/Eligibility/Medicare"],
+        ["TRICARE with other health insurance", "https://www.tricare.mil/Plans/OHI"],
+        ["Find a TRICARE pharmacy (Express Scripts)", "https://militaryrx.express-scripts.com/find-pharmacy"],
+        ["Find a TRICARE doctor (also ask if they take CHAMPVA)", "https://www.tricare.mil/FindDoctor"],
+      ]],
+      ["Extra Help", [
+        ["Extra Help (LIS) basics", "https://www.medicareinteractive.org/get-answers/cost-saving-programs-for-people-with-medicare/the-extra-helplow-income-subsidy-lis-program/extra-help-basics", "Medicare Rights Center"],
+      ]],
+    ],
+  };
 
   // ---------------- specialized (veterans, C-SNP) ----------------
   const SPEC_CARDS = [
