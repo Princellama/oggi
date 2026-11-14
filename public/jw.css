@@ -212,3 +212,14 @@ body.jw {
 .jw-chip.wait { color: #F2C66D; border-color: rgba(242, 198, 109, .4); }
 .jw-chip.hotchip { margin-top: 8px; color: #F0A58C; border-color: rgba(240, 165, 140, .45); }
 .jw-alert.hit, .jw-assign.hit { outline: 2px solid var(--jw-teal); outline-offset: 2px; }
+
+/* official documents */
+.jw-doc { border: 1px solid var(--jw-line); border-radius: 14px; background: rgba(234, 241, 238, .035); margin: 0 0 10px; }
+.jw-doc summary { cursor: pointer; padding: 14px 18px; display: flex; flex-direction: column; gap: 4px; list-style: none; }
+.jw-doc summary::-webkit-details-marker { display: none; }
+.jw-doc summary b { font: 600 17px/1.3 var(--serif); color: var(--jw-ink); }
+.jw-doc summary span { font-size: 12.5px; color: var(--jw-soft); }
+.jw-doc-b { padding: 4px 18px 16px; border-top: 1px solid var(--jw-line); }
+.jw-doc-b p { font: 15px/1.65 var(--sans); color: var(--jw-ink); margin: 14px 0 0; position: relative; padding-left: 30px; }
+.jw-doc-b p .n { position: absolute; left: 0; top: 1px; width: 21px; height: 21px; border-radius: 50%; background: rgba(111, 195, 192, .15); color: var(--jw-teal); font: 600 11.5px/21px var(--sans); text-align: center; }
+.jw-doc-b p b { color: var(--jw-teal); font-weight: 600; }

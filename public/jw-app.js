@@ -471,7 +471,7 @@
         h("h1", { class: "jw-title", text: p.name }),
         h("p", { class: "jw-sub", text: [p.when ? fmtDay(p.when) + (clock(p.when) ? " · " + clock(p.when) : "") : null, p.where].filter(Boolean).join(" · ") })),
       days != null && days >= 0 ? h("div", { class: "jw-count" }, h("b", { text: String(days) }), h("span", { text: days === 1 ? "day to go" : "days to go" })) : null));
-    main.append(jumpNav([["alerts", "Alerts", items.filter((i) => i.kind === "Alert" && i.status !== "Done" && i.level !== "Info").length], ["mine", "Mine", items.filter((i) => i.mine && i.kind === "Assignment" && i.status !== "Done").length], ["program", "Program"], ["teams", "Teams"], ["decisions", "Decided"]].filter(([id]) => id === "alerts" || items.some((i) => ({ mine: "Assignment", program: "Program", teams: "Team", decisions: "Decision" })[id] === i.kind))));
+    main.append(jumpNav([["alerts", "Alerts", items.filter((i) => i.kind === "Alert" && i.status !== "Done" && i.level !== "Info").length], ["mine", "Mine", items.filter((i) => i.mine && i.kind === "Assignment" && i.status !== "Done").length], ["docs", "Instructions"], ["program", "Program"], ["teams", "Teams"], ["decisions", "Decided"]].filter(([id]) => id === "alerts" || items.some((i) => ({ mine: "Assignment", docs: "Document", program: "Program", teams: "Team", decisions: "Decision" })[id] === i.kind))));
     if (p.summary) main.append(h("p", { class: "jw-p jw-lede", text: p.summary }));
     const facts = String(p.facts || "").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const i = l.indexOf(":"); return i > 0 ? [l.slice(0, i), l.slice(i + 1).trim()] : ["", l]; });
     if (facts.length) main.append(h("dl", { class: "jw-facts" }, facts.map(([k, v]) => h("div", null, h("dt", { text: k }), h("dd", { text: v })))));
@@ -492,6 +492,19 @@
       const msec = h("section", { class: "jw-sec", id: "mine" }, h("h2", { class: "jw-h", text: "My assignments" }));
       mine.sort((a, b) => (a.status === "Done") - (b.status === "Done") || a.order - b.order).forEach((it) => msec.append(assignmentCard(it)));
       main.append(msec);
+    }
+
+    // documents: the official text, readable here
+    const docs = by("Document");
+    if (docs.length) {
+      const dsec = h("section", { class: "jw-sec", id: "docs" }, h("h2", { class: "jw-h", text: docs.length > 1 ? "Official instructions" : "Official instruction" }));
+      for (const d of docs) {
+        const paras = String(d.details || "").split(/\n\s*\n/).map((t) => t.trim()).filter(Boolean);
+        dsec.append(h("details", { class: "jw-doc", open: docs.length === 1 ? true : null },
+          h("summary", null, h("b", { text: d.title }), d.lead ? h("span", { text: d.lead }) : null),
+          h("div", { class: "jw-doc-b" }, paras.map((t) => { const m = /^(\d+)\.\s*([^:]{2,60}:)?\s*/.exec(t); return h("p", null, m ? h("span", { class: "n", text: m[1] }) : null, m && m[2] ? h("b", { text: m[2] + " " }) : null, m ? t.slice(m[0].length) : t); }))));
+      }
+      main.append(dsec);
     }
 
     // program

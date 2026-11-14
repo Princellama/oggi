@@ -24,6 +24,7 @@ const pitems = [
   { id: "g1", kind: "Program", minutes: "10", title: "Opening song and prayer", lead: "Chairman", order: 1 },
   { id: "g2", kind: "Program", minutes: "45-60", title: "Main talk", lead: "Speaker", details: "Notes.", order: 2 },
   { id: "d1", kind: "Decision", title: "Sample decision", order: 1 },
+  { id: "doc1", kind: "Document", title: "Sample announcement", lead: "For elders · ref", details: "1. First Point: Some text here that goes on.\n\n2. Second Point: More text.", order: 1 },
 ];
 module.exports = {
   getProject: async (slug) => (slug === "demo" ? { project, items: pitems } : null),
