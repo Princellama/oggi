@@ -204,7 +204,7 @@
     const open = items.filter((i) => i.status !== "Closed");
     const mine = open.filter((i) => !i.waitingOn), theirs = open.filter((i) => i.waitingOn);
     const closed = items.filter((i) => i.status === "Closed");
-    const alerts = D.alerts || [];
+    const alerts = (D.alerts || []).slice().sort((a, b) => (a.level === "Action" ? 0 : 1) - (b.level === "Action" ? 0 : 1) || a.order - b.order);
     const mail = open.filter((i) => /mail\.google\.com/.test(i.link || ""));
     // next three days: calendar, parts, project items due
     const soon = [];
