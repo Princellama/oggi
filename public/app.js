@@ -3401,7 +3401,7 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
     { name: "Personal", color: "#E6C65A", x: 74, y: 12, r: 12 },
     { name: "Kalihi JW", color: "#6FC3C0", x: 16, y: 70, r: 11 },
     { name: "Field service", color: "#B9A3E3", x: 76, y: 72, r: 8 },
-    { name: "HWC", color: "#9A988F", x: 84, y: 40, r: 6, note: "free/busy only" },
+    { name: "HWC", color: "#9A988F", x: 84, y: 40, r: 6 },
   ];
   const EV = { rows: null, at: null, err: null, loading: false, cal: store.get("evCal") || null, mode: store.get("evMode") || "date" };
   const evCal = (name) => EV_CALS.find((c) => c.name === name) || EV_CALS[0];
