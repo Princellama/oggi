@@ -87,6 +87,19 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .nav .navlink:hover { color: var(--soft); }
 @media (max-width: 640px) { .nav { gap: clamp(8px, 3vw, 30px); } }
 @media (max-width: 420px) { .nav { gap: clamp(7px, 2.4vw, 30px); } .nav button, .nav .navlink { font-size: 12.5px; } }
+/* Phone: the menu has more items than fit, so it scrolls sideways (swipe it). Centred while it fits. */
+@media (max-width: 979px) {
+  .nav { justify-content: flex-start; overflow-x: auto; overflow-y: hidden; padding-left: 16px; padding-right: 16px;
+         scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; touch-action: pan-x; }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav > * { flex: none; white-space: nowrap; }
+  .nav > :first-child { margin-left: auto; }
+  .nav > :last-child { margin-right: auto; padding-right: 16px; }
+  .nav button, .nav .navlink { padding: 12px 4px; }
+  /* soft fade at the edges says "there's more, swipe" */
+  .nav { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 30px), transparent 100%);
+                 mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 30px), transparent 100%); }
+}
 
 .wrap { max-width: 860px; margin: 0 auto; padding: 40px 28px 44px; }
 .band-top { background: var(--wash); border-bottom: 1px solid var(--edge); }

@@ -3548,7 +3548,12 @@ ${rows.map((r, i) => `${i + 1}. ${r.url}`).join("\n")}`;
     if (name === "outbox") showOutbox();
     if (name === "events") showEvents();
   }
-  function markNav(name) { document.querySelectorAll(".nav button").forEach((b) => b.setAttribute("aria-current", String(b.dataset.go === name))); }
+  function markNav(name) {
+    document.querySelectorAll(".nav button").forEach((b) => b.setAttribute("aria-current", String(b.dataset.go === name)));
+    // phone: keep the current tab in view inside the sideways-scrolling menu
+    const cur = document.querySelector(`.nav button[data-go="${name}"]`), nav = $("#nav");
+    if (cur && nav && nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: cur.offsetLeft - (nav.clientWidth - cur.offsetWidth) / 2, behavior: "smooth" });
+  }
   $("#nav").addEventListener("click", (ev) => {
     const b = ev.target.closest("button[data-go]");
     if (!b) return;
