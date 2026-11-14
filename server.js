@@ -21,6 +21,7 @@ const istore = DEMO ? require("./italian-demo") : require("./italian");
 const coach = require("./coach");
 const feedstore = DEMO ? require("./feeding-demo") : require("./feeding");
 const fitstore = DEMO ? require("./fit-demo") : require("./fit");
+const jwstore = DEMO ? require("./jw-demo") : require("./jw");
 
 const PORT = process.env.PORT || 8080;
 const SECRET = process.env.SESSION_SECRET || (DEMO ? "demo-secret" : null);
@@ -853,6 +854,65 @@ app.post("/api/cpa/meeting", requireAuth, wrap(async (req, res) => { const f = c
 app.get(["/cpa", "/cpa/*"], (req, res) => {
   res.set("Cache-Control", "no-cache");
   res.sendFile(path.join(__dirname, "public", "cpa.html"));
+});
+
+// ---------- /jw: the Kalihi galaxy ----------
+// Not in the nav. Needs Oggi sign-in AND the /jw PIN. The PIN is a salted scrypt hash on the Access
+// row of the JW Parts table in Notion (never in this repo); a right PIN sets oggi_jw for 30 days,
+// which stops working the moment the hash in Notion changes. Every JW detail comes from Notion
+// only after both checks pass.
+let jCache = { at: 0, hash: null };
+async function jwHash() {
+  if (Date.now() - jCache.at < 60_000) return jCache.hash;
+  const h = await jwstore.getAccess().catch((e) => { console.error("jw access", e.message); return null; });
+  jCache = { at: Date.now(), hash: h };
+  return h;
+}
+const jFails = new Map(); // ip -> { n, until }
+let jGlobal = { n: 0, since: Date.now(), until: 0 };
+app.post("/auth/jw", requireAuth, wrap(async (req, res) => {
+  const now = Date.now();
+  if (now - jGlobal.since > 3600_000) jGlobal = { n: 0, since: now, until: 0 };
+  if (jGlobal.until > now) return res.status(429).json({ error: "Too many wrong PINs. Try again in an hour." });
+  const ip = req.ip || "?";
+  const f = jFails.get(ip) || { n: 0, until: 0 };
+  if (f.until > now) return res.status(429).json({ error: `Too many wrong tries. Try again in ${Math.ceil((f.until - now) / 60000)} minutes.` });
+  const hash = await jwHash();
+  if (!hash) return res.status(503).json({ error: "The /jw PIN isn't set up in Notion." });
+  if (!checkPin(String(req.body.pin || "").trim().slice(0, 12), hash)) {
+    f.n += 1; if (f.n >= 5) { f.until = now + 15 * 60_000; f.n = 0; }
+    jFails.set(ip, f);
+    jGlobal.n += 1; if (jGlobal.n >= 15) jGlobal.until = now + 3600_000;
+    return res.status(401).json({ error: "That PIN isn't right." });
+  }
+  jFails.delete(ip);
+  const t = sign({ k: "jw", v: pinVersion(hash), exp: now + 30 * 24 * 3600_000 });
+  const secure = BASE_URL.startsWith("https") ? "; Secure" : "";
+  res.set("Set-Cookie", `oggi_jw=${encodeURIComponent(t)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${30 * 24 * 3600}${secure}`);
+  res.json({ ok: true });
+}));
+app.post("/auth/jw/lock", (req, res) => { res.set("Set-Cookie", "oggi_jw=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0"); res.json({ ok: true }); });
+function requireJw(req, res, next) {
+  if (!authed(req)) return res.status(401).json({ error: "signin" });
+  const p = verify(cookie(req, "oggi_jw"));
+  if (!p || p.k !== "jw") return res.status(401).json({ error: "pin" });
+  jwHash().then((hash) => (hash && p.v === pinVersion(hash) ? next() : res.status(401).json({ error: "pin" })), () => res.status(502).json({ error: "failed" }));
+}
+const JW_STATUS = ["Draft", "Preparing", "Ready", "Given"];
+app.get("/api/jw", requireJw, wrap(async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json(await jwstore.getAll(localDate(req)));
+}));
+app.patch("/api/jw/part/:id", requireJw, wrap(async (req, res) => {
+  if (!/^[\w-]{1,64}$/.test(req.params.id)) throw bad("id");
+  const f = {};
+  if ("deliverables" in req.body) f.deliverables = String(req.body.deliverables || "").slice(0, 6000);
+  if ("status" in req.body) { if (req.body.status !== null && !JW_STATUS.includes(req.body.status)) throw bad("status"); f.status = req.body.status; }
+  res.json(await jwstore.updatePart(req.params.id, f));
+}));
+app.get(["/jw", "/jw/"], (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.sendFile(path.join(__dirname, "public", "jw.html"));
 });
 
 // /leadhero: a ghost page for Aaron Burton (IFG). Public on purpose (no sign-in), not linked

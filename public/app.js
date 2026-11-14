@@ -509,7 +509,12 @@
     paint();
     return wrap;
   }
+  // Kalihi (JW) items keep their titles here, but their details live in the /jw galaxy behind its PIN.
+  const isJW = (it) => !!it && it.place === "Kalihi";
+  const jwHref = (it) => "/jw#" + encodeURIComponent(it.key || it.id || "");
+  const teleport = (it) => { location.href = jwHref(it); };
   function titleEl(it) {
+    if (isJW(it)) { const a = h("a", { class: "ttl", href: jwHref(it), title: "Open in the Kalihi galaxy" }); a.append(document.createTextNode(it.title || ""), h("span", { class: "quiet", text: " ↗" })); return a; }
     const url = safeUrl(it.link);
     const el = url ? ext(h("a", { class: "ttl", href: url })) : h("span", { class: "ttl" });
     el.append(document.createTextNode(it.title || ""));
@@ -2662,6 +2667,7 @@
     card.append(...cardBits(cur, dive));
   }
   function cardBits(cur, onOpen) {
+    if (cur.kind === "item" && isJW(cur.it)) onOpen = () => teleport(cur.it);
     const card = h("div");
     if (cur.kind === "event") {
       const e = cur.ev, t = nowMs();
