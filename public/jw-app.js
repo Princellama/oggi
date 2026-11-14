@@ -136,6 +136,7 @@
       card.append(ul, prog);
     }
     if (p.details) card.append(h("details", { class: "jw-details" }, h("summary", { text: "Outline and notes" }), h("pre", { text: p.details })));
+    card.append(replyBox(p.notes, (v) => api("PATCH", "/api/jw/part/" + p.id, { notes: v }).then((n) => { p.notes = n.notes; })));
     const links = h("div", { class: "jw-links" });
     if (safeUrl(p.link)) links.append(ext(p.link, "Open the talk page ↗"));
     if (safeUrl(p.url)) links.append(ext(p.url, "Edit in Notion ↗"));
@@ -143,50 +144,122 @@
     return card;
   }
 
+  // A reply / update box. Autosaves; Claude reads it on the next Oggi run.
+  function replyBox(value, save, opts = {}) {
+    const wrap = h("div", { class: "jw-reply" });
+    const state = h("span", { class: "jw-saved", "aria-live": "polite" });
+    const ta = h("textarea", { class: "jw-notes", rows: "3", placeholder: opts.placeholder || "Your update or answer: what happened, what's decided, what you need. Claude reads this on the next run.", "aria-label": opts.label || "Your update" });
+    ta.value = value || "";
+    const go = debounce(() => {
+      state.textContent = "Saving…";
+      save(ta.value).then(() => { state.textContent = "Saved · Claude will pick it up"; setTimeout(() => (state.textContent = ""), 2500); }, (e) => { state.textContent = "Not saved: " + e.message; });
+    }, 1000);
+    ta.addEventListener("input", go);
+    const box = h("div", { class: "jw-notewrap" }, h("div", { class: "jw-row" }, h("span", { class: "jw-mini-h", text: opts.label || "Your update for Claude" }), state), ta);
+    if (value || opts.open) { wrap.append(box); return wrap; }
+    const btn = h("button", { type: "button", class: "jw-replybtn", text: opts.button || "Reply / update" });
+    btn.addEventListener("click", () => { btn.replaceWith(box); ta.focus(); });
+    wrap.append(btn);
+    return wrap;
+  }
+  const saveItem = (it, body) => api("PATCH", "/api/item/" + it.id, { ...body, dayId: D && D.dayId }).then((n) => Object.assign(it, n));
+
   function itemLi(it) {
     const done = it.status === "Closed";
-    const li = h("li", { id: it.key || it.id, class: done ? "jw-done" : "" });
-    li.append(h("div", { class: "jw-row" }, h("p", { class: "jw-name", text: it.title }), h("span", { class: "jw-meta", text: done ? "done" : it.lastSeen ? "seen " + fmtDay(it.lastSeen) : "" })));
+    const li = h("li", { id: it.key || it.id, class: "jw-item" + (done ? " jw-done" : "") });
+    li.append(h("div", { class: "jw-row" }, h("p", { class: "jw-name", text: it.title }),
+      it.waitingOn && !done ? h("span", { class: "jw-chip wait", text: "Waiting on " + it.waitingOn }) : h("span", { class: "jw-meta", text: done ? "done" : "" })));
     if (it.sentence) li.append(h("p", { class: "jw-p", text: it.sentence }));
-    if (it.note) li.append(h("p", { class: "jw-note", text: "Your update: " + it.note }));
+    if (!done) li.append(replyBox(it.note, (v) => saveItem(it, { note: v })));
     const links = h("div", { class: "jw-links" });
-    if (safeUrl(it.link)) links.append(ext(it.link, (it.sourcePhrase || "Source") + " ↗"));
+    if (safeUrl(it.link)) links.append(ext(it.link, (/mail\.google\.com/.test(it.link) ? "✉ " : "") + (it.sourcePhrase || "Source") + " ↗"));
     if (safeUrl(it.task)) links.append(ext(it.task, "Task ↗"));
+    if (!done && it.waitingOn) links.append(h("button", { type: "button", text: "They answered", onclick: async (ev) => {
+      ev.currentTarget.disabled = true;
+      try { await saveItem(it, { waitingOn: null }); render(); } catch (e) { ev.currentTarget.disabled = false; alert("Didn't save: " + e.message); }
+    } }));
     if (!done) links.append(h("button", { type: "button", text: "Mark done", onclick: async (ev) => {
       ev.currentTarget.disabled = true;
-      try { await api("PATCH", "/api/item/" + it.id, { status: "Closed" }); it.status = "Closed"; render(); }
-      catch (e) { ev.currentTarget.disabled = false; alert("Didn't save: " + e.message); }
+      try { await saveItem(it, { status: "Closed" }); render(); } catch (e) { ev.currentTarget.disabled = false; alert("Didn't save: " + e.message); }
     } }));
+    if (done) links.append(h("button", { type: "button", text: "Reopen", onclick: async () => { await saveItem(it, { status: "Open" }).catch(() => {}); render(); } }));
     li.append(links);
     return li;
   }
 
+  // sticky menu that jumps to each section
+  function jumpNav(list) {
+    const nav = h("nav", { class: "jw-jump", "aria-label": "Jump to" });
+    for (const [id, label, n] of list) nav.append(h("a", { href: "#" + id, onclick: (ev) => { ev.preventDefault(); const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); } }, label, n ? h("b", { text: String(n) }) : null));
+    return nav;
+  }
+  const projOf = (id) => (D.projects || []).find((p) => p.id && id && p.id.replace(/-/g, "") === id.replace(/-/g, ""));
+  const inDays = (iso, n) => { const d = daysTo(iso); return d != null && d >= 0 && d <= n; };
+  const whenLabel = (iso) => { const d = daysTo(iso); return (d === 0 ? "Today" : d === 1 ? "Tomorrow" : fmtDay(iso).replace(/, \d{4}$/, "")) + (clock(iso) ? " · " + clock(iso) : ""); };
+
   function render() {
     $("#lock").hidden = false;
     const main = $("#main"); main.replaceChildren();
-    main.append(glyph(), h("h1", { class: "jw-title", text: "Kalihi" }));
-    const open = D.items.filter((i) => i.status !== "Closed");
-    main.append(h("p", { class: "jw-sub", text: `${open.length} open · ${D.parts.length} parts` }));
+    const items = D.items || [];
+    const open = items.filter((i) => i.status !== "Closed");
+    const mine = open.filter((i) => !i.waitingOn), theirs = open.filter((i) => i.waitingOn);
+    const closed = items.filter((i) => i.status === "Closed");
+    const alerts = D.alerts || [];
+    const mail = open.filter((i) => /mail\.google\.com/.test(i.link || ""));
+    // next three days: calendar, parts, project items due
+    const soon = [];
+    for (const e of D.events || []) if (inDays(e.start, 3)) soon.push({ at: e.start, title: e.title, sub: e.where, allDay: e.allDay });
+    for (const p of D.parts || []) if (p.when && p.status !== "Given" && inDays(p.when, 3)) soon.push({ at: p.when, title: "Your part: " + p.name, href: "#part-" + p.id });
+    for (const d of D.due || []) { const pr = projOf(d.projectId); soon.push({ at: d.due, title: d.title, sub: pr ? pr.name : "", href: pr ? "/jw/p/" + encodeURIComponent(pr.slug) + "#i-" + d.id : null }); }
+    soon.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+
+    main.append(h("header", { class: "jw-homehead" }, glyph(), h("div", null, h("h1", { class: "jw-title", text: "Kalihi" }),
+      h("p", { class: "jw-sub", text: `${mine.length} on you · ${theirs.length} waiting on others · ${(D.projects || []).length} projects` }))));
+    main.append(jumpNav([["today", "Today"], ["mine", "On me", mine.length], ["theirs", "Waiting", theirs.length], ["projects", "Projects", (D.projects || []).length], ["parts", "Parts"], ["coming", "Calendar"], ["lit", "Literature"]]));
     if (D.errors && D.errors.length) main.append(h("p", { class: "jw-err", text: `Couldn't read from Notion: ${D.errors.join(", ")}. Share those tables with the Oggi connection.` }));
 
-    // Projects: each opens its own planning page
-    if ((D.projects || []).length) {
-      const psec = h("section", { class: "jw-sec" }, h("h2", { class: "jw-h", text: "Projects" }));
-      for (const p of D.projects) {
-        const days = daysTo(p.when);
-        psec.append(h("a", { class: "jw-proj", href: "/jw/p/" + encodeURIComponent(p.slug) },
-          h("div", { class: "jw-proj-l" }, h("b", { text: p.name }), h("span", { text: [p.when ? fmtDay(p.when) + (clock(p.when) ? " · " + clock(p.when) : "") : null, p.where].filter(Boolean).join(" · ") }), p.summary ? h("p", { text: p.summary }) : null),
-          days != null && days >= 0 ? h("div", { class: "jw-proj-n" }, h("b", { text: String(days) }), h("span", { text: days === 1 ? "day to go" : "days to go" })) : h("span", { class: "jw-chip", text: p.status || "" })));
-      }
-      main.append(psec);
-    }
+    // Today: alerts, next three days, JW mail
+    const tiles = h("div", { class: "jw-tiles" });
+    const at = h("article", { class: "jw-tile" + (alerts.some((a) => a.level === "Action") ? " hot" : "") }, h("h3", null, "Alerts ", h("b", { text: String(alerts.length) })));
+    if (alerts.length) at.append(h("ul", null, alerts.map((a) => { const pr = projOf(a.projectId); return h("li", null, h("a", { href: pr ? "/jw/p/" + encodeURIComponent(pr.slug) + "#alerts" : "#" }, h("i", { class: "lv " + (a.level === "Action" ? "a" : "h") }), a.title), pr ? h("span", { text: pr.name }) : null); })));
+    else at.append(h("p", { class: "jw-quiet", text: "No alerts." }));
+    const st = h("article", { class: "jw-tile" }, h("h3", null, "Next 3 days ", h("b", { text: String(soon.length) })));
+    if (soon.length) st.append(h("ul", null, soon.map((x) => h("li", null, x.href ? h("a", { href: x.href, text: x.title }) : h("span", { class: "t", text: x.title }), h("span", { text: (x.allDay ? fmtDay(x.at).replace(/, \d{4}$/, "") : whenLabel(x.at)) + (x.sub ? " · " + x.sub : "") })))));
+    else st.append(h("p", { class: "jw-quiet", text: "Nothing in the next three days." }));
+    const mt = h("article", { class: "jw-tile" }, h("h3", null, "JW mail ", h("b", { text: String(mail.length) })));
+    if (mail.length) mt.append(h("ul", null, mail.map((i) => h("li", null, h("a", { href: "#" + (i.key || i.id), text: i.title }), h("a", { class: "sub", href: i.link, target: "_blank", rel: "noopener noreferrer", text: "Open in Gmail ↗" })))));
+    else mt.append(h("p", { class: "jw-quiet", text: "No JW mail waiting." }));
+    mt.append(h("p", { class: "jw-links" }, ext("https://mail.google.com/mail/u/0/#label/JW", "Gmail JW label ↗")));
+    tiles.append(at, st, mt);
+    main.append(h("section", { class: "jw-sec", id: "today" }, h("h2", { class: "jw-h", text: "Today" }), tiles));
 
-    // Parts: the next part up top, every part so far as a link
+    // On me / waiting on others
+    main.append(h("section", { class: "jw-sec", id: "mine" }, h("h2", { class: "jw-h", text: `Waiting on me · ${mine.length}` }),
+      mine.length ? h("ul", { class: "jw-list" }, mine.map(itemLi)) : h("p", { class: "jw-quiet", text: "Nothing on you in Kalihi." })));
+    main.append(h("section", { class: "jw-sec", id: "theirs" }, h("h2", { class: "jw-h", text: `Waiting on others · ${theirs.length}` }),
+      theirs.length ? h("ul", { class: "jw-list" }, theirs.map(itemLi)) : h("p", { class: "jw-quiet", text: "Nothing waiting on anyone else." })));
+
+    // Projects
+    const psec = h("section", { class: "jw-sec", id: "projects" }, h("h2", { class: "jw-h", text: "Projects" }));
+    for (const p of D.projects || []) {
+      const days = daysTo(p.when);
+      const nAlerts = alerts.filter((a) => projOf(a.projectId) === p).length;
+      psec.append(h("a", { class: "jw-proj", href: "/jw/p/" + encodeURIComponent(p.slug) },
+        h("div", { class: "jw-proj-l" }, h("b", { text: p.name }), h("span", { text: [p.when ? fmtDay(p.when) + (clock(p.when) ? " · " + clock(p.when) : "") : null, p.where].filter(Boolean).join(" · ") }), p.summary ? h("p", { text: p.summary }) : null,
+          nAlerts ? h("span", { class: "jw-chip hotchip", text: `${nAlerts} alert${nAlerts > 1 ? "s" : ""}` }) : null),
+        days != null && days >= 0 ? h("div", { class: "jw-proj-n" }, h("b", { text: String(days) }), h("span", { text: days === 1 ? "day to go" : "days to go" })) : h("span", { class: "jw-chip", text: p.status || "" })));
+    }
+    if (!(D.projects || []).length) psec.append(h("p", { class: "jw-quiet", text: "No projects yet." }));
+    main.append(psec);
+
+    // Parts: the soonest one coming up, else the newest not given
     const parts = D.parts.slice().sort((a, b) => a.order - b.order);
-    const next = parts.slice().reverse().find((p) => p.status && p.status !== "Given") || null;
-    const sec = h("section", { class: "jw-sec" }, h("h2", { class: "jw-h", text: "Parts" }));
-    if (next) sec.append(partCard(next, true));
-    const rest = parts.filter((p) => p !== next);
+    const live = parts.filter((p) => p.status && p.status !== "Given");
+    const dated = live.filter((p) => p.when && daysTo(p.when) >= 0).sort((a, b) => a.when.localeCompare(b.when));
+    const nexts = dated.length ? [dated[0], ...live.filter((p) => p !== dated[0]).slice(-1)] : live.slice(-1);
+    const sec = h("section", { class: "jw-sec", id: "parts" }, h("h2", { class: "jw-h", text: "Parts" }));
+    nexts.forEach((p, i) => sec.append(partCard(p, i === 0)));
+    const rest = parts.filter((p) => !nexts.includes(p));
     if (rest.length) {
       const grid = h("div", { class: "jw-mini" });
       for (const p of rest) {
@@ -199,34 +272,30 @@
     if (!parts.length) sec.append(h("p", { class: "jw-quiet", text: "No parts yet." }));
     main.append(sec);
 
-    // Items: the Kalihi stars from Sky and Today, with their details
-    const isec = h("section", { class: "jw-sec" }, h("h2", { class: "jw-h", text: "Reminders and to-dos" }));
-    if (D.items.length) isec.append(h("ul", { class: "jw-list" }, D.items.map(itemLi)));
-    else isec.append(h("p", { class: "jw-quiet", text: "Nothing open in Kalihi." }));
-    main.append(isec);
-
-    // Schedule
-    if (D.events.length) {
-      const esec = h("section", { class: "jw-sec" }, h("h2", { class: "jw-h", text: "Coming up" }));
-      esec.append(h("ul", { class: "jw-list" }, D.events.map((e) => h("li", { id: e.itemKey || null },
-        h("div", { class: "jw-row" }, h("p", { class: "jw-name", text: e.title }), h("span", { class: "jw-meta", text: fmtDay(e.start) + (e.allDay ? "" : " · " + clock(e.start)) })),
-        e.where ? h("p", { class: "jw-meta", text: e.where }) : null))));
-      main.append(esec);
-    }
+    // Calendar
+    const esec = h("section", { class: "jw-sec", id: "coming" }, h("h2", { class: "jw-h", text: "Coming up" }));
+    if ((D.events || []).length) esec.append(h("ul", { class: "jw-list" }, D.events.map((e) => h("li", { id: e.itemKey ? "ev-" + e.itemKey : null },
+      h("div", { class: "jw-row" }, h("p", { class: "jw-name", text: e.title }), h("span", { class: "jw-meta", text: fmtDay(e.start) + (e.allDay ? "" : " · " + clock(e.start)) })),
+      e.where ? h("p", { class: "jw-meta", text: e.where }) : null))));
+    else esec.append(h("p", { class: "jw-quiet", text: "Nothing on the calendar." }));
+    main.append(esec);
 
     // Literature
     const lit = D.literature || [];
+    const lsec = h("section", { class: "jw-sec", id: "lit" });
+    const liveLit = lit.filter((l) => !["Handed out", "Cancelled"].includes(l.status));
+    lsec.append(h("h2", { class: "jw-h", text: `Literature requests · ${liveLit.length} in progress` }));
     if (lit.length) {
-      const live = lit.filter((l) => !["Handed out", "Cancelled"].includes(l.status));
-      const lsec = h("section", { class: "jw-sec" }, h("h2", { class: "jw-h", text: `Literature requests · ${live.length} in progress` }));
-      const rows = (live.length ? live : lit.slice(0, 10)).map((l) => h("tr", null,
+      const rows = (liveLit.length ? liveLit : lit.slice(0, 10)).map((l) => h("tr", null,
         h("td", null, l.item, l.symbol ? h("span", { class: "jw-meta", text: " " + l.symbol }) : null),
         h("td", { text: [l.forWhom, l.language].filter(Boolean).join(" · ") }),
         h("td", { class: "n", text: l.quantity == null ? "" : String(l.quantity) }),
         h("td", { text: (l.status || "") + (l.requested ? " · " + fmtDay(l.requested).replace(/, \d{4}$/, "") : "") })));
       lsec.append(h("div", { class: "jw-scroll" }, h("table", { class: "jw-table" }, h("thead", null, h("tr", null, ["Item", "For", "Qty", "Status"].map((t) => h("th", { text: t })))), h("tbody", null, rows))));
-      main.append(lsec);
-    }
+    } else lsec.append(h("p", { class: "jw-quiet", text: "No requests." }));
+    main.append(lsec);
+
+    if (closed.length) main.append(h("section", { class: "jw-sec" }, h("details", { class: "jw-details" }, h("summary", { text: `Done lately (${closed.length})` }), h("ul", { class: "jw-list" }, closed.map(itemLi)))));
 
     // arrived from a star: fly to it
     const key = decodeURIComponent(location.hash.slice(1));
@@ -291,7 +360,7 @@
     ta.value = it.notes || "";
     const go = debounce(() => { state.textContent = "Saving…"; savePI(it, { notes: ta.value }).then(() => { state.textContent = "Saved"; setTimeout(() => (state.textContent = ""), 1500); }, () => { state.textContent = "Not saved"; }); }, 900);
     ta.addEventListener("input", go);
-    return h("div", { class: "jw-notewrap" }, h("div", { class: "jw-row" }, h("span", { class: "jw-mini-h", text: "My notes" }), state), ta);
+    return h("div", { class: "jw-notewrap" }, h("div", { class: "jw-row" }, h("span", { class: "jw-mini-h", text: "My notes · Claude reads these" }), state), ta);
   }
 
   function statusSeg(it, onChange) {
@@ -329,7 +398,7 @@
 
   function alertCard(it, rerender) {
     const done = it.status === "Done";
-    const card = h("article", { class: `jw-alert lv-${(it.level || "Info").replace(/\W/g, "")}` + (done ? " done" : "") });
+    const card = h("article", { id: "i-" + it.id, class: `jw-alert lv-${(it.level || "Info").replace(/\W/g, "")}` + (done ? " done" : "") });
     const icon = it.level === "Action" ? "!" : it.level === "Heads-up" ? "◆" : "i";
     card.append(h("span", { class: "jw-alert-i", "aria-hidden": "true", text: icon }));
     const body = h("div", { class: "jw-alert-b" },
@@ -339,6 +408,7 @@
       body.append(h("pre", { class: "jw-alert-d", text: it.details }));
       if (m && navigator.clipboard) body.append(h("div", { class: "jw-links" }, h("button", { type: "button", text: "Copy announcement", onclick: (ev) => { navigator.clipboard.writeText(m[1]).then(() => { ev.target.textContent = "Copied"; }); } })));
     }
+    if (it.level === "Action" || it.level === "Heads-up") body.append(replyBox(it.notes, (v) => savePI(it, { notes: v }), { placeholder: "Your response: what you did or answered. Claude reads this on the next run." }));
     if (it.level === "Action" || it.level === "Heads-up") {
       const links = body.querySelector(".jw-links") || body.appendChild(h("div", { class: "jw-links" }));
       links.append(h("button", { type: "button", text: done ? "Reopen" : "Mark done", onclick: async (ev) => {
@@ -401,6 +471,7 @@
         h("h1", { class: "jw-title", text: p.name }),
         h("p", { class: "jw-sub", text: [p.when ? fmtDay(p.when) + (clock(p.when) ? " · " + clock(p.when) : "") : null, p.where].filter(Boolean).join(" · ") })),
       days != null && days >= 0 ? h("div", { class: "jw-count" }, h("b", { text: String(days) }), h("span", { text: days === 1 ? "day to go" : "days to go" })) : null));
+    main.append(jumpNav([["alerts", "Alerts", items.filter((i) => i.kind === "Alert" && i.status !== "Done" && i.level !== "Info").length], ["mine", "Mine", items.filter((i) => i.mine && i.kind === "Assignment" && i.status !== "Done").length], ["program", "Program"], ["teams", "Teams"], ["decisions", "Decided"]].filter(([id]) => id === "alerts" || items.some((i) => ({ mine: "Assignment", program: "Program", teams: "Team", decisions: "Decision" })[id] === i.kind))));
     if (p.summary) main.append(h("p", { class: "jw-p jw-lede", text: p.summary }));
     const facts = String(p.facts || "").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const i = l.indexOf(":"); return i > 0 ? [l.slice(0, i), l.slice(i + 1).trim()] : ["", l]; });
     if (facts.length) main.append(h("dl", { class: "jw-facts" }, facts.map(([k, v]) => h("div", null, h("dt", { text: k }), h("dd", { text: v })))));
@@ -436,6 +507,8 @@
     if (dec.length) main.append(h("section", { class: "jw-sec", id: "decisions" }, h("h2", { class: "jw-h", text: "Decided" }), h("ul", { class: "jw-dec" }, dec.map((d) => h("li", { text: d.title })))));
 
     if (safeUrl(p.url)) main.append(h("p", { class: "jw-links" }, ext(p.url, "Open the project in Notion ↗")));
+    const key = decodeURIComponent(location.hash.slice(1));
+    if (key) { const el = document.getElementById(key); if (el) { el.scrollIntoView({ block: "start" }); if (el.tagName === "ARTICLE") { el.classList.add("hit"); setTimeout(() => el.classList.remove("hit"), 2500); } } }
   }
 
   $("#lock").addEventListener("click", async () => { await api("POST", "/auth/jw/lock").catch(() => {}); D = null; showGate(); });

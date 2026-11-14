@@ -9,6 +9,7 @@ const DS = {
   lit: process.env.NOTION_JW_LIT_DS || "4188f469-b674-8144-9a0e-000becc71b29",
   items: process.env.NOTION_ITEMS_DS || "56605421-1249-4338-9a43-4ac9edc3bddc",
   projects: process.env.NOTION_JW_PROJECTS_DS || "4188f469-b674-81c0-8110-000b9c73275c",
+  days: process.env.NOTION_DAYS_DS || "292f1929-9158-4c3f-8e80-80ad70cd4b13",
   pitems: process.env.NOTION_JW_PITEMS_DS || "4188f469-b674-81be-b3b1-000b376da772",
 };
 
@@ -29,6 +30,7 @@ function toPart(page) {
     order: read(p["Order"]) ?? 99,
     deliverables: read(p["Deliverables"]) || "",
     details: read(p["Details"]) || "",
+    notes: read(p["Notes"]) || "",
   };
 }
 function toLit(page) {
@@ -61,6 +63,7 @@ function toProject(page) {
 }
 function toPItem(page) {
   const p = page.properties;
+  const proj = p["Project"] && p["Project"].relation && p["Project"].relation[0];
   const due = p["Due"] && p["Due"].date;
   return {
     id: page.id, url: page.url,
@@ -69,6 +72,7 @@ function toPItem(page) {
     minutes: read(p["Minutes"]) || "", due: due ? due.start : null,
     details: read(p["Details"]) || "", steps: read(p["Steps"]) || "", notes: read(p["Notes"]) || "",
     order: read(p["Order"]) ?? 99,
+    projectId: proj ? proj.id : null,
   };
 }
 async function getProjects() {
@@ -90,8 +94,33 @@ async function updatePItem(id, f) {
   const props = {};
   if ("status" in f) props["Status"] = { select: f.status ? { name: f.status } : null };
   if ("steps" in f) props["Steps"] = { rich_text: rich(f.steps) };
-  if ("notes" in f) props["Notes"] = { rich_text: rich(f.notes) };
+  if ("notes" in f) { props["Notes"] = { rich_text: rich(f.notes) }; props["Response at"] = { date: { start: new Date().toISOString() } }; }
   return toPItem(await call("PATCH", `/pages/${id}`, { properties: props }));
+}
+
+// Open alerts that ask something of Eric, across every project.
+async function getAlerts() {
+  const rows = await queryAll(DS.pitems, { filter: { and: [
+    { property: "Kind", select: { equals: "Alert" } },
+    { property: "Level", select: { does_not_equal: "Info" } },
+    { property: "Status", select: { does_not_equal: "Done" } },
+  ] } });
+  return rows.map(toPItem);
+}
+// Project items with a due date in the next few days, not done.
+async function getDue(today, days) {
+  const until = new Date(new Date(today + "T12:00:00Z").getTime() + days * 864e5).toISOString().slice(0, 10);
+  const rows = await queryAll(DS.pitems, { filter: { and: [
+    { property: "Due", date: { on_or_after: today } },
+    { property: "Due", date: { on_or_before: until } },
+    { property: "Status", select: { does_not_equal: "Done" } },
+  ] } });
+  return rows.map(toPItem);
+}
+// Today's Brief Days row, so an update typed here lands in Edits since brief like one typed in Oggi.
+async function getDayId(today) {
+  const r = await n._queryDS(DS.days, { filter: { property: "Date", date: { on_or_before: today } }, sorts: [{ property: "Date", direction: "descending" }], page_size: 1 });
+  return r.results.length ? r.results[0].id : null;
 }
 
 async function getAccess() {
@@ -111,6 +140,7 @@ async function updatePart(id, f) {
   const props = {};
   if ("deliverables" in f) props["Deliverables"] = { rich_text: rich(f.deliverables) };
   if ("status" in f) props["Status"] = { select: f.status ? { name: f.status } : null };
+  if ("notes" in f) { props["Notes"] = { rich_text: rich(f.notes) }; props["Response at"] = { date: { start: new Date().toISOString() } }; }
   const page = await call("PATCH", `/pages/${id}`, { properties: props });
   return toPart(page);
 }
@@ -134,17 +164,19 @@ async function getLiterature() {
 
 async function getEvents(today) {
   const evs = await n.getEvents(today);
-  return evs.filter((e) => e.calendar === "Kalihi JW" || e.calendar === "Field service").slice(0, 40);
+  const jw = (e) => e.calendar === "Kalihi JW" || e.calendar === "Field service" || /^JW\b|Kam IV|Kalihi|Kingdom Hall/i.test(e.title || "") || /Kam IV|Kamehameha IV/i.test(e.where || "");
+  return evs.filter(jw).slice(0, 40);
 }
 
 // Each section loads on its own, so one table the integration can't see doesn't blank the page.
 async function getAll(today) {
   const errors = [];
   const safe = (name, p) => p.catch((e) => { console.error("jw", name, e.message); errors.push(name); return []; });
-  const [parts, items, literature, events, projects] = await Promise.all([
+  const [parts, items, literature, events, projects, alerts, due, dayId] = await Promise.all([
     safe("parts", getParts()), safe("items", getItems(today)), safe("literature", getLiterature()), safe("events", getEvents(today)), safe("projects", getProjects()),
+    safe("alerts", getAlerts()), safe("due", getDue(today, 3)), getDayId(today).catch(() => null),
   ]);
-  return { parts, items, literature, events, projects, errors };
+  return { parts, items, literature, events, projects, alerts, due, dayId, errors };
 }
 
 module.exports = { getAll, getAccess, getPart, updatePart, getProject, getPItem, updatePItem, DS };

@@ -9,6 +9,9 @@ const parts = [
 ];
 const items = [
   { id: "i1", key: "demo-jw", title: "Sample Kalihi task", place: "Kalihi", area: "Personal", status: "Open", sentence: "A made-up item for demo mode.", note: "", lastSeen: "2026-11-13" },
+  { id: "i2", key: "demo-mail", title: "Read a sample letter", place: "Kalihi", status: "Open", sentence: "Came in by email.", link: "https://mail.google.com/mail/u/0/#inbox/x", sourcePhrase: "the email", note: "Read it, replying tomorrow", lastSeen: "2026-11-13" },
+  { id: "i3", key: "demo-wait", title: "Sample waiting item", place: "Kalihi", status: "Open", sentence: "Ball is with them.", waitingOn: "Organizers", lastSeen: "2026-11-13" },
+  { id: "i4", key: "demo-done", title: "Sample done item", place: "Kalihi", status: "Closed", sentence: "Finished.", lastSeen: "2026-11-12" },
 ];
 const project = { id: "pr1", slug: "demo", name: "Sample hall dedication", status: "Active", when: "2027-05-01T14:00:00-10:00", where: "Sample hall", summary: "Made-up project for demo mode.", facts: "Date: Sat May 1\nProgram: 2:00 PM\nSpeaker: Sample speaker", order: 1 };
 const pitems = [
@@ -27,7 +30,7 @@ module.exports = {
   getPItem: async (id) => pitems.find((x) => x.id === id),
   updatePItem: async (id, f) => Object.assign(pitems.find((x) => x.id === id), f),
   getAccess: async () => HASH,
-  getAll: async () => ({ parts, items, literature: [{ id: "l1", item: "Sample tract", symbol: "T-0", language: "English", forWhom: "Kalihi English", quantity: 50, status: "Submitted", requested: "2026-11-13" }], events: [], projects: [project], errors: [] }),
+  getAll: async () => ({ parts, items, literature: [{ id: "l1", item: "Sample tract", symbol: "T-0", language: "English", forWhom: "Kalihi English", quantity: 50, status: "Submitted", requested: "2026-11-13" }], events: [{ id: "e1", title: "Sample meeting", start: new Date(Date.now() + 864e5).toISOString().slice(0, 10) + "T13:00:00-10:00", where: "Kam IV", allDay: false }], projects: [project], alerts: [Object.assign({ projectId: "pr1" }, pitems[0])], due: [], dayId: null, errors: [] }),
   getPart: async (id) => parts.find((p) => p.id === id),
   updatePart: async (id, f) => Object.assign(parts.find((p) => p.id === id), f),
 };

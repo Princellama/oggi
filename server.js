@@ -908,6 +908,7 @@ app.patch("/api/jw/part/:id", requireJw, wrap(async (req, res) => {
   const f = {};
   if ("deliverables" in req.body) f.deliverables = String(req.body.deliverables || "").slice(0, 6000);
   if ("status" in req.body) { if (req.body.status !== null && !JW_STATUS.includes(req.body.status)) throw bad("status"); f.status = req.body.status; }
+  if ("notes" in req.body) f.notes = String(req.body.notes || "").slice(0, 6000);
   res.json(await jwstore.updatePart(req.params.id, f));
 }));
 app.get("/api/jw/project/:slug", requireJw, wrap(async (req, res) => {
