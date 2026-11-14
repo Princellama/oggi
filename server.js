@@ -910,7 +910,23 @@ app.patch("/api/jw/part/:id", requireJw, wrap(async (req, res) => {
   if ("status" in req.body) { if (req.body.status !== null && !JW_STATUS.includes(req.body.status)) throw bad("status"); f.status = req.body.status; }
   res.json(await jwstore.updatePart(req.params.id, f));
 }));
-app.get(["/jw", "/jw/"], (req, res) => {
+app.get("/api/jw/project/:slug", requireJw, wrap(async (req, res) => {
+  if (!/^[\w-]{1,64}$/.test(req.params.slug)) throw bad("slug");
+  res.set("Cache-Control", "no-store");
+  const p = await jwstore.getProject(req.params.slug);
+  if (!p) return res.status(404).json({ error: "No such project." });
+  res.json(p);
+}));
+const PI_STATUS = ["To do", "Doing", "Done"];
+app.patch("/api/jw/pitem/:id", requireJw, wrap(async (req, res) => {
+  if (!/^[\w-]{1,64}$/.test(req.params.id)) throw bad("id");
+  const f = {};
+  if ("status" in req.body) { if (req.body.status !== null && !PI_STATUS.includes(req.body.status)) throw bad("status"); f.status = req.body.status; }
+  if ("steps" in req.body) f.steps = String(req.body.steps || "").slice(0, 6000);
+  if ("notes" in req.body) f.notes = String(req.body.notes || "").slice(0, 6000);
+  res.json(await jwstore.updatePItem(req.params.id, f));
+}));
+app.get(["/jw", "/jw/", "/jw/p/:slug"], (req, res) => {
   res.set("Cache-Control", "no-store");
   res.sendFile(path.join(__dirname, "public", "jw.html"));
 });

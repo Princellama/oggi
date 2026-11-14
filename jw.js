@@ -8,6 +8,8 @@ const DS = {
   parts: process.env.NOTION_JW_PARTS_DS || "4188f469-b674-81b2-9f6c-000b6096ee41",
   lit: process.env.NOTION_JW_LIT_DS || "4188f469-b674-8144-9a0e-000becc71b29",
   items: process.env.NOTION_ITEMS_DS || "56605421-1249-4338-9a43-4ac9edc3bddc",
+  projects: process.env.NOTION_JW_PROJECTS_DS || "4188f469-b674-81c0-8110-000b9c73275c",
+  pitems: process.env.NOTION_JW_PITEMS_DS || "4188f469-b674-81be-b3b1-000b376da772",
 };
 
 function toPart(page) {
@@ -44,6 +46,52 @@ function toLit(page) {
     careOf: read(p["Care of"]) || "",
     notes: read(p["Notes"]) || "",
   };
+}
+
+function toProject(page) {
+  const p = page.properties;
+  const when = p["When"] && p["When"].date;
+  return {
+    id: page.id, url: page.url,
+    name: read(p["Name"]) || "", slug: read(p["Slug"]) || page.id,
+    status: read(p["Status"]), when: when ? when.start : null,
+    where: read(p["Where"]) || "", summary: read(p["Summary"]) || "", facts: read(p["Facts"]) || "",
+    order: read(p["Order"]) ?? 99,
+  };
+}
+function toPItem(page) {
+  const p = page.properties;
+  const due = p["Due"] && p["Due"].date;
+  return {
+    id: page.id, url: page.url,
+    title: read(p["Title"]) || "", kind: read(p["Kind"]), level: read(p["Level"]), status: read(p["Status"]),
+    mine: !!(p["Mine"] && p["Mine"].checkbox), lead: read(p["Lead"]) || "", assistants: read(p["Assistants"]) || "",
+    minutes: read(p["Minutes"]) || "", due: due ? due.start : null,
+    details: read(p["Details"]) || "", steps: read(p["Steps"]) || "", notes: read(p["Notes"]) || "",
+    order: read(p["Order"]) ?? 99,
+  };
+}
+async function getProjects() {
+  const rows = await queryAll(DS.projects, { sorts: [{ property: "Order", direction: "ascending" }] });
+  return rows.map(toProject);
+}
+async function getProject(slug) {
+  const rows = await queryAll(DS.projects, { filter: { property: "Slug", rich_text: { equals: slug } } });
+  if (!rows.length) return null;
+  const project = toProject(rows[0]);
+  const items = await queryAll(DS.pitems, {
+    filter: { property: "Project", relation: { contains: project.id } },
+    sorts: [{ property: "Order", direction: "ascending" }],
+  });
+  return { project, items: items.map(toPItem) };
+}
+async function getPItem(id) { return toPItem(await call("GET", `/pages/${id}`)); }
+async function updatePItem(id, f) {
+  const props = {};
+  if ("status" in f) props["Status"] = { select: f.status ? { name: f.status } : null };
+  if ("steps" in f) props["Steps"] = { rich_text: rich(f.steps) };
+  if ("notes" in f) props["Notes"] = { rich_text: rich(f.notes) };
+  return toPItem(await call("PATCH", `/pages/${id}`, { properties: props }));
 }
 
 async function getAccess() {
@@ -93,10 +141,10 @@ async function getEvents(today) {
 async function getAll(today) {
   const errors = [];
   const safe = (name, p) => p.catch((e) => { console.error("jw", name, e.message); errors.push(name); return []; });
-  const [parts, items, literature, events] = await Promise.all([
-    safe("parts", getParts()), safe("items", getItems(today)), safe("literature", getLiterature()), safe("events", getEvents(today)),
+  const [parts, items, literature, events, projects] = await Promise.all([
+    safe("parts", getParts()), safe("items", getItems(today)), safe("literature", getLiterature()), safe("events", getEvents(today)), safe("projects", getProjects()),
   ]);
-  return { parts, items, literature, events, errors };
+  return { parts, items, literature, events, projects, errors };
 }
 
-module.exports = { getAll, getAccess, getPart, updatePart, DS };
+module.exports = { getAll, getAccess, getPart, updatePart, getProject, getPItem, updatePItem, DS };
