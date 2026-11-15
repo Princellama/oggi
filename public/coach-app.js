@@ -191,7 +191,7 @@
         h("button", { class: "textlink", type: "button", text: "Not today", onclick: () => { S.pmApplied = false; go("close"); } }),
         h("button", { class: "btn", type: "button", text: "That's my vote", onclick: async () => {
           const v = ta.value.trim(); if (!v) return;
-          try { await saveDraft({ apply: v, book: b.title, chapter: "Ch. " + b.chapterNo }); } catch { return; }
+          try { await saveDraft({ apply: v, book: b.title, chapter: "Ch. " + b.chapterNo, point: tk.text, quoteId: tk.id || "" }); } catch { return; }
           S.pmApplied = v; go("close");
         } })));
     } else {

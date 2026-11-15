@@ -9,7 +9,7 @@ const DS = {
   quotes: process.env.NOTION_QUOTES_DS || "fe6d0f14-dbba-4863-9a2c-4f19be9cffe5",
 };
 const HABITS = ["Bible reading", "Walk", "Workout", "Italian", "No phone first hour", "Bed by 10", "Reading", "Veg at 2 meals", "No sugary drinks", "Protein every meal"];
-const TEXT = { win: "Win", grateful: "Grateful for", book: "Book", chapter: "Chapter", notes: "Book notes", apply: "Apply", tomorrow: "Tomorrow" };
+const TEXT = { win: "Win", grateful: "Grateful for", book: "Book", chapter: "Chapter", notes: "Book notes", apply: "Apply", point: "Apply point", tomorrow: "Tomorrow" };
 
 function read(p) {
   if (!p) return null;
@@ -55,7 +55,7 @@ async function takeaways(book) {
     { property: "Book", relation: { contains: book.id } },
     { property: "Chapter", rich_text: { equals: ch } },
   ] }, page_size: 30 });
-  return r.results.map((q) => ({ text: read(q.properties["Quote"]) || "", mine: read(q.properties["Kind"]) === "Eric captured" })).filter((t) => t.text);
+  return r.results.map((q) => ({ id: q.id, text: read(q.properties["Quote"]) || "", mine: read(q.properties["Kind"]) === "Eric captured" })).filter((t) => t.text);
 }
 async function getAll(today) {
   const [t, y, books, st] = await Promise.all([

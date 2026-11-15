@@ -22,6 +22,7 @@ const coach = require("./coach");
 const feedstore = DEMO ? require("./feeding-demo") : require("./feeding");
 const fitstore = DEMO ? require("./fit-demo") : require("./fit");
 const jwstore = DEMO ? require("./jw-demo") : require("./jw");
+const libri = DEMO ? require("./libri-demo") : require("./libri");
 
 const PORT = process.env.PORT || 8080;
 const SECRET = process.env.SESSION_SECRET || (DEMO ? "demo-secret" : null);
@@ -641,17 +642,54 @@ app.get("/api/coach", requireAuth, wrap(async (req, res) => {
 }));
 app.post("/api/coach", requireAuth, wrap(async (req, res) => {
   const b = req.body || {}, f = {};
-  for (const k of ["win", "grateful", "book", "chapter", "notes", "apply", "tomorrow"]) if (k in b) f[k] = String(b[k] || "").slice(0, 4000);
+  for (const k of ["win", "grateful", "book", "chapter", "notes", "apply", "point", "tomorrow"]) if (k in b) f[k] = String(b[k] || "").slice(0, 4000);
   if (b.habits && typeof b.habits === "object") { f.habits = {}; for (const h of coach.HABITS) if (h in b.habits) f.habits[h] = !!b.habits[h]; }
   if ("water" in b) f.water = b.water === "" || b.water == null ? null : Math.max(0, Math.min(20, Number(b.water) || 0));
   if ("mood" in b) { if (b.mood && !["Great", "Good", "Okay", "Rough"].includes(b.mood)) throw bad("mood"); f.mood = b.mood || null; }
   if ("checkedOut" in b) f.checkedOut = !!b.checkedOut;
   if (DEMO) return res.json({ ok: true });
-  res.json(await coach.save(localDate(req), f));
+  const saved = await coach.save(localDate(req), f);
+  // Roger asked about one point: keep Eric's answer on that takeaway or quote too, for /libri.
+  if (b.quoteId && /^[0-9a-f-]{32,36}$/i.test(String(b.quoteId)) && f.apply && f.apply.trim())
+    await libri.applyTo(String(b.quoteId), localDate(req), f.apply).catch((e) => console.error("libri apply", e.message));
+  res.json(saved);
 }));
 app.get(["/coach", "/coach/*"], (req, res) => {
   res.set("Cache-Control", "no-cache");
   res.sendFile(path.join(__dirname, "public", "coach.html"));
+});
+
+// ---------- /libri (books) ----------
+// The cover shelf and a page per book: takeaways, Eric's lines, Roger's answers, notes, quiz. Notion: Books, Quotes, Daily Log.
+const isId = (s) => /^[0-9a-f-]{32,36}$/i.test(String(s || "")) || (DEMO && /^[a-z0-9]{2,8}$/i.test(String(s || "")));
+app.get("/api/libri", requireAuth, wrap(async (req, res) => { res.set("Cache-Control", "no-store"); res.json(await libri.list()); }));
+app.get("/api/libri/:id", requireAuth, wrap(async (req, res) => {
+  if (!isId(req.params.id)) throw bad("id");
+  res.set("Cache-Control", "no-store");
+  res.json(await libri.get(req.params.id));
+}));
+app.post("/api/libri/:id/quote", requireAuth, wrap(async (req, res) => {
+  if (!isId(req.params.id)) throw bad("id");
+  const b = req.body || {}, text = String(b.text || "").trim();
+  if (!text) throw bad("text");
+  res.json(await libri.addQuote(req.params.id, { text: text.slice(0, 1900), chapter: String(b.chapter || "").slice(0, 60), page: String(b.page || "").slice(0, 30), why: String(b.why || "").slice(0, 1900) }));
+}));
+app.patch("/api/libri/quote/:id", requireAuth, wrap(async (req, res) => {
+  if (!isId(req.params.id)) throw bad("id");
+  const b = req.body || {}, f = {};
+  if ("favorite" in b) f.favorite = !!b.favorite;
+  if ("why" in b) f.why = String(b.why || "").slice(0, 1900);
+  res.json(await libri.updateQuote(req.params.id, f));
+}));
+app.post("/api/libri/:id/quiz", requireAuth, wrap(async (req, res) => {
+  if (!isId(req.params.id)) throw bad("id");
+  const pct = Math.round(Number((req.body || {}).pct));
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) throw bad("pct");
+  res.json(await libri.saveQuiz(req.params.id, localDate(req), pct));
+}));
+app.get(["/libri", "/libri/", "/libri/:id"], (req, res) => {
+  res.set("Cache-Control", "no-cache");
+  res.sendFile(path.join(__dirname, "public", "libri.html"));
 });
 
 // ---------- /fit (London) ----------
