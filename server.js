@@ -49,7 +49,7 @@ app.use((req, res, next) => {
   res.set("X-Robots-Tag", "noindex, nofollow");
   res.set("Referrer-Policy", "no-referrer");
   res.set("X-Content-Type-Options", "nosniff");
-  res.set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");
+  res.set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: https://covers.openlibrary.org https://archive.org https://*.archive.org; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");
   next();
 });
 
