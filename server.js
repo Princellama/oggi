@@ -514,6 +514,33 @@ app.post("/api/medicare/announcement", requireAuth, wrap(async (req, res) => {
 }));
 app.delete("/api/medicare/announcement/:id", requireAuth, wrap(async (req, res) => res.json(await mstore.archiveAnnouncement(req.params.id))));
 
+// Leads (/medicare/leads): GHL pipelines synced with the Google Sheet both ways (leads.js). Read-only here,
+// apart from Sync now and Add to Calls. Demo mode serves a few made-up rows.
+const leadsStore = require("./leads");
+const LEADS_DEMO = () => ({ configured: true, missing: [], sheetUrl: "https://docs.google.com/spreadsheets/d/demo/edit", syncedAt: new Date().toISOString(), running: false, error: null, lastPushed: 0, changes: [], pipelines: ["Events", "Retail Market", "Referrals", "T65"],
+  leads: [
+    { tab: "Retail Market", oppId: "o1", contactId: "c1", name: "Cherry Reganit", phone: "", email: "cherry@example.com", stage: "Permission to Contact Received", tags: "manilaoptical", notes: "[2026-11-13] Picking up glasses for her tenants on Devoted.", added: "2026-11-13", last: "2026-11-13", via: "GHL note", stageChanged: "2026-11-13", source: "", value: 0, opp: "Cherry Reganit", link: "#" },
+    { tab: "Events", oppId: "o2", contactId: "c2", name: "Adam Tamayoshi", phone: "(808) 555-0101", email: "adam@example.com", stage: "Awareness", tags: "golf, events", notes: "[2024-08-19] under 65", added: "2024-08-29", last: "", via: "", stageChanged: "2024-08-29", source: "St Louis Class 69", value: 0, opp: "Adam Tamayoshi", link: "#" },
+    { tab: "T65", oppId: "o3", contactId: "c3", name: "Christy Fernando", phone: "(808) 555-0102", email: "christy@example.com", stage: "PTC", tags: "t65, kiosk-salt-lake", notes: "", added: "2026-09-26", last: "2026-09-17", via: "People row", stageChanged: "2026-10-26", source: "Devoted kiosk - Salt Lake", value: 725, opp: "Christy Fernando", link: "#" },
+    { tab: "Referrals", oppId: "o4", contactId: "c4", name: "Wanda Emilyon", phone: "(808) 555-0103", email: "", stage: "Awareness - Contacting", tags: "jw, referral", notes: "", added: "2026-11-11", last: "", via: "", stageChanged: "2026-11-11", source: "", value: 363, opp: "Wanda Emilyon", link: "#" },
+  ] });
+app.get("/api/medicare/leads", requireAuth, wrap(async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  if (DEMO) return res.json(LEADS_DEMO());
+  res.json(await leadsStore.get());
+}));
+app.post("/api/medicare/leads/sync", requireAuth, wrap(async (req, res) => {
+  if (DEMO) return res.json(LEADS_DEMO());
+  if (!leadsStore.configured()) return res.status(409).json({ error: "Leads sync isn't set up yet." });
+  await leadsStore.sync("Sync now");
+  res.json(await leadsStore.get());
+}));
+app.post("/api/medicare/leads/:oppId/call", requireAuth, wrap(async (req, res) => {
+  if (!/^[A-Za-z0-9]{2,40}$/.test(req.params.oppId)) return res.status(400).json({ error: "id" });
+  if (DEMO) return res.json({ ok: true, name: "Demo lead", order: 9 });
+  res.json(await leadsStore.addToCall(req.params.oppId, localDate(req)));
+}));
+
 // Photos and thumbnails are private Notion files with short-lived URLs, so they come through here.
 const PLACEHOLDER = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#EDECE6"/><path d="M30 64 L44 48 L54 58 L62 50 L72 64 Z" fill="#D6D5CC"/><circle cx="62" cy="38" r="5" fill="#D6D5CC"/></svg>');
 app.get("/api/medicare/img/:id", requireAuth, wrap(async (req, res) => {
@@ -998,3 +1025,4 @@ app.use(express.static(path.join(__dirname, "public"), {
 app.get("*", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
 app.listen(PORT, () => console.log(`oggi on ${PORT}${DEMO ? " (demo data)" : ""}`));
+if (!DEMO) leadsStore.start();

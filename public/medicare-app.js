@@ -63,7 +63,7 @@
 
   // ---------------- state ----------------
   const S = { data: null, err: null, msg: null, tab: "overview", pulseScope: "All", pulseCarrier: "All", partnerFilter: "All", draft: { kind: "In the field" } };
-  const TABS = ["overview", "team", "calls", "tools", "pulse", "carriers", "specialized", "campaigns", "content", "partners", "log"];
+  const TABS = ["overview", "team", "leads", "calls", "tools", "pulse", "carriers", "specialized", "campaigns", "content", "partners", "log"];
   const PROMPTS = {
     scan: "/medicare-marketing scan — scan Hawaii and national Medicare news and the four carriers (Devoted, UHC, Humana, HMSA), and add what's new to Medicare Pulse.",
     count: "/medicare-marketing count — count leads, appointments and enrollments in GHL for each running campaign in Medicare Campaigns, and sync my kiosk and event schedule from Google Calendar into Medicare Field Days.",
@@ -151,7 +151,7 @@
     for (const [k, v] of otherErrors()) main.append(h("p", { class: "mc-err", text: `${k}: ${v.error}` }));
     if (S.msg) main.append(h("p", { class: "mc-msg", text: S.msg }));
     if (S.tab === "carriers" && S.sub === "plans") return plans2027(main);
-    ({ overview, team, calls, tools, pulse, carriers, specialized, campaigns, content, partners, log })[S.tab](main);
+    ({ overview, team, leads, calls, tools, pulse, carriers, specialized, campaigns, content, partners, log })[S.tab](main);
   }
 
   // ---------------- overview ----------------
@@ -429,6 +429,107 @@
       const sec2 = h("section", { class: "mc-sec" }, h("h2", { class: "sec", text: "Past" }));
       for (const m of past) sec2.append(teamCard(m));
       main.append(sec2);
+    }
+  }
+
+  // ---------------- leads ----------------
+  // GHL's four pipelines, synced with the Google Sheet by the server (leads.js). Read-only here:
+  // edits happen in the sheet (Phone, Email, Stage, Tags, New note) and flow back to GHL.
+  const LEAD_SORTS = [["name", "Name A–Z"], ["lastNew", "Last contacted, newest"], ["lastOld", "Last contacted, oldest first"], ["addedNew", "Date added, newest"], ["addedOld", "Date added, oldest"]];
+  async function loadLeads(force) {
+    S.leadsBusy = true; if (force) render();
+    try { S.leads = await api(force ? "POST" : "GET", force ? "/api/medicare/leads/sync" : "/api/medicare/leads"); S.leadsErr = null; }
+    catch (e) { S.leadsErr = e.message === "signin" ? null : "Couldn't load the leads: " + e.message; }
+    S.leadsBusy = false; if (S.tab === "leads") render();
+  }
+  function leadList() {
+    const L = S.leads, f = S.leadF || (S.leadF = { pipe: "All", q: "", stage: "All", sort: "name", show: 100 });
+    let list = (L.leads || []).filter((l) => (f.pipe === "All" || l.tab === f.pipe) && (f.stage === "All" || l.stage === f.stage));
+    const qq = f.q.trim().toLowerCase();
+    if (qq) list = list.filter((l) => [l.name, l.email, l.phone, l.tags, l.notes, l.source].join(" ").toLowerCase().includes(qq));
+    const by = { name: (a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }),
+      lastNew: (a, b) => (b.last || "").localeCompare(a.last || ""), lastOld: (a, b) => (a.last || "0000").localeCompare(b.last || "0000"),
+      addedNew: (a, b) => (b.added || "").localeCompare(a.added || ""), addedOld: (a, b) => (a.added || "").localeCompare(b.added || "") };
+    return list.sort(by[f.sort] || by.name);
+  }
+  async function addLeadToCalls(l, btn) {
+    btn.disabled = true; btn.textContent = "Adding…";
+    try {
+      const r = await api("POST", "/api/medicare/leads/" + l.oppId + "/call");
+      (S.leadCalled = S.leadCalled || {})[l.oppId] = true;
+      btn.textContent = r.already ? "Already on today's calls" : "On today's calls ✓";
+      api("GET", "/api/medicare?d=" + todayISO()).then((d) => { S.data = d; header(); }).catch(() => {});
+    } catch (e) { btn.disabled = false; btn.textContent = "Couldn't add. Try again"; }
+  }
+  function leadsRows(box) {
+    box.textContent = "";
+    const f = S.leadF, list = leadList();
+    box.append(h("p", { class: "quiet ld-count", text: `${list.length} lead${list.length === 1 ? "" : "s"}` + (f.q ? ` matching “${f.q}”` : "") }));
+    const ul = h("ul", { class: "ld-list" });
+    for (const l of list.slice(0, f.show)) {
+      const called = S.leadCalled && S.leadCalled[l.oppId];
+      const li = h("li", { class: "ld" },
+        h("div", { class: "ld-main" },
+          h("div", { class: "ld-name" }, h("b", { text: l.name || "(no name)" }), chip(l.tab), l.stage ? chip(l.stage, "ld-stage") : null),
+          h("div", { class: "ld-contact" }, l.phone ? h("span", { text: l.phone }) : h("span", { class: "quiet", text: "no phone" }), l.email ? h("span", { text: l.email }) : null),
+          h("div", { class: "meta" },
+            h("span", { text: l.last ? `Last contacted ${fmtDay(l.last)} ${l.last.slice(0, 4)} · ${l.via}` : "No contact on record" }),
+            h("span", { text: "Added " + (l.added ? fmtDay(l.added) + " " + l.added.slice(0, 4) : "—") }),
+            l.source ? h("span", { text: l.source }) : null),
+          l.tags ? h("div", { class: "ld-tags", text: l.tags }) : null,
+          l.notes ? h("details", { class: "ld-notes" }, h("summary", { text: "Notes" }), h("p", { text: l.notes })) : null),
+        h("div", { class: "ld-acts" },
+          h("button", { class: "btn small" + (called ? " ghost" : ""), type: "button", disabled: called || null, text: called ? "On today's calls ✓" : "Add to Calls", onclick: (e) => addLeadToCalls(l, e.currentTarget) }),
+          safeUrl(l.link) ? ext(h("a", { class: "textlink", href: l.link, text: "Open in GHL" })) : null));
+      ul.append(li);
+    }
+    box.append(ul);
+    if (list.length > f.show) box.append(h("button", { class: "btn small ghost", type: "button", text: `Show ${Math.min(100, list.length - f.show)} more`, onclick: () => { f.show += 100; leadsRows(box); } }));
+  }
+  function leads(main) {
+    if (!S.leads && !S.leadsBusy && !S.leadsErr) { loadLeads(false); }
+    const L = S.leads;
+    const head = h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Leads" }));
+    const acts = h("div", { class: "mc-acts", style: "margin:0" });
+    if (L && L.sheetUrl) acts.append(ext(h("a", { class: "btn small ghost", href: L.sheetUrl, text: "Open Google Sheet" })));
+    if (L && L.configured) acts.append(h("button", { class: "btn small", type: "button", disabled: S.leadsBusy || null, text: S.leadsBusy ? "Syncing…" : "Sync now", onclick: () => loadLeads(true) }));
+    head.append(acts);
+    main.append(head);
+    main.append(h("p", { class: "mc-lede", text: "Your GHL pipelines, synced with the Google Sheet every 15 minutes. Edit Phone, Email, Stage, Tags or New note in the sheet and it goes back to GHL; here it's read-only, with Add to Calls." }));
+    if (S.leadsErr) main.append(h("p", { class: "mc-err", text: S.leadsErr }));
+    if (!L) { main.append(h("p", { class: "quiet", text: S.leadsBusy || !S.leadsErr ? "Loading from GHL… the first load takes about half a minute." : "" })); return; }
+    if (!L.configured) {
+      main.append(h("div", { class: "mc-share" },
+        h("p", {}, h("b", { text: "One-time setup before the sync can run." }), " Missing on Railway: " + (L.missing || []).join(", ") + "."),
+        h("p", { text: "1. GHL: Settings → Private Integrations → Create. Name it Oggi Leads, allow contacts (view, edit), opportunities (view, edit) and contact notes, then copy the token into a Railway variable named GHL_TOKEN." }),
+        h("p", { text: "2. Google: in Google Cloud, create a project, turn on the Google Sheets API, create a service account, add a JSON key, and paste the whole file into a Railway variable named GOOGLE_SERVICE_ACCOUNT_JSON." }),
+        h("p", { text: "3. Share the Google Sheet with the service account's email (the client_email in that file) as Editor. Railway redeploys; the first sync runs within a minute." })));
+      return;
+    }
+    const sub = [L.syncedAt ? `Synced ${fmtWeekday(L.syncedAt)} ${fmtClock(L.syncedAt)}` : "Not synced yet", L.lastPushed ? `${L.lastPushed} sheet edit${L.lastPushed === 1 ? "" : "s"} sent to GHL on the last sync` : ""].filter(Boolean).join(" · ");
+    main.append(h("p", { class: "quiet", style: "margin:-8px 0 16px", text: sub }));
+    if (L.error) main.append(h("p", { class: "mc-err", text: "Last sync: " + L.error }));
+    const f = S.leadF || (S.leadF = { pipe: "All", q: "", stage: "All", sort: "name", show: 100 });
+    const counts = {}; for (const l of L.leads || []) counts[l.tab] = (counts[l.tab] || 0) + 1;
+    const pills = h("div", { class: "filters" });
+    for (const p of ["All"].concat(L.pipelines || [])) pills.append(h("button", { type: "button", "aria-pressed": String(f.pipe === p), text: p + " " + (p === "All" ? (L.leads || []).length : counts[p] || 0), onclick: () => { f.pipe = p; f.stage = "All"; f.show = 100; render(); } }));
+    main.append(pills);
+    const stages = [...new Set((L.leads || []).filter((l) => f.pipe === "All" || l.tab === f.pipe).map((l) => l.stage).filter(Boolean))].sort();
+    const qIn = h("input", { class: "field ld-q", type: "search", placeholder: "Search name, phone, email, tag, note", "aria-label": "Search leads", value: f.q });
+    const stageSel = h("select", { class: "field", "aria-label": "Stage" }, h("option", { value: "All", text: "Every stage" }), ...stages.map((s) => h("option", { value: s, text: s, selected: s === f.stage })));
+    const sortSel = h("select", { class: "field", "aria-label": "Sort" }, ...LEAD_SORTS.map(([k, t]) => h("option", { value: k, text: t, selected: k === f.sort })));
+    const box = h("div", {});
+    qIn.addEventListener("input", () => { f.q = qIn.value; f.show = 100; leadsRows(box); });
+    stageSel.addEventListener("change", () => { f.stage = stageSel.value; f.show = 100; leadsRows(box); });
+    sortSel.addEventListener("change", () => { f.sort = sortSel.value; leadsRows(box); });
+    main.append(h("div", { class: "ld-bar" }, qIn, stageSel, sortSel));
+    main.append(box);
+    leadsRows(box);
+    if ((L.changes || []).length) {
+      const d = h("details", { class: "ann-old" }, h("summary", { text: `Recent edits from the sheet (${L.changes.length})` }));
+      const ul = h("ul", { class: "ld-changes" });
+      for (const c of L.changes) ul.append(h("li", { text: `${c.when} · ${c.tab} · ${c.name}: ${c.what} (${c.result})` }));
+      d.append(ul); main.append(d);
     }
   }
 
