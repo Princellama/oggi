@@ -464,6 +464,56 @@ app.patch("/api/medicare/call-session/:id", requireAuth, wrap(async (req, res) =
   res.json(await mstore.updateCallSession(req.params.id, f));
 }));
 
+// Team meetings (/medicare/team): high-level meetings with uplines, carriers and the team. Eric ticks
+// Plaud recorded; Claude writes Plaud match and Processed, so neither is accepted here.
+const TEAM_KINDS = ["Upline", "Team", "Carrier", "Partner", "Recruit", "Other"];
+const TEAM_STATUS = ["Planned", "Prepped", "Held", "Followed up"];
+function teamFields(b) {
+  const f = {}, no = (k) => Object.assign(new Error(k), { status: 400 });
+  if ("title" in b) { f.title = String(b.title || "").trim().slice(0, 160); if (!f.title) throw no("title"); }
+  if ("when" in b) { const w = b.when ? String(b.when) : null; if (w && !/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?([+-]\d{2}:\d{2}|Z)?)?$/.test(w)) throw no("when"); f.when = w; }
+  if ("kind" in b) { if (b.kind && !TEAM_KINDS.includes(b.kind)) throw no("kind"); f.kind = b.kind || null; }
+  if ("status" in b) { if (b.status && !TEAM_STATUS.includes(b.status)) throw no("status"); f.status = b.status || null; }
+  if ("agenda" in b) {
+    if (!Array.isArray(b.agenda) || b.agenda.length > 40) throw no("agenda");
+    f.agenda = b.agenda.map((x) => ({ t: String((x && x.t) || "").slice(0, 200), done: !!(x && x.done) })).filter((x) => x.t);
+    if (JSON.stringify(f.agenda).length > 1900) throw no("agenda too long");
+  }
+  if ("plaud" in b) f.plaud = !!b.plaud;
+  for (const [k, max] of [["with", 120], ["org", 120], ["strategy", 1900], ["goals", 1900], ["team", 1900], ["notes", 1900], ["decisions", 1900], ["followups", 1900]])
+    if (k in b) f[k] = String(b[k] || "").slice(0, max);
+  return f;
+}
+app.patch("/api/medicare/team/:id", requireAuth, wrap(async (req, res) => res.json(await mstore.updateTeamMeeting(req.params.id, teamFields(req.body)))));
+app.post("/api/medicare/team", requireAuth, wrap(async (req, res) => {
+  const f = teamFields(req.body);
+  if (!f.title) return res.status(400).json({ error: "title" });
+  res.json(await mstore.createTeamMeeting({ status: "Planned", kind: "Team", ...f }));
+}));
+
+// Team announcements: messages for the team WhatsApp chat. Oggi only copies them; nothing is sent.
+function announceFields(b) {
+  const f = {}, no = (k) => Object.assign(new Error(k), { status: 400 });
+  if ("title" in b) { f.title = String(b.title || "").trim().slice(0, 120); if (!f.title) throw no("title"); }
+  if ("message" in b) f.message = String(b.message || "").slice(0, 1900);
+  if ("status" in b) { if (!["Draft", "Ready", "Posted"].includes(b.status)) throw no("status"); f.status = b.status; }
+  if ("pinned" in b) f.pinned = !!b.pinned;
+  return f;
+}
+app.patch("/api/medicare/announcement/:id", requireAuth, wrap(async (req, res) => {
+  const f = announceFields(req.body);
+  if (f.status === "Posted") f.postedOn = localDate(req);
+  else if (f.status) f.postedOn = null;
+  res.json(await mstore.updateAnnouncement(req.params.id, f));
+}));
+app.post("/api/medicare/announcement", requireAuth, wrap(async (req, res) => {
+  const f = announceFields(req.body);
+  if (!f.message) return res.status(400).json({ error: "message" });
+  if (!f.title) f.title = f.message.split(/\s+/).slice(0, 6).join(" ").slice(0, 60);
+  res.json(await mstore.createAnnouncement({ status: "Ready", from: "Eric", date: localDate(req), ...f }));
+}));
+app.delete("/api/medicare/announcement/:id", requireAuth, wrap(async (req, res) => res.json(await mstore.archiveAnnouncement(req.params.id))));
+
 // Photos and thumbnails are private Notion files with short-lived URLs, so they come through here.
 const PLACEHOLDER = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#EDECE6"/><path d="M30 64 L44 48 L54 58 L62 50 L72 64 Z" fill="#D6D5CC"/><circle cx="62" cy="38" r="5" fill="#D6D5CC"/></svg>');
 app.get("/api/medicare/img/:id", requireAuth, wrap(async (req, res) => {

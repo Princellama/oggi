@@ -92,6 +92,8 @@ async function getAll() {
     log: { rows: copy(state.log) },
     calls: { rows: copy(state.calls) },
     callSessions: { rows: copy(state.callSessions) },
+    team: { rows: copy(state.team) },
+    announcements: { rows: copy(state.announcements) },
   };
 }
 const find = (t, i) => { const r = state[t].find((x) => x.id === i); if (!r) throw Object.assign(new Error("not found"), { status: 404 }); return r; };
@@ -109,6 +111,25 @@ async function updateCall(i, f) { return copy(Object.assign(find("calls", i), f)
 state.callSessions = [];
 async function createCallSession(f) { const r = { id: "sess" + (state.callSessions.length + 1), ended: null, ...f }; state.callSessions.unshift(r); return copy(r); }
 async function updateCallSession(i, f) { return copy(Object.assign(find("callSessions", i), f)); }
+state.team = [
+  { title: "Aaron Burton: co-op, January visit, building the Hawaii team", when: at(1, 13), with: "Aaron Burton", org: "Desert Skies (IFG)", kind: "Upline", status: "Prepped",
+    agenda: [{ t: "Co-op money: has the ACH landed, what it can be spent on", done: true }, { t: "January visit: lock the dates", done: false }, { t: "First Medicare 101 during his visit, for OEP", done: false }],
+    strategy: "Aaron wants you as his go-to in Hawaii, visiting about once a quarter.\nDisruption is the opening: people who must choose need someone local.",
+    goals: "Finish AEP strong by Dec 7\nJanuary: first Medicare 101 during his visit", team: "Agents who asked to come under you: ask how contracting works at IFG.",
+    notes: "", decisions: "", followups: "", plaud: false, plaudMatch: "", processed: false, brief: null, key: "tm-demo-aaron" },
+  { title: "Team call: AEP check-in", when: at(-6, 18), with: "The team", org: "", kind: "Team", status: "Held", agenda: [{ t: "Who still needs a review", done: true }],
+    strategy: "", goals: "", team: "", notes: "Everyone has their HMSA list.", decisions: "Weekly call through Dec 7", followups: "", plaud: true, plaudMatch: "Team call · 6:02 PM", processed: true, brief: null, key: "tm-demo-team" },
+].map((r) => ({ id: id(), url: null, ...r }));
+state.announcements = [
+  { title: "AEP final stretch", message: "Aloha team! AEP ends Monday, December 7. If you have clients you haven't reviewed yet, now's the time to reach out. Mahalo!", date: iso(0), status: "Ready", postedOn: null, pinned: true, from: "Claude" },
+  { title: "Kiosk schedule", message: "This week's kiosk days: Salt Lake Wed and Thu, 8 to 12.", date: iso(-4), status: "Posted", postedOn: iso(-4), pinned: false, from: "Eric" },
+].map((r) => ({ id: id(), url: null, created: new Date().toISOString(), ...r }));
+async function updateTeamMeeting(i, f) { return copy(Object.assign(find("team", i), f)); }
+async function createTeamMeeting(f) { const r = { id: id(), url: null, agenda: [], strategy: "", goals: "", team: "", notes: "", decisions: "", followups: "", plaud: false, plaudMatch: "", processed: false, brief: null, key: "", with: "", org: "", ...f }; state.team.unshift(r); return copy(r); }
+async function updateAnnouncement(i, f) { return copy(Object.assign(find("announcements", i), f)); }
+async function createAnnouncement(f) { const r = { id: id(), url: null, created: new Date().toISOString(), message: "", pinned: false, postedOn: null, ...f }; state.announcements.unshift(r); return copy(r); }
+async function archiveAnnouncement(i) { state.announcements = state.announcements.filter((r) => r.id !== i); return { ok: true }; }
 async function fileUrl() { return null; }
 
-module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, updatePortal, updateCall, createCallSession, updateCallSession, fileUrl };
+module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, updatePortal, updateCall, createCallSession, updateCallSession,
+  updateTeamMeeting, createTeamMeeting, updateAnnouncement, createAnnouncement, archiveAnnouncement, fileUrl };

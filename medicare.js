@@ -16,6 +16,8 @@ const DS = {
   people: process.env.NOTION_PEOPLE_DS || "47d42794-febb-4efb-9173-14a22ce848cb",
   calls: process.env.NOTION_CALLS_DS || "243be2d4-fdf7-48c5-899a-568749b3cb42",
   callSessions: process.env.NOTION_CALL_SESSIONS_DS || "15f4273f-7ab9-439d-8178-de3f14147f36",
+  team: process.env.NOTION_TEAM_MEETINGS_DS || "4198f469-b674-81ad-9cc2-000b1f3828ae",
+  announce: process.env.NOTION_ANNOUNCEMENTS_DS || "4198f469-b674-8172-91fc-000b197e6166",
 };
 
 function read(p) {
@@ -209,6 +211,68 @@ async function updateCallSession(id, f) {
   return toCallSession(await call("PATCH", `/pages/${id}`, { properties: sessionProps(f) }));
 }
 
+// Team Meetings: high-level meetings with uplines, carriers and the team (agenda, strategy, goals,
+// team building). Plaud recorded is Eric's tick; Claude finds the recording on the next brief, writes
+// Plaud match, folds the transcript in and ticks Processed.
+function parseAgenda(s) {
+  if (!s) return [];
+  try { const a = JSON.parse(s); return Array.isArray(a) ? a.filter((x) => x && typeof x.t === "string").map((x) => ({ t: x.t, done: !!x.done })) : []; } catch { return []; }
+}
+function toTeamMeeting(pg) {
+  const p = pg.properties;
+  return {
+    id: pg.id, url: pg.url, title: read(p["Title"]) || "", when: read(p["When"]), with: read(p["With"]) || "", org: read(p["Org"]) || "",
+    kind: read(p["Kind"]) || "Other", status: read(p["Status"]) || "Planned", agenda: parseAgenda(read(p["Agenda"])),
+    strategy: read(p["Strategy"]) || "", goals: read(p["Goals"]) || "", team: read(p["Team building"]) || "",
+    notes: read(p["Notes"]) || "", decisions: read(p["Decisions"]) || "", followups: read(p["Follow-ups"]) || "",
+    plaud: read(p["Plaud recorded"]), plaudMatch: read(p["Plaud match"]) || "", processed: read(p["Processed"]),
+    brief: read(p["Brief item"]), key: read(p["Key"]) || "",
+  };
+}
+const TEAM_TEXT = [["with", "With"], ["org", "Org"], ["strategy", "Strategy"], ["goals", "Goals"], ["team", "Team building"],
+  ["notes", "Notes"], ["decisions", "Decisions"], ["followups", "Follow-ups"], ["key", "Key"]];
+function teamProps(f) {
+  const o = {};
+  if ("title" in f) o["Title"] = { title: rich(f.title) };
+  if ("when" in f) o["When"] = { date: f.when ? { start: f.when } : null };
+  if ("kind" in f) o["Kind"] = { select: f.kind ? { name: f.kind } : null };
+  if ("status" in f) o["Status"] = { select: f.status ? { name: f.status } : null };
+  if ("agenda" in f) o["Agenda"] = { rich_text: rich(f.agenda && f.agenda.length ? JSON.stringify(f.agenda) : "") };
+  if ("plaud" in f) o["Plaud recorded"] = { checkbox: !!f.plaud };
+  for (const [k, name] of TEAM_TEXT) if (k in f) o[name] = { rich_text: rich(f[k] || "") };
+  return o;
+}
+async function updateTeamMeeting(id, f) { return toTeamMeeting(await call("PATCH", `/pages/${id}`, { properties: teamProps(f) })); }
+async function createTeamMeeting(f) {
+  return toTeamMeeting(await call("POST", "/pages", { parent: { type: "data_source_id", data_source_id: DS.team }, properties: teamProps(f) }));
+}
+
+// Team Announcements: messages for the team WhatsApp chat, copied from Overview. Nothing is sent from here.
+function toAnnouncement(pg) {
+  const p = pg.properties;
+  return {
+    id: pg.id, url: pg.url, title: read(p["Title"]) || "", message: read(p["Message"]) || "", date: read(p["Date"]),
+    status: read(p["Status"]) || "Draft", postedOn: read(p["Posted on"]), pinned: read(p["Pinned"]), from: read(p["From"]) || null,
+    created: pg.created_time,
+  };
+}
+function announceProps(f) {
+  const o = {};
+  if ("title" in f) o["Title"] = { title: rich(f.title) };
+  if ("message" in f) o["Message"] = { rich_text: rich(f.message || "") };
+  if ("date" in f) o["Date"] = { date: f.date ? { start: f.date } : null };
+  if ("status" in f) o["Status"] = { select: f.status ? { name: f.status } : null };
+  if ("postedOn" in f) o["Posted on"] = { date: f.postedOn ? { start: f.postedOn } : null };
+  if ("pinned" in f) o["Pinned"] = { checkbox: !!f.pinned };
+  if ("from" in f) o["From"] = { select: f.from ? { name: f.from } : null };
+  return o;
+}
+async function updateAnnouncement(id, f) { return toAnnouncement(await call("PATCH", `/pages/${id}`, { properties: announceProps(f) })); }
+async function createAnnouncement(f) {
+  return toAnnouncement(await call("POST", "/pages", { parent: { type: "data_source_id", data_source_id: DS.announce }, properties: announceProps(f) }));
+}
+async function archivePage(id) { await call("PATCH", `/pages/${id}`, { in_trash: true }); return { ok: true }; }
+
 const isoDay = (s, add) => { const d = new Date(s + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + add); return d.toISOString().slice(0, 10); };
 
 // Each table loads on its own, so one table not yet shared with the integration doesn't blank the page.
@@ -220,7 +284,7 @@ async function part(fn) {
 }
 
 async function getAll(today) {
-  const [pulse, campaigns, content, partners, field, portals, log, calls, callSessions] = await Promise.all([
+  const [pulse, campaigns, content, partners, field, portals, log, calls, callSessions, team, announcements] = await Promise.all([
     part(async () => (await queryAll(DS.pulse, {
       filter: { property: "Status", select: { does_not_equal: "Archived" } },
       sorts: [{ property: "Date", direction: "descending" }],
@@ -236,8 +300,10 @@ async function getAll(today) {
     part(getLog),
     part(() => getCalls(today)),
     part(() => getCallSessions(today)),
+    part(async () => (await queryAll(DS.team, { sorts: [{ property: "When", direction: "descending" }] })).slice(0, 80).map(toTeamMeeting)),
+    part(async () => (await queryAll(DS.announce, { sorts: [{ property: "Date", direction: "descending" }] })).slice(0, 40).map(toAnnouncement)),
   ]);
-  return { pulse, campaigns, content, partners, field, portals, log, calls, callSessions };
+  return { pulse, campaigns, content, partners, field, portals, log, calls, callSessions, team, announcements };
 }
 
 // ---------- writes ----------
@@ -348,4 +414,5 @@ async function fileUrl(id, prop, i) {
   return url;
 }
 
-module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, updatePortal, updateCall, createCallSession, updateCallSession, fileUrl, DS };
+module.exports = { getAll, setPulse, updateCampaign, createCampaign, updateContent, createContent, updatePartner, updatePortal, updateCall, createCallSession, updateCallSession,
+  updateTeamMeeting, createTeamMeeting, updateAnnouncement, createAnnouncement, archiveAnnouncement: archivePage, fileUrl, DS };

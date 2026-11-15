@@ -63,7 +63,7 @@
 
   // ---------------- state ----------------
   const S = { data: null, err: null, msg: null, tab: "overview", pulseScope: "All", pulseCarrier: "All", partnerFilter: "All", draft: { kind: "In the field" } };
-  const TABS = ["overview", "calls", "tools", "pulse", "carriers", "specialized", "campaigns", "content", "partners", "log"];
+  const TABS = ["overview", "team", "calls", "tools", "pulse", "carriers", "specialized", "campaigns", "content", "partners", "log"];
   const PROMPTS = {
     scan: "/medicare-marketing scan — scan Hawaii and national Medicare news and the four carriers (Devoted, UHC, Humana, HMSA), and add what's new to Medicare Pulse.",
     count: "/medicare-marketing count — count leads, appointments and enrollments in GHL for each running campaign in Medicare Campaigns, and sync my kiosk and event schedule from Google Calendar into Medicare Field Days.",
@@ -72,6 +72,7 @@
     calls: "/medicare-calls — build my Medicare call list for the next calling day and write it to the Medicare Calls table in Notion so it shows in Oggi's Calls tab.",
     fileCalls: (day) => `/medicare-calls file — file my logged calls from ${day}. First, for every Medicare Calls row from that day with Plaud note ticked and Plaud match empty, find the Plaud recording (conversation or voicemail) by time — between Dialed at and Called at, inside the call session's Started–Ended in Medicare Call Sessions — and by name; write its title and start time into Plaud match, correct Called at to the recording's start if they differ, and fold what was said into Notes (no Medicare numbers). Then, for each row with an Outcome that is not Filed: update the People row (Last contact, AEP 2027 stage, any corrected email, address or phone), add an Encounters row (Setting: Phone call), move the GHL opportunity stage and add the notes to the GHL contact, write a Medicare Activity Log row, turn any next step with a date into a QuickAction, write Claude next (the next step, or who we are waiting on and since when), then tick Filed. Never copy a Medicare number into a note.`,
     plaud: (n) => `/medicare-calls file — find the Plaud recordings for my ${n} call${n === 1 ? "" : "s"} marked Plaud note in Medicare Calls (Plaud match empty), match each by time and name, write Plaud match, correct Called at if needed, and fold the transcript into Notes. Then file those calls as usual.`,
+    announce: "Draft an announcement for my Medicare team WhatsApp chat and add it to the Team Announcements table in Notion (Status Draft, From Claude, today's date) so it shows on Oggi's Medicare Overview with a Copy button. Read the barayuga-notion System Map, then ask me in one line what it should be about if I haven't said. Plain text, short, warm, no plan names or premiums unless I say so, no Medicare numbers.",
     partner: (p) => `/medicare-marketing partner — give me a short talk track for ${p.name}${p.url ? " (" + p.url + ")" : ""}: who they are, what this AEP's changes mean for their patients or members, and one ask.`,
   };
 
@@ -150,7 +151,7 @@
     for (const [k, v] of otherErrors()) main.append(h("p", { class: "mc-err", text: `${k}: ${v.error}` }));
     if (S.msg) main.append(h("p", { class: "mc-msg", text: S.msg }));
     if (S.tab === "carriers" && S.sub === "plans") return plans2027(main);
-    ({ overview, calls, tools, pulse, carriers, specialized, campaigns, content, partners, log })[S.tab](main);
+    ({ overview, team, calls, tools, pulse, carriers, specialized, campaigns, content, partners, log })[S.tab](main);
   }
 
   // ---------------- overview ----------------
@@ -188,6 +189,14 @@
       tile(leads, "campaign leads", `${money(spend)} spent · ${enrolled} enrolled`, "campaigns"),
       tile(hot.length, "partners in the disruption", hot[0] ? hot[0].name : "None flagged yet", "partners")));
 
+    announcements(main);
+    const nextMeet = rows("team").filter((m) => !teamDay(m) || teamDay(m) >= today).sort((a, b) => String(a.when || "9").localeCompare(String(b.when || "9")))[0];
+    if (nextMeet) main.append(h("section", { class: "mc-sec" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Next team meeting" }),
+      h("a", { class: "textlink", href: "/medicare/team", text: "All team meetings", onclick: (e) => { e.preventDefault(); go("team"); } })),
+      h("a", { class: "tm-next", href: "/medicare/team", onclick: (e) => { e.preventDefault(); (S.teamOpen = S.teamOpen || {})[nextMeet.id] = true; go("team"); } },
+        h("span", { class: "when", text: teamWhen(nextMeet) }), h("span", { class: "what", text: nextMeet.title }),
+        h("span", { class: "where", text: [nextMeet.with, nextMeet.org, `${(nextMeet.agenda || []).length} on the agenda`].filter(Boolean).join(" · ") }))));
+
     const upcoming = rows("field").filter((f) => !f.start || localDay(f.start) >= today).slice(0, 5);
     const sec = h("section", { class: "mc-sec" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "In the field" }),
       ext(h("a", { class: "textlink", href: claude(PROMPTS.count), text: "Sync from my calendar" }))));
@@ -202,6 +211,224 @@
       const ps = h("section", { class: "mc-sec" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "New in the Pulse" })));
       ps.append(pulseList(pulseNew.slice(0, 3), true));
       main.append(ps);
+    }
+  }
+
+  // ---------------- announcements (Overview) ----------------
+  // Messages for the team WhatsApp chat. Copy puts the text on the clipboard; Oggi never sends anything.
+  async function annSave(a, f) {
+    S.annSaving = true;
+    try { Object.assign(a, await api("PATCH", "/api/medicare/announcement/" + a.id, f)); }
+    catch { S.msg = "Couldn't save that announcement to Notion."; }
+    S.annSaving = false; render();
+  }
+  function announcements(main) {
+    const all = rows("announcements");
+    const live = all.filter((a) => a.status !== "Posted").sort((a, b) => (b.pinned - a.pinned) || String(b.date || "").localeCompare(String(a.date || "")));
+    const posted = all.filter((a) => a.status === "Posted").slice(0, 3);
+    const sec = h("section", { class: "mc-sec ann" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Announcements" }),
+      ext(h("a", { class: "textlink", href: claude(PROMPTS.announce), text: "Draft one with Claude" }))));
+    sec.append(h("p", { class: "mc-lede", text: "For the team WhatsApp chat. Copy, paste it in, then mark it posted." }));
+    const card = (a) => {
+      const li = h("li", { class: "ann-card" + (a.status === "Posted" ? " posted" : "") + (a.pinned ? " pinned" : "") });
+      li.append(h("div", { class: "meta" },
+        a.pinned ? chip("Pinned", "new") : null,
+        chip(a.status, a.status === "Ready" ? "ok" : null),
+        h("span", { text: [a.date ? fmtDay(a.date) : "", a.from ? "from " + a.from : "", a.postedOn ? "posted " + fmtDay(a.postedOn) : ""].filter(Boolean).join(" · ") })));
+      if (a.title) li.append(h("h3", { text: a.title }));
+      if (S.annEdit === a.id) {
+        const ta = h("textarea", { class: "field ann-ta", rows: "6", "aria-label": "Message" }); ta.value = a.message;
+        li.append(ta, h("div", { class: "mc-acts" },
+          h("button", { class: "btn small", type: "button", text: "Save", onclick: () => { S.annEdit = null; a.message = ta.value; annSave(a, { message: ta.value }); } }),
+          h("button", { class: "textlink", type: "button", text: "Cancel", onclick: () => { S.annEdit = null; render(); } })));
+        setTimeout(() => ta.focus(), 0);
+        return li;
+      }
+      li.append(h("p", { class: "ann-msg", text: a.message || "" }));
+      const acts = h("div", { class: "mc-acts" }, copyBtn(() => a.message || ""));
+      if (a.status !== "Posted") acts.append(h("button", { class: "textlink", type: "button", text: "Mark posted", onclick: () => annSave(a, { status: "Posted" }) }));
+      else acts.append(h("button", { class: "textlink", type: "button", text: "Undo posted", onclick: () => annSave(a, { status: "Ready" }) }));
+      if (a.status === "Draft") acts.append(h("button", { class: "textlink", type: "button", text: "Ready", onclick: () => annSave(a, { status: "Ready" }) }));
+      acts.append(h("button", { class: "textlink", type: "button", text: "Edit", onclick: () => { S.annEdit = a.id; render(); } }));
+      acts.append(h("button", { class: "textlink", type: "button", text: a.pinned ? "Unpin" : "Pin", onclick: () => annSave(a, { pinned: !a.pinned }) }));
+      acts.append(h("button", { class: "textlink", type: "button", text: "Delete", onclick: (e) => annDelete(a, e.currentTarget) }));
+      li.append(acts);
+      return li;
+    };
+    const ul = h("ul", { class: "ann-list" });
+    for (const a of live) ul.append(card(a));
+    if (!live.length) sec.append(h("p", { class: "quiet", text: "Nothing waiting to post." }));
+    sec.append(ul);
+    if (posted.length) {
+      const d = h("details", { class: "ann-old" }, h("summary", { text: `Recently posted (${posted.length})` }));
+      const ul2 = h("ul", { class: "ann-list" }); for (const a of posted) ul2.append(card(a));
+      d.append(ul2); sec.append(d);
+    }
+    // New announcement: type it, save it, then Copy.
+    const ta = h("textarea", { class: "field ann-ta", rows: "3", placeholder: "Write an announcement for the team…", "aria-label": "New announcement" });
+    ta.value = S.annDraft || ""; ta.addEventListener("input", () => (S.annDraft = ta.value));
+    sec.append(h("div", { class: "ann-new" }, ta, h("div", { class: "mc-acts" },
+      h("button", { class: "btn small", type: "button", text: "Add announcement", onclick: async (e) => {
+        const message = ta.value.trim(); if (!message) return ta.focus();
+        e.target.disabled = true;
+        try { const a = await api("POST", "/api/medicare/announcement", { message }); S.data.announcements.rows.unshift(a); S.annDraft = ""; }
+        catch { S.msg = "Couldn't add that announcement. Try again."; }
+        render();
+      } }))));
+    main.append(sec);
+  }
+  // Two-tap delete without a browser dialog: the first tap arms it, the second within 4 seconds deletes.
+  async function annDelete(a, btn) {
+    if (btn.dataset.armed !== "1") {
+      btn.dataset.armed = "1"; btn.textContent = "Tap again to delete";
+      setTimeout(() => { if (btn.isConnected) { btn.dataset.armed = ""; btn.textContent = "Delete"; } }, 4000);
+      return;
+    }
+    try { await api("DELETE", "/api/medicare/announcement/" + a.id); S.data.announcements.rows = rows("announcements").filter((x) => x.id !== a.id); }
+    catch { S.msg = "Couldn't delete that announcement."; }
+    render();
+  }
+
+  // ---------------- team meetings ----------------
+  // Agenda, strategy, goals, team building. Fields save as he types; Plaud recorded tells Claude to
+  // find the recording on the next brief (or now, from Retrieve Voice Notes).
+  const TEAM_STATUS = ["Planned", "Prepped", "Held", "Followed up"];
+  const TEAM_KINDS = ["Upline", "Team", "Carrier", "Partner", "Recruit", "Other"];
+  const teamWhen = (m) => (!m.when ? "No date yet" : m.when.length <= 10 ? `${fmtWeekday(m.when + "T12:00:00Z")} ${fmtDay(m.when)}` : `${fmtWeekday(m.when)} ${fmtDay(m.when)}, ${fmtClock(m.when)}`);
+  const teamDay = (m) => (!m.when ? null : m.when.length <= 10 ? m.when : localDay(m.when));
+  const teamLinks = (m) => (m.url ? "Team Meetings row: " + m.url : "") + (m.brief ? "\nBrief item: " + m.brief : "");
+  function teamPrepPrompt(m) {
+    return `Prep my Medicare team meeting “${m.title}” with ${m.with || "the team"}${m.org ? " (" + m.org + ")" : ""}, ${teamWhen(m)}.\n${teamLinks(m)}\n\n` +
+      "Read the row, the barayuga-notion System Map, my earlier notes and Plaud recordings about this person, and my mail with them. Keep it high level. " +
+      "Update the Team Meetings row (Oggi reads it): Agenda (JSON list of {t, done}; keep my lines and their ticks, add what's missing), Strategy, Goals (one per line) and Team building (one per line). " +
+      "Set Status to Prepped. No Medicare numbers or tax figures. Tell me in a few lines what you added.";
+  }
+  function teamPlaudPrompt(m) {
+    return `Retrieve my Plaud voice notes for my Medicare team meeting “${m.title}” with ${m.with || "the team"}, ${teamWhen(m)}.\n${teamLinks(m)}\n\n` +
+      "Read the process-captures skill and use its Plaud loop, but only for this meeting: the recording made from an hour before to three hours after the meeting time, or that clearly mentions " + (m.with || "them") + ". " +
+      "Work from the transcript, never Plaud's summary. If none matches, or it is still transcribing, say so and change nothing.\n\n" +
+      "Then update the Team Meetings row:\n- Plaud match: the recording's title and start time.\n- Notes: add a \"From Plaud\" section below what I typed, in plain sentences.\n" +
+      "- Decisions and Follow-ups: one per line (who does what by when).\n- Agenda: tick what was covered.\n- Goals and Team building: add anything new that was agreed.\n" +
+      "- Status: Held if still Planned or Prepped. Tick Processed.\n" +
+      "Turn dated follow-ups that are mine into QuickActions, and add a Medicare Activity Log row (Key tm-<row id>). No Medicare numbers. Tell me in a few lines what you added.";
+  }
+  async function teamSave(m, f, redraw) {
+    S.teamSaving = (S.teamSaving || 0) + 1;
+    try { const fresh = await api("PATCH", "/api/medicare/team/" + m.id, f); for (const k of Object.keys(f)) m[k] = fresh[k]; }
+    catch { S.msg = "Couldn't save that to Notion."; redraw = true; }
+    S.teamSaving--;
+    if (redraw) render();
+  }
+  function teamText(m, key, label, placeholder, rowsN = 3) {
+    const ta = h("textarea", { class: "field tm-ta", rows: String(rowsN), placeholder: placeholder || "", "aria-label": label });
+    ta.value = m[key] || "";
+    const sv = h("span", { class: "tm-saved" });
+    let t;
+    ta.addEventListener("input", () => {
+      m[key] = ta.value; clearTimeout(t); sv.textContent = "";
+      t = setTimeout(async () => { await teamSave(m, { [key]: ta.value }); sv.textContent = "Saved"; setTimeout(() => (sv.textContent = ""), 1600); }, 900);
+    });
+    return h("div", { class: "tm-field" }, h("label", { class: "tm-lbl" }, label, sv), ta);
+  }
+  function teamCard(m) {
+    if (!S.teamOpen) S.teamOpen = {};
+    const today = todayISO();
+    const d = teamDay(m);
+    const det = h("details", { class: "tm-card" + (d && d < today ? " past" : "") });
+    if (S.teamOpen[m.id]) det.open = true;
+    det.addEventListener("toggle", () => (S.teamOpen[m.id] = det.open));
+    det.append(h("summary", {},
+      h("div", { class: "meta" }, chip(m.kind || "Other"), chip(m.status, m.status === "Held" || m.status === "Followed up" ? "ok" : null),
+        m.plaud ? chip(m.processed ? "Plaud filed" : "Plaud recorded", m.processed ? "ok" : "warn") : null,
+        h("span", { text: [teamWhen(m), m.with, m.org].filter(Boolean).join(" · ") })),
+      h("h3", { text: m.title })));
+    const body = h("div", { class: "tm-body" });
+    // status steps
+    body.append(h("div", { class: "filters tm-steps" }, ...TEAM_STATUS.map((s) => h("button", { type: "button", "aria-pressed": String(m.status === s), text: s,
+      onclick: () => { m.status = s; render(); teamSave(m, { status: s }); } }))));
+    // Plaud
+    const cb = h("input", { type: "checkbox", id: "pl-" + m.id }); cb.checked = !!m.plaud;
+    cb.addEventListener("change", () => { m.plaud = cb.checked; render(); teamSave(m, { plaud: cb.checked }); });
+    body.append(h("div", { class: "tm-plaud" }, cb, h("label", { for: "pl-" + m.id, text: "🎙 Recorded by Plaud" }),
+      h("span", { class: "quiet", text: m.processed ? "Filed from " + (m.plaudMatch || "the recording") : m.plaudMatch ? "Matched: " + m.plaudMatch : m.plaud ? "Claude will find it on the next brief" : "" })));
+    // agenda
+    const ag = m.agenda || [];
+    const saveAg = (next) => { m.agenda = next; render(); teamSave(m, { agenda: next }); };
+    const ul = h("ul", { class: "tm-agenda" });
+    ag.forEach((x, i) => {
+      const box = h("input", { type: "checkbox", "aria-label": "Covered" }); box.checked = x.done;
+      box.addEventListener("change", () => saveAg(ag.map((y, j) => (j === i ? { ...y, done: box.checked } : y))));
+      ul.append(h("li", { class: x.done ? "done" : "" }, box, h("span", { text: x.t }),
+        h("button", { class: "x", type: "button", "aria-label": "Remove", text: "×", onclick: () => saveAg(ag.filter((_, j) => j !== i)) })));
+    });
+    const add = h("input", { class: "field", type: "text", maxlength: "200", placeholder: "Add an agenda item", "aria-label": "Add an agenda item" });
+    const addIt = () => { const v = add.value.trim(); if (v) saveAg(ag.concat([{ t: v, done: false }])); };
+    add.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addIt(); } });
+    body.append(h("div", { class: "tm-field" }, h("span", { class: "tm-lbl", text: `Agenda · ${ag.filter((x) => x.done).length} of ${ag.length} covered` }), ul,
+      h("div", { class: "tm-add" }, add, h("button", { class: "btn small ghost", type: "button", text: "Add", onclick: addIt }))));
+    body.append(h("div", { class: "tm-grid" },
+      teamText(m, "strategy", "Strategy", "The big picture to hold in the room", 4),
+      teamText(m, "goals", "Goals", "One per line", 4),
+      teamText(m, "team", "Team building", "Who, recruiting, training, rhythm. One per line", 4)));
+    body.append(teamText(m, "notes", "Notes", "What was said", 4));
+    body.append(h("div", { class: "tm-grid two" },
+      teamText(m, "decisions", "Decisions", "One per line", 3),
+      teamText(m, "followups", "Follow-ups", "Who does what by when", 3)));
+    const acts = h("div", { class: "mc-acts" },
+      ext(h("a", { class: "btn small", href: claude(teamPrepPrompt(m)), text: "Prep with Claude" })),
+      ext(h("a", { class: "btn small ghost", href: claude(teamPlaudPrompt(m)), text: "🎙 Retrieve Voice Notes" })),
+      copyBtn(() => teamRecap(m), "Copy recap"));
+    if (safeUrl(m.url)) acts.append(ext(h("a", { class: "textlink", href: m.url, text: "Open in Notion" })));
+    body.append(acts);
+    det.append(body);
+    return det;
+  }
+  // A plain-text recap for WhatsApp or email: decisions and follow-ups.
+  function teamRecap(m) {
+    const lines = (s) => String(s || "").split("\n").map((x) => x.trim().replace(/^[-•]\s*/, "")).filter(Boolean);
+    const out = [`${m.title} (${teamWhen(m)})`];
+    const dec = lines(m.decisions), fu = lines(m.followups), goals = lines(m.goals);
+    if (dec.length) out.push("", "Decided:", ...dec.map((x) => "• " + x));
+    if (fu.length) out.push("", "Next steps:", ...fu.map((x) => "• " + x));
+    if (!dec.length && !fu.length && goals.length) out.push("", "Goals:", ...goals.map((x) => "• " + x));
+    return out.join("\n");
+  }
+  function team(main) {
+    const today = todayISO();
+    const all = rows("team");
+    main.append(h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Team meetings" }),
+      h("button", { class: "btn small", type: "button", text: S.teamNew ? "Close" : "New meeting", onclick: () => { S.teamNew = !S.teamNew; render(); } })));
+    main.append(h("p", { class: "mc-lede", text: "Agendas, strategy, goals and building the team. Tick Recorded by Plaud and Claude files the recording on the next brief." }));
+    if (S.teamNew) {
+      const t = h("input", { class: "field", type: "text", placeholder: "What it's about", maxlength: "160", "aria-label": "Title" });
+      const w = h("input", { class: "field", type: "text", placeholder: "With (name)", maxlength: "120", "aria-label": "With" });
+      const o = h("input", { class: "field", type: "text", placeholder: "Organisation", maxlength: "120", "aria-label": "Organisation" });
+      const when = h("input", { class: "field", type: "datetime-local", "aria-label": "When" });
+      const k = h("select", { class: "field", "aria-label": "Kind" }, ...TEAM_KINDS.map((x) => h("option", { value: x, text: x, selected: x === "Team" })));
+      main.append(h("div", { class: "tm-newform" }, t, h("div", { class: "tm-grid" }, w, o, k), when, h("div", { class: "mc-acts" },
+        h("button", { class: "btn small", type: "button", text: "Add meeting", onclick: async (e) => {
+          if (!t.value.trim()) return t.focus();
+          e.target.disabled = true;
+          // datetime-local has no zone: these are Hawaii times.
+          const iso = when.value ? when.value + ":00-10:00" : null;
+          try {
+            const m = await api("POST", "/api/medicare/team", { title: t.value.trim(), with: w.value.trim(), org: o.value.trim(), kind: k.value, when: iso });
+            S.data.team.rows.unshift(m); S.teamNew = false; (S.teamOpen = S.teamOpen || {})[m.id] = true;
+          } catch { S.msg = "Couldn't add that meeting. Try again."; }
+          render();
+        } }))));
+    }
+    const ahead = all.filter((m) => !teamDay(m) || teamDay(m) >= today).sort((a, b) => String(a.when || "9").localeCompare(String(b.when || "9")));
+    const past = all.filter((m) => teamDay(m) && teamDay(m) < today);
+    if (S.teamOpen == null) { S.teamOpen = {}; if (ahead[0]) S.teamOpen[ahead[0].id] = true; }
+    const sec1 = h("section", { class: "mc-sec" }, h("h2", { class: "sec", text: "Coming up" }));
+    if (!ahead.length) sec1.append(h("p", { class: "quiet", text: "Nothing booked. Add one with New meeting." }));
+    for (const m of ahead) sec1.append(teamCard(m));
+    main.append(sec1);
+    if (past.length) {
+      const sec2 = h("section", { class: "mc-sec" }, h("h2", { class: "sec", text: "Past" }));
+      for (const m of past) sec2.append(teamCard(m));
+      main.append(sec2);
     }
   }
 
@@ -1922,7 +2149,7 @@ ${WRITEBACK("GHL push", "push")}`;
   // Skipped while typing, presenting, or with a log row's details open, and redraws only on a change.
   setInterval(async () => {
     if (document.visibilityState !== "visible" || !S.data) return;
-    if (document.querySelector(".mc-full") || document.querySelector(".log-det:not([hidden])") || document.querySelector(".cl-log[open]") || S.callSaving) return;
+    if (document.querySelector(".mc-full") || document.querySelector(".log-det:not([hidden])") || document.querySelector(".cl-log[open]") || S.callSaving || S.teamSaving || S.annSaving || S.annEdit) return;
     if (document.activeElement && document.activeElement.closest("input:not([type=checkbox]), textarea, select")) return;
     try {
       const fresh = await api("GET", "/api/medicare?d=" + todayISO());
