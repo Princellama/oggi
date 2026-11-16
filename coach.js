@@ -23,6 +23,7 @@ function toDay(pg) {
   for (const h of HABITS) out.habits[h] = read(p[h]) || false;
   out.water = read(p["Water glasses"]); out.walkMin = read(p["Walk minutes"]); out.mood = read(p["Mood"]);
   out.rogerMorning = read(p["Roger morning"]) || ""; out.rogerPick = read(p["Roger pick"]) || "";
+  out.rogerAfternoon = read(p["Roger afternoon"]) || "";
   out.checkedOut = read(p["Checked out"]) || false;
   return out;
 }
