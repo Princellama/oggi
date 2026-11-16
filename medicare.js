@@ -144,7 +144,7 @@ function toCall(pg) {
     outcome: read(p["Outcome"]), recording: read(p["Recording on"]), verified: read(p["Identity verified"]),
     disclaimer: read(p["Disclaimer read"]), soa: read(p["SOA"]), nextStep: read(p["Next step"]) || "", nextDate: read(p["Next date"]),
     notes: read(p["Notes"]) || "", newEmail: read(p["New email"]) || "", newAddress: read(p["New address"]) || "", newPhone: read(p["New phone"]) || "",
-    calledAt: read(p["Called at"]), filed: read(p["Filed"]),
+    calledAt: read(p["Called at"]), filed: read(p["Filed"]), setting: read(p["Setting"]) || "Phone call",
     plaud: read(p["Plaud note"]), dialedAt: read(p["Dialed at"]), session: read(p["Session"]) || "",
     plaudMatch: read(p["Plaud match"]) || "", claudeNext: read(p["Claude next"]) || "",
     // The script for this person (Agent Tools wizard or Claude's script-builder skill).
@@ -168,6 +168,7 @@ async function updateCall(id, f) {
   for (const [k, name] of CALL_BOX) if (k in f) props[name] = { checkbox: !!f[k] };
   if ("outcome" in f) props["Outcome"] = { select: f.outcome ? { name: f.outcome } : null };
   if ("type" in f) props["Type"] = { select: f.type ? { name: f.type } : null };
+  if ("setting" in f) props["Setting"] = { select: f.setting ? { name: f.setting } : null };
   if ("scriptBy" in f) props["Script by"] = { select: f.scriptBy ? { name: f.scriptBy } : null };
   if ("nextDate" in f) props["Next date"] = { date: f.nextDate ? { start: f.nextDate } : null };
   if ("calledAt" in f) props["Called at"] = { date: f.calledAt ? { start: f.calledAt } : null };

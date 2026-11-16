@@ -70,7 +70,7 @@
     writeAll: "/medicare-marketing write — write every Medicare Content row that is Requested: thumbnail, IG and Facebook captions, summary, call to action and disclaimer.",
     write: (r) => `/medicare-marketing write — write this post in Medicare Content: “${r.title}”${r.url ? " " + r.url : ""}. Thumbnail, IG and Facebook captions, summary, call to action and disclaimer.`,
     calls: "/medicare-calls — build my Medicare call list for the next calling day and write it to the Medicare Calls table in Notion so it shows in Oggi's Calls tab.",
-    fileCalls: (day) => `/medicare-calls file — file my logged calls from ${day}. First, for every Medicare Calls row from that day with Plaud note ticked and Plaud match empty, find the Plaud recording (conversation or voicemail) by time — between Dialed at and Called at, inside the call session's Started–Ended in Medicare Call Sessions — and by name; write its title and start time into Plaud match, correct Called at to the recording's start if they differ, and fold what was said into Notes (no Medicare numbers). Then, for each row with an Outcome that is not Filed: update the People row (Last contact, AEP 2027 stage, any corrected email, address or phone), add an Encounters row (Setting: Phone call), move the GHL opportunity stage and add the notes to the GHL contact, write a Medicare Activity Log row, turn any next step with a date into a QuickAction, write Claude next (the next step, or who we are waiting on and since when), then tick Filed. Never copy a Medicare number into a note.`,
+    fileCalls: (day) => `/medicare-calls file — file my logged calls from ${day}. First, for every Medicare Calls row from that day with Plaud note ticked and Plaud match empty, find the Plaud recording (conversation or voicemail) by time — between Dialed at and Called at, inside the call session's Started–Ended in Medicare Call Sessions — and by name; write its title and start time into Plaud match, correct Called at to the recording's start if they differ, and fold what was said into Notes (no Medicare numbers). Then, for each row with an Outcome that is not Filed: update the People row (Last contact, AEP 2027 stage, any corrected email, address or phone), add an Encounters row (Setting: the row's Setting — Phone call, In person or Video call; Phone call when empty), move the GHL opportunity stage and add the notes to the GHL contact, write a Medicare Activity Log row, turn any next step with a date into a QuickAction, write Claude next (the next step, or who we are waiting on and since when), then tick Filed. Never copy a Medicare number into a note.`,
     plaud: (n) => `/medicare-calls file — find the Plaud recordings for my ${n} call${n === 1 ? "" : "s"} marked Plaud note in Medicare Calls (Plaud match empty), match each by time and name, write Plaud match, correct Called at if needed, and fold the transcript into Notes. Then file those calls as usual.`,
     announce: "Draft an announcement for my Medicare team WhatsApp chat and add it to the Team Announcements table in Notion (Status Draft, From Claude, today's date) so it shows on Oggi's Medicare Overview with a Copy button. Read the barayuga-notion System Map, then ask me in one line what it should be about if I haven't said. Plain text, short, warm, no plan names or premiums unless I say so, no Medicare numbers.",
     partner: (p) => `/medicare-marketing partner — give me a short talk track for ${p.name}${p.url ? " (" + p.url + ")" : ""}: who they are, what this AEP's changes mean for their patients or members, and one ask.`,
@@ -733,7 +733,12 @@
     ["Waiting on them", "A gentle nudge. They owe you something before you can move."],
     ["Lead", "Fresh leads from the GHL call stages, with permission from this fall."]];
   const CALL_OUTCOMES = ["Reached", "Left voicemail", "No answer", "Wrong number", "Call back later", "Booked appointment", "Enrolled", "Staying put", "Not interested"];
-  const CALL_DONE = new Set(["Reached", "Booked appointment", "Enrolled", "Staying put", "Not interested", "Wrong number"]);
+  // In-person visits and video calls get their own outcomes; nobody leaves a voicemail at a front door.
+  const VISIT_OUTCOMES = ["Met", "Booked appointment", "Enrolled", "Staying put", "Not interested", "Rescheduled", "No-show"];
+  const CALL_DONE = new Set(["Reached", "Booked appointment", "Enrolled", "Staying put", "Not interested", "Wrong number", "Met"]);
+  const isVisit = (c) => c.setting && c.setting !== "Phone call";
+  const SETTING_CHIP = { "In person": "🤝 In person", "Video call": "🎥 Video call" };
+  const mapsHref = (a) => (a ? "https://maps.apple.com/?q=" + encodeURIComponent(String(a).replace(/\s*\(.*?\)\s*/g, " ").trim()) : null);
   // Today's list if there is one, else the nearest upcoming day, else the latest past day.
   function callDay() {
     const all = rows("calls"), today = todayISO();
@@ -745,9 +750,10 @@
   const notionPage = (id) => (id ? "https://www.notion.so/" + String(id).replace(/-/g, "") : null);
   const telHref = (p) => { const d = String(p || "").replace(/[^\d+]/g, ""); return d.length >= 10 ? "tel:" + (d.startsWith("+") ? d : d.length === 10 ? "+1" + d : "+" + d) : null; };
   // Call sessions: Start marks a prospecting session; calls dialed during it carry its Key and Dialed at.
-  const TALKED = new Set(["Reached", "Call back later", "Booked appointment", "Enrolled", "Staying put", "Not interested"]);
+  const TALKED = new Set(["Reached", "Call back later", "Booked appointment", "Enrolled", "Staying put", "Not interested", "Met"]);
   const activeSession = () => rows("callSessions").find((x) => !x.ended && x.started && Date.now() - Date.parse(x.started) < 14 * 3600e3) || null;
   function callStats(list) {
+    list = list.filter((c) => !isVisit(c));   // visits aren't dials
     const n = (f) => list.filter(f).length;
     return {
       dialed: n((c) => c.dialedAt || c.outcome), reached: n((c) => TALKED.has(c.outcome)), voicemail: n((c) => c.outcome === "Left voicemail"),
@@ -796,12 +802,13 @@
         step("Voicemail", say("“Hi [name], Eric Barayuga, licensed Medicare agent, following up on [reason]. Please call me back at [your number]. Mahalo.”"), " No plan names or benefits in a voicemail.")));
   }
   function callCard(c) {
+    const visit = isVisit(c);
     const flag = h("span", { class: "cl-flag", "aria-live": "polite" });
     const status = h("span", { class: "chip" });
     const plaudChip = h("span", { class: "chip warn", text: "Plaud note", title: "Claude will find this recording on the next brief or File" });
     const paint = () => {
       status.className = "chip" + (c.filed ? " ok" : c.outcome ? (CALL_DONE.has(c.outcome) ? " ok" : " warn") : "");
-      status.textContent = c.filed ? "Filed" : c.outcome || (c.dialedAt ? "Dialed" : "Not called");
+      status.textContent = c.filed ? "Filed" : c.outcome || (c.dialedAt ? (visit ? "Started" : "Dialed") : (visit ? "Not met yet" : "Not called"));
       plaudChip.hidden = !(c.plaud && !c.plaudMatch);
       li.classList.toggle("cl-done", !!c.outcome);
     };
@@ -831,7 +838,7 @@
       if (k === "notes") el.addEventListener("focus", () => { if (!el.value.trim()) { el.value = "[" + fmtClock(new Date().toISOString()) + "] "; el.setSelectionRange(el.value.length, el.value.length); } });
       return h("div", { class: "cl-field" + (area ? " wide" : "") }, h("label", { for: el.id, text: label }), el);
     };
-    const out = h("select", { id: `cl-${c.id}-outcome` }, h("option", { value: "", text: "Choose…" }), ...CALL_OUTCOMES.map((o) => h("option", { value: o, text: o, selected: o === c.outcome })));
+    const out = h("select", { id: `cl-${c.id}-outcome` }, h("option", { value: "", text: "Choose…" }), ...(visit ? VISIT_OUTCOMES : CALL_OUTCOMES).concat(c.outcome && !(visit ? VISIT_OUTCOMES : CALL_OUTCOMES).includes(c.outcome) ? [c.outcome] : []).map((o) => h("option", { value: o, text: o, selected: o === c.outcome })));
     out.addEventListener("change", () => {
       const sess = activeSession(), f = { outcome: out.value || null, stamp: !c.calledAt };
       if (sess && c.session !== sess.key) f.session = sess.key;
@@ -840,16 +847,26 @@
     const nd = h("input", { type: "date", id: `cl-${c.id}-nextDate`, value: c.nextDate ? c.nextDate.slice(0, 10) : "" });
     nd.addEventListener("change", () => saveCall(c, { nextDate: nd.value || null }, flag));
     const people = safeUrl(notionPage(c.person));
-    const dial = tel ? h("a", { class: "btn small cl-dial", href: tel, text: "Call" }) : null;
+    const dial = visit ? null : tel ? h("a", { class: "btn small cl-dial", href: tel, text: "Call" }) : null;
+    // A visit starts with a tap on Start visit: it stamps the start time and opens the log.
+    const start = visit ? h("button", { type: "button", class: "btn small cl-dial", text: c.dialedAt ? "Started " + fmtClock(c.dialedAt) : c.setting === "Video call" ? "Start call" : "Start visit" }) : null;
+    if (start) start.addEventListener("click", () => {
+      log.open = true;
+      if (c.dialedAt) return;
+      saveCall(c, { dialed: true }, flag).then(() => { start.textContent = "Started " + fmtClock(c.dialedAt || new Date().toISOString()); paint(); });
+    });
+    const maps = visit && c.setting === "In person" ? safeUrl(mapsHref(c.address)) : null;
+    const settingSel = h("select", { class: "cl-setting", "aria-label": "Phone call or in person" }, ...["Phone call", "In person", "Video call"].map((o) => h("option", { value: o, text: o, selected: o === (c.setting || "Phone call") })));
+    settingSel.addEventListener("change", () => saveCall(c, { setting: settingSel.value }, flag).then(() => render()));
     if (dial) dial.addEventListener("click", () => {
       const sess = activeSession(), f = { dialed: true };
       if (sess) f.session = sess.key;
       log.open = true;
       saveCall(c, f, flag).then(() => { paint(); refreshDash(); });
     });
-    const log = h("details", { class: "cl-log" }, h("summary", { text: "Call log" }),
+    const log = h("details", { class: "cl-log" }, h("summary", { text: visit ? (c.setting === "Video call" ? "Video call log" : "Visit log") : "Call log" }),
       h("div", { class: "cl-body" },
-        h("div", { class: "cl-checks" }, box("recording", "Recording on"), box("verified", "Identity verified"), box("disclaimer", "Disclaimer read"), box("soa", "SOA sent or recorded"),
+        h("div", { class: "cl-checks" }, box("recording", visit ? "Recording on (Plaud)" : "Recording on"), box("verified", "Identity verified"), box("disclaimer", "Disclaimer read"), box("soa", "SOA sent or recorded"),
           box("plaud", "Plaud note — Claude finds it")),
         h("div", { class: "cl-grid" },
           h("div", { class: "cl-field" }, h("label", { for: out.id, text: "Outcome" }), out),
@@ -861,19 +878,19 @@
           text("newAddress", "Corrected address", { type: "text", placeholder: "only if it changed" }),
           text("newPhone", "Corrected phone", { type: "tel", placeholder: "only if it changed" })),
         h("p", { class: "cl-meta" },
-          c.dialedAt ? h("span", { text: "Dialed " + fmtWeekday(c.dialedAt) + " " + fmtClock(c.dialedAt) }) : null,
-          c.calledAt ? h("span", { text: "Called " + fmtWeekday(c.calledAt) + " " + fmtClock(c.calledAt) + (c.plaudMatch ? " · verified by Plaud" : c.plaud ? " · Plaud to match" : "") }) : null,
+          c.dialedAt ? h("span", { text: (visit ? "Started " : "Dialed ") + fmtWeekday(c.dialedAt) + " " + fmtClock(c.dialedAt) }) : null,
+          c.calledAt ? h("span", { text: (visit ? "Logged " : "Called ") + fmtWeekday(c.calledAt) + " " + fmtClock(c.calledAt) + (c.plaudMatch ? " · verified by Plaud" : c.plaud ? " · Plaud to match" : "") }) : null,
           c.plaudMatch ? h("span", { text: "Plaud: " + c.plaudMatch }) : null, flag)));
     const li = h("li", { class: "cl-card" },
       h("div", { class: "cl-top" },
-        h("span", { class: "cl-name", text: c.name }), status, plaudChip,
+        h("span", { class: "cl-name", text: c.name }), visit ? chip(SETTING_CHIP[c.setting] || c.setting, "ok") : null, status, plaudChip,
         c.type ? chip(c.type, "t-" + c.type.replace(/\s/g, "")) : null,
         h("span", { class: "cl-tag", text: c.tag }),
-        people ? ext(h("a", { class: "textlink", href: people, text: "People row" })) : null),
+        people ? ext(h("a", { class: "textlink", href: people, text: "People row" })) : null, settingSel, start),
       h("div", { class: "cl-facts" },
         fact("Phone", c.phone, true, tel ? dial : null),
         fact("Email", c.email, true),
-        fact("Address", c.address, false),
+        fact("Address", c.address, false, maps ? ext(h("a", { class: "textlink", href: maps, text: "Map" })) : null),
         fact("Medicare #", c.mbiOn ? "On file in " + c.mbiOn : "", false)),
       c.why ? h("div", { class: "cl-row" }, h("span", { text: "Why" }), h("p", { text: c.why })) : null,
       c.say ? h("div", { class: "cl-row" }, h("span", { text: "Say" }), h("p", { text: c.say })) : null,
@@ -910,7 +927,7 @@
     const { day, days, list } = callDay();
     const logged = list.filter((c) => c.outcome).length, toFile = list.filter((c) => c.outcome && !c.filed).length;
     const when = day ? (day === todayISO() ? "Today" : `${fmtWeekday(day + "T12:00:00")} ${fmtDay(day)}`) : "";
-    main.append(h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Calls" + (when ? " · " + when : "") }),
+    main.append(h("div", { class: "mc-head" }, h("h2", { class: "sec", text: (list.some(isVisit) ? "Calls & visits" : "Calls") + (when ? " · " + when : "") }),
       h("div", { class: "chips" },
         days.length > 1 ? (() => {
           const s = h("select", { class: "copy", "aria-label": "Which day's list", style: "border:0;background:transparent" },

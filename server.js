@@ -423,7 +423,8 @@ app.patch("/api/medicare/portal/:id", requireAuth, wrap(async (req, res) => {
 // Medicare Calls: Eric's call log from the Calls tab. The list itself is written by Claude; only the
 // log fields are accepted here. The first outcome stamps Called at.
 const CALL_TYPES = ["Direct", "Gentle", "Analytical", "Not now"];
-const CALL_OUTCOMES = ["Reached", "Left voicemail", "No answer", "Wrong number", "Call back later", "Booked appointment", "Enrolled", "Staying put", "Not interested"];
+const CALL_OUTCOMES = ["Reached", "Left voicemail", "No answer", "Wrong number", "Call back later", "Booked appointment", "Enrolled", "Staying put", "Not interested", "Met", "Rescheduled", "No-show"];
+const CALL_SETTINGS = ["Phone call", "In person", "Video call"];
 app.patch("/api/medicare/call/:id", requireAuth, wrap(async (req, res) => {
   const b = req.body, f = {};
   if ("outcome" in b) {
@@ -435,6 +436,7 @@ app.patch("/api/medicare/call/:id", requireAuth, wrap(async (req, res) => {
   if (b.dialed) f.dialedAt = new Date().toISOString();
   if ("session" in b) { const k = String(b.session || ""); if (k && !/^sess-\d{8}-\d{4}$/.test(k)) return res.status(400).json({ error: "session" }); f.session = k; }
   for (const k of ["recording", "verified", "disclaimer", "soa", "plaud"]) if (k in b) f[k] = !!b[k];
+  if ("setting" in b) { if (b.setting && !CALL_SETTINGS.includes(b.setting)) return res.status(400).json({ error: "setting" }); f.setting = b.setting || null; }
   if ("nextDate" in b) { if (!isDay(b.nextDate || null)) return res.status(400).json({ error: "nextDate" }); f.nextDate = b.nextDate || null; }
   for (const [k, max] of [["nextStep", 300], ["notes", 1900], ["newEmail", 200], ["newAddress", 300], ["newPhone", 40],
     ["context", 1500], ["script", 3800], ["voicemail", 600], ["missing", 300]]) if (k in b) f[k] = String(b[k] || "").slice(0, max);

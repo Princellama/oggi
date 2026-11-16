@@ -76,7 +76,7 @@ state.calls = [
     why: "You promised his 2027 options with dental by last week.", say: "“I owe you the 2027 options with dental. Do you have a few minutes, or shall we set a time?”", ready: "The dental options and his dentist's network status." },
   { name: "Lani Fujimoto", band: "Waiting on them", tag: "Humana PPO", phone: "808-555-0119", email: "lani@example.com", address: "", mbiOn: "GHL",
     why: "You asked for her new doctor's name five days ago.", say: "“Did you get your new doctor's name? I'll check the network before anything changes.”", ready: "The provider search open." },
-  { name: "Rogelio Tabura", band: "Lead", tag: "A+B only · Kalihi", phone: "808-555-0163", email: "", address: "77 Example Ave, Wahiawa", mbiOn: "",
+  { name: "Rogelio Tabura", setting: "In person", band: "Lead", tag: "A+B only · Kalihi", phone: "808-555-0163", email: "", address: "77 Example Ave, Wahiawa", mbiOn: "",
     why: "Original Medicare only; he may not know what drug coverage would add.", say: "“You mentioned you only have Parts A and B. Would you like to go over drug coverage?”", ready: "Whether he has drug coverage anywhere else." },
 ].map((r, i) => ({ id: id(), url: null, key: "", date: iso(0), order: i + 1, person: null, ghlContact: "", outcome: null, recording: false, verified: false, disclaimer: false, soa: false, nextStep: "", nextDate: null, notes: "", newEmail: "", newAddress: "", newPhone: "", calledAt: null, filed: false, ...r }));
 
