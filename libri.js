@@ -39,7 +39,7 @@ function toBook(pg) {
   };
   if (!b.cover && b.isbn) b.cover = `https://covers.openlibrary.org/b/isbn/${b.isbn.replace(/[^0-9Xx]/g, "")}-M.jpg`;
   b.chapterNo = chapterNo(b.chapter);
-  b.quiz = parseQuiz(read(p["Quiz"]));
+  b.quiz = parseQuiz(read(p["Quiz"])).concat(parseQuiz(read(p["Quiz extra"])));
   return b;
 }
 function toQuote(pg) {
