@@ -3233,6 +3233,18 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
   async function decide(it, c) { await patchItem(it, { decision: it.decision === c ? null : c }); renderAll(); }
 
   // ---------------- read aloud ----------------
+  // A British voice from the device. Lewis (Kokoro) is kept for Eric's talks, so the brief uses a
+  // different one: British female voices first, the best quality first (Premium, then Enhanced).
+  const GB_VOICES = ["Serena", "Kate", "Martha", "Stephanie", "Google UK English Female", "Daniel", "Arthur", "Google UK English Male"];
+  function britishVoice(synth) {
+    const gb = synth.getVoices().filter((v) => /^en[-_]GB/i.test(v.lang));
+    if (!gb.length) return null;
+    const tier = (v) => (/premium/i.test(v.name) ? 0 : /enhanced/i.test(v.name) ? 1 : 2);
+    const rank = (v) => { const i = GB_VOICES.findIndex((n) => v.name.includes(n)); return i < 0 ? GB_VOICES.length : i; };
+    return gb.slice().sort((a, b) => tier(a) - tier(b) || rank(a) - rank(b))[0];
+  }
+  // Some browsers load voices late; ask early so the first tap already has them.
+  if (window.speechSynthesis) { window.speechSynthesis.getVoices(); window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices(); }
   function readAloud() {
     const synth = window.speechSynthesis;
     const btn = $("#readBtn");
@@ -3251,6 +3263,9 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
     }
     const u = new SpeechSynthesisUtterance(parts.filter(Boolean).join("  "));
     u.rate = 1.0;
+    u.lang = "en-GB";
+    const v = britishVoice(synth);
+    if (v) u.voice = v;
     u.onend = () => { if (btn) btn.textContent = "Read aloud"; };
     synth.speak(u);
     if (btn) btn.textContent = "Stop reading";
