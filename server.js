@@ -338,6 +338,25 @@ app.get("/api/xteink/:kind.:ext", requireAuth, wrap(async (req, res) => {
   res.send(buf);
 }));
 
+// ---------- Read aloud in Lewis (Kokoro bm_lewis): clips recorded with each brief, kept on JIRO ----------
+// OGGI_VOICE_DIR serves a local folder instead (for testing).
+const VOICE_DIR = process.env.OGGI_VOICE_DIR;
+app.get("/api/voice/manifest", requireAuth, wrap(async (req, res) => {
+  res.set("Cache-Control", "no-cache");
+  if (VOICE_DIR) { try { return res.json(JSON.parse(require("fs").readFileSync(require("path").join(VOICE_DIR, "manifest.json"), "utf8"))); } catch { return res.json({ keys: [] }); } }
+  const r = await fetch(XT_BASE + "/voice/manifest.json").catch(() => null);
+  res.json(r && r.ok ? await r.json() : { keys: [] });
+}));
+app.get("/api/voice/:k.mp3", requireAuth, wrap(async (req, res) => {
+  const k = req.params.k;
+  if (!/^[0-9a-f]{16}$/.test(k)) return res.status(404).end();
+  res.set("Cache-Control", "private, max-age=604800, immutable").set("Content-Type", "audio/mpeg");
+  if (VOICE_DIR) return res.sendFile(require("path").join(VOICE_DIR, k + ".mp3"), (e) => e && res.status(404).end());
+  const r = await fetch(`${XT_BASE}/voice/${k}.mp3`);
+  if (!r.ok) return res.status(r.status).end();
+  res.send(Buffer.from(await r.arrayBuffer()));
+}));
+
 // ---------- /medicare ----------
 const CARRIERS = ["Devoted", "UHC", "Humana", "HMSA", "CMS", "Other"];
 const strOrNull = (v, max) => (v == null || v === "" ? null : String(v).slice(0, max));

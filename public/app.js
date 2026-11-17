@@ -3233,9 +3233,10 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
   async function decide(it, c) { await patchItem(it, { decision: it.decision === c ? null : c }); renderAll(); }
 
   // ---------------- read aloud ----------------
-  // A British voice from the device. Lewis (Kokoro) is kept for Eric's talks, so the brief uses a
-  // different one: British female voices first, the best quality first (Premium, then Enhanced).
-  const GB_VOICES = ["Serena", "Kate", "Martha", "Stephanie", "Google UK English Female", "Daniel", "Arthur", "Google UK English Male"];
+  // Read aloud is Lewis (Kokoro bm_lewis), the JIRO talks voice. The brief records one clip per segment
+  // (JIRO scripts/brief_voice.py, same segments as voiceSegments below, named by a hash of the text);
+  // a segment with no clip (an item edited or added since the brief) is read by a British device voice.
+  const GB_VOICES = ["Daniel", "Arthur", "Google UK English Male", "Serena", "Kate", "Google UK English Female"];
   function britishVoice(synth) {
     const gb = synth.getVoices().filter((v) => /^en[-_]GB/i.test(v.lang));
     if (!gb.length) return null;
@@ -3245,30 +3246,73 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
   }
   // Some browsers load voices late; ask early so the first tap already has them.
   if (window.speechSynthesis) { window.speechSynthesis.getVoices(); window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices(); }
-  function readAloud() {
-    const synth = window.speechSynthesis;
-    const btn = $("#readBtn");
-    if (!synth) return;
-    if (synth.speaking) { synth.cancel(); if (btn) btn.textContent = "Read aloud"; return; }
-    const parts = [B.day.headline, B.day.mapCaption];
+  const vnorm = (t) => String(t || "").replace(/\s+/g, " ").trim();
+  function voiceSegments() {
+    // Must match segments() in JIRO scripts/brief_voice.py.
+    const seg = [B.day.headline, B.day.mapCaption];
     const open = openNeeds();
     if (passOf() === "Evening") {
-      parts.push(open.length ? `${open.length} thing${open.length === 1 ? "" : "s"} to decide on.` : "Nothing to carry.");
-      open.forEach((it, i) => parts.push(`${i + 1}. ${it.title}. ${it.carries ? `Carried ${it.carries} days.` : ""}`));
-      const tmr = typeof B.day.tomorrow === "string" ? B.day.tomorrow : (B.day.tomorrow && B.day.tomorrow.text);
-      if (tmr) parts.push(tmr);
+      seg.push(open.length ? `${open.length} thing${open.length === 1 ? "" : "s"} to decide on.` : "Nothing to carry.");
+      open.forEach((it, i) => {
+        seg.push(`${i + 1}.`, `${vnorm(it.title)}.`);
+        const c = parseInt(it.carries, 10) || 0;
+        if (c) seg.push(`Carried ${c} day${c === 1 ? "" : "s"}.`);
+      });
+      seg.push(typeof B.day.tomorrow === "string" ? B.day.tomorrow : (B.day.tomorrow && B.day.tomorrow.text));
     } else {
-      if (open.length) parts.push("Needs attention.");
-      open.forEach((it, i) => parts.push(`${i + 1}. ${it.title}. ${it.sentence || ""}`));
+      if (open.length) seg.push("Needs attention.");
+      open.forEach((it, i) => seg.push(`${i + 1}.`, vnorm(`${vnorm(it.title)}. ${vnorm(it.sentence)}`)));
     }
-    const u = new SpeechSynthesisUtterance(parts.filter(Boolean).join("  "));
-    u.rate = 1.0;
-    u.lang = "en-GB";
-    const v = britishVoice(synth);
-    if (v) u.voice = v;
-    u.onend = () => { if (btn) btn.textContent = "Read aloud"; };
-    synth.speak(u);
+    return seg.map(vnorm).filter(Boolean);
+  }
+  async function voiceKey(t) {
+    const buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(`lewis1|${vnorm(t)}`));
+    return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+  }
+  const RA = { on: false, audio: null, run: 0 };
+  function readStop() {
+    RA.on = false; RA.run++;
+    if (RA.audio) { RA.audio.pause(); RA.audio = null; }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    const btn = $("#readBtn"); if (btn) btn.textContent = "Read aloud";
+  }
+  function playClip(src, run) {
+    return new Promise((done) => {
+      const a = new Audio(src);
+      RA.audio = a;
+      a.onended = a.onerror = () => done();
+      a.play().catch(() => done());
+      const chk = setInterval(() => { if (run !== RA.run) { clearInterval(chk); a.pause(); done(); } }, 200);
+      a.addEventListener("ended", () => clearInterval(chk));
+    });
+  }
+  function sayDevice(text, run) {
+    return new Promise((done) => {
+      const synth = window.speechSynthesis;
+      if (!synth || run !== RA.run) return done();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.0; u.lang = "en-GB";
+      const v = britishVoice(synth); if (v) u.voice = v;
+      u.onend = u.onerror = () => done();
+      synth.speak(u);
+    });
+  }
+  const pauseMs = (ms, run) => new Promise((r) => setTimeout(r, run === RA.run ? ms : 0));
+  async function readAloud() {
+    if (RA.on) return readStop();
+    const btn = $("#readBtn");
+    RA.on = true; const run = ++RA.run;
     if (btn) btn.textContent = "Stop reading";
+    const segs = voiceSegments();
+    let have = new Set();
+    try { have = new Set(((await api("GET", "/api/voice/manifest")) || {}).keys || []); } catch { /* device voice only */ }
+    const keys = window.crypto && crypto.subtle ? await Promise.all(segs.map(voiceKey)) : segs.map(() => "");
+    for (let i = 0; i < segs.length && run === RA.run; i++) {
+      if (have.has(keys[i])) await playClip(`/api/voice/${keys[i]}.mp3`, run);
+      else await sayDevice(segs[i], run);
+      await pauseMs(/^\d+\.$/.test(segs[i]) ? 120 : 380, run);
+    }
+    if (run === RA.run) readStop();
   }
 
   // ---------------- OUTBOX ----------------
