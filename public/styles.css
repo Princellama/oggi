@@ -938,3 +938,18 @@ ol.items li.child { margin-left: 22px; padding-left: 12px; border-left: 1px dash
 .xt-how { font-size: 12.5px; margin-top: 10px; }
 .btn.small { padding: 7px 12px; font-size: 13px; }
 .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--hair); }
+
+/* Today: XTEINK and Focus sessions side by side (stacked on phones) */
+.xt-pair { display: grid; grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr); gap: 24px; align-items: start; }
+.xt-pair > .blk { margin-top: 0; }
+@media (max-width: 760px) { .xt-pair { grid-template-columns: 1fr; } }
+.focus-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.focus-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "time btn" "main btn"; gap: 2px 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line, #e3e3e3); border-radius: 10px; }
+.focus-item > .btn { grid-area: btn; }
+.focus-time { grid-area: time; }
+.focus-main { grid-area: main; line-height: 1.35; }
+.focus-item.live { border-color: #E7B75C; box-shadow: 0 0 0 2px rgba(231, 183, 92, .25); }
+.focus-item.over { opacity: .55; }
+.focus-time { font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
+.focus-main { min-width: 0; }
+.focus-live { color: #B8862B; font-weight: 600; }

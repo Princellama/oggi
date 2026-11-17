@@ -586,7 +586,7 @@
 
     // bottom band
     const bot = h("div", { class: "wrap" });
-    bot.append(xteinkBlock());
+    bot.append(h("div", { class: "xt-pair" }, xteinkBlock(), focusBlock()));
     const open = openNeeds();
     bot.append(h("div", { class: "mapblock" },
       h("h2", { class: "sec", text: evening ? "Where the rest of it sits" : "Where today sits" }),
@@ -626,6 +626,27 @@
     }
     if (!isDesk()) bot.append(renderChanges());
     pane.append(h("div", null, bot));
+  }
+
+  // Focus sessions: today's FLOWN bookings (from /flown), each with its host, time and a Join link.
+  function focusBlock() {
+    const list = (((B && B.day && B.day.flown) || []).filter((x) => x.start)).slice().sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+    const box = h("div", { class: "blk focus" }, h("h2", { class: "sec" }, "Focus sessions ", h("a", { class: "xt-coach", href: "/flown", text: "· FLOWN →" })));
+    if (!list.length) { box.append(h("p", { class: "quiet", text: "No FLOWN sessions booked today." })); return box; }
+    const now = Date.now();
+    const ul = h("ul", { class: "focus-list" });
+    for (const x of list) {
+      const s0 = new Date(x.start), e0 = x.end ? new Date(x.end) : null;
+      const over = e0 ? e0.getTime() < now : false, live = !over && s0.getTime() <= now;
+      const join = /^https:\/\//.test(String(x.join || "")) ? x.join : null;
+      ul.append(h("li", { class: "focus-item" + (over ? " over" : "") + (live ? " live" : "") },
+        h("span", { class: "focus-time", text: fmtTime(s0) + (e0 ? "–" + fmtTime(e0) : "") }),
+        h("span", { class: "focus-main" }, h("b", { text: x.title || "FLOWN session" }), x.host ? h("span", { class: "quiet", text: " · " + x.host }) : null,
+          live ? h("span", { class: "focus-live", text: " · on now" }) : over ? h("span", { class: "quiet", text: " · ended" }) : null),
+        join && !over ? ext(h("a", { class: "btn small" + (live ? "" : " ghost"), href: join, text: "Join here" })) : null));
+    }
+    box.append(ul);
+    return box;
   }
 
   // XTEINK: today's screens from JIRO, Roger's pick starred, each with a download for the reader.
