@@ -3246,6 +3246,7 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
   }
   // Some browsers load voices late; ask early so the first tap already has them.
   if (window.speechSynthesis) { window.speechSynthesis.getVoices(); window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices(); }
+  const VOICE_LIMIT = 15; // match LIMIT in JIRO scripts/brief_voice.py
   const vnorm = (t) => String(t || "").replace(/\s+/g, " ").trim();
   function voiceSegments() {
     // Must match segments() in JIRO scripts/brief_voice.py.
@@ -3253,15 +3254,17 @@ Please read the barayuga-notion skill, then act on them: make sure each capture 
     const open = openNeeds();
     if (passOf() === "Evening") {
       seg.push(open.length ? `${open.length} thing${open.length === 1 ? "" : "s"} to decide on.` : "Nothing to carry.");
-      open.forEach((it, i) => {
+      open.slice(0, VOICE_LIMIT).forEach((it, i) => {
         seg.push(`${i + 1}.`, `${vnorm(it.title)}.`);
         const c = parseInt(it.carries, 10) || 0;
         if (c) seg.push(`Carried ${c} day${c === 1 ? "" : "s"}.`);
       });
+      if (open.length > VOICE_LIMIT) seg.push("And more on the list.");
       seg.push(typeof B.day.tomorrow === "string" ? B.day.tomorrow : (B.day.tomorrow && B.day.tomorrow.text));
     } else {
       if (open.length) seg.push("Needs attention.");
-      open.forEach((it, i) => seg.push(`${i + 1}.`, vnorm(`${vnorm(it.title)}. ${vnorm(it.sentence)}`)));
+      open.slice(0, VOICE_LIMIT).forEach((it, i) => seg.push(`${i + 1}.`, vnorm(`${vnorm(it.title)}. ${vnorm(it.sentence)}`)));
+      if (open.length > VOICE_LIMIT) seg.push("And more on the list.");
     }
     return seg.map(vnorm).filter(Boolean);
   }
