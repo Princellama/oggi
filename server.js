@@ -23,6 +23,7 @@ const feedstore = DEMO ? require("./feeding-demo") : require("./feeding");
 const fitstore = DEMO ? require("./fit-demo") : require("./fit");
 const jwstore = DEMO ? require("./jw-demo") : require("./jw");
 const libri = DEMO ? require("./libri-demo") : require("./libri");
+const coinstore = DEMO ? require("./coin-demo") : require("./coin");
 
 const PORT = process.env.PORT || 8080;
 const SECRET = process.env.SESSION_SECRET || (DEMO ? "demo-secret" : null);
@@ -622,6 +623,27 @@ app.get("/flown", (req, res) => {
   res.set("Cache-Control", "no-cache");
   res.sendFile(path.join(__dirname, "public", "flown.html"));
 });
+
+// ---------- /coin ----------
+// Eric's credit cards, payments, spending by category and reimbursements, with Covey as the coach.
+// Claude writes cards and spending from statements; the page edits reimbursements only.
+const REIMB_STATUS = ["Owed", "Requested", "Paid back"];
+function reimbFields(b) {
+  const f = {};
+  for (const k of ["name", "owedBy", "card", "note"]) if (k in b) f[k] = String(b[k] || "").slice(0, k === "note" ? 800 : 160);
+  if ("amount" in b) { const v = b.amount === "" || b.amount == null ? null : Number(b.amount); f.amount = v == null || !isFinite(v) ? null : Math.round(v * 100) / 100; }
+  if ("spentOn" in b && isDay(b.spentOn || null)) f.spentOn = b.spentOn || null;
+  if ("status" in b && REIMB_STATUS.includes(b.status)) f.status = b.status;
+  return f;
+}
+app.get("/api/coin", requireAuth, wrap(async (req, res) => { res.set("Cache-Control", "no-store"); res.json(await coinstore.getAll()); }));
+app.post("/api/coin/reimb", requireAuth, wrap(async (req, res) => {
+  const f = reimbFields(req.body);
+  if (!f.name) return res.status(400).json({ error: "name" });
+  res.json(await coinstore.createReimb(f));
+}));
+app.patch("/api/coin/reimb/:id", requireAuth, wrap(async (req, res) => res.json(await coinstore.updateReimb(req.params.id, reimbFields(req.body)))));
+app.get("/coin", (req, res) => { res.set("Cache-Control", "no-cache"); res.sendFile(path.join(__dirname, "public", "coin.html")); });
 
 // ---------- /feeding ----------
 // The Nov 11 SCE lunch for 70 at Kingdom Hall C: dishes and cooks, supplies, the timeline, notes.

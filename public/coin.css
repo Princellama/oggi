@@ -1,0 +1,100 @@
+/* /coin — Eric's cards, spending and reimbursements, with Covey. Same paper and ink as the brief. */
+:root { --green: #2F5D46; --green-w: #E7EFE6; --red: #A8402B; --red-w: #F7E6DF; --gold: #B8862F; --gold-w: #F6EEDC; --navy: #1F3350; }
+body.cn { height: auto; min-height: 100%; overflow-x: hidden; }
+.cn-wrap { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+.cn-top { background: var(--wash); border-bottom: 1px solid var(--edge); position: sticky; top: 0; z-index: 5; }
+.cn-bar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-top: calc(14px + env(safe-area-inset-top, 0px)); padding-bottom: 12px; }
+.cn-back { font-size: 13px; color: var(--soft); text-decoration: none; }
+.cn-back:hover { color: var(--ink); }
+.cn-asof { font-size: 12px; color: var(--soft); }
+.cn-main { padding-top: 26px; padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
+.cn-title { font: 600 36px/1.15 var(--serif); color: var(--ink); margin: 0 0 4px; }
+.cn-sub { margin: 0 0 24px; }
+.cn-sec { border-top: 1px solid var(--hair); padding-top: 22px; margin: 0 0 34px; }
+.cn-head { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+.cn-head h2 { font: 600 20px var(--serif); color: var(--ink); margin: 0; }
+.cn-head small { font-size: 12px; color: var(--soft); }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Covey */
+.covey { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 16px; background: var(--green-w); border-radius: 16px; padding: 18px 20px; margin: 0 0 28px; }
+.covey img { width: 76px; height: 76px; border-radius: 50%; }
+.covey h3 { margin: 2px 0 2px; font: 600 18px var(--serif); color: var(--green); }
+.covey .role { font-size: 12px; color: var(--soft); margin: 0 0 10px; }
+.covey ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+.covey li { color: var(--ink); font-size: 14.5px; line-height: 1.5; padding-left: 18px; position: relative; }
+.covey li::before { content: ""; position: absolute; left: 2px; top: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+.covey li.warn::before { background: var(--red); }
+.covey li.watch::before { background: var(--gold); }
+.covey li b { font-weight: 600; }
+
+/* tiles */
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 30px; }
+.tile { background: var(--wash); border: 1px solid var(--edge); border-radius: 12px; padding: 12px 14px; }
+.tile span { display: block; font-size: 12px; color: var(--soft); }
+.tile b { display: block; font: 600 22px/1.2 var(--serif); color: var(--ink); margin-top: 2px; }
+.tile.bad b { color: var(--red); }
+@media (max-width: 640px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* cards */
+.card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; padding: 14px 2px; border-bottom: 1px solid var(--hair); }
+.card .nm { color: var(--ink); font-weight: 600; }
+.card .nm small { font-weight: 400; color: var(--soft); margin-left: 6px; }
+.card .bal { text-align: right; font: 600 18px var(--serif); color: var(--ink); }
+.card .meta { font-size: 13px; color: var(--soft); }
+.card .right { text-align: right; font-size: 13px; color: var(--soft); }
+.chip { display: inline-block; font-size: 11.5px; padding: 2px 8px; border-radius: 99px; margin-left: 6px; background: var(--hair); color: var(--ink); }
+.chip.bad { background: var(--red-w); color: var(--red); }
+.chip.good { background: var(--green-w); color: var(--green); }
+.util { grid-column: 1 / -1; height: 5px; border-radius: 3px; background: var(--hair); overflow: hidden; margin-top: 4px; }
+.util i { display: block; height: 100%; background: var(--green); }
+.util i.hi { background: var(--red); }
+.util i.mid { background: var(--gold); }
+
+/* payments */
+.pay { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.pay .d { color: var(--soft); }
+.pay .w { color: var(--ink); }
+.pay .w small { display: block; color: var(--soft); font-size: 12px; }
+.pay .a { text-align: right; color: var(--ink); }
+
+/* spending */
+.cat { display: grid; grid-template-columns: 18px minmax(0, 1fr) 100px 64px; align-items: center; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--hair); cursor: pointer; background: none; border-left: 0; border-right: 0; border-top: 0; width: 100%; text-align: left; font: inherit; color: inherit; }
+.cat:hover { background: var(--wash); }
+.cat .t { color: var(--ink); font-weight: 600; }
+.cat .bar { height: 6px; border-radius: 3px; background: var(--navy); margin-top: 5px; opacity: .8; }
+.cat .bar.big { background: var(--red); }
+.cat .amt { text-align: right; color: var(--ink); }
+.cat .pct { text-align: right; font-size: 12.5px; color: var(--soft); }
+.cat .chev { color: var(--soft); transition: transform .15s; }
+.cat[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.merch { padding: 4px 0 10px 30px; }
+.merch[hidden] { display: none; }
+.merch div { display: grid; grid-template-columns: minmax(0, 1fr) 50px 90px; gap: 8px; font-size: 13.5px; padding: 3px 0; }
+.merch div span:first-child { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.merch div span:nth-child(2) { color: var(--soft); text-align: right; }
+.merch div span:last-child { text-align: right; }
+.tbtn { font: inherit; font-size: 13px; background: none; border: 1px solid var(--edge); border-radius: 8px; padding: 5px 12px; color: var(--ink); cursor: pointer; }
+.tbtn:hover { background: var(--wash); }
+.buckets { font-size: 12.5px; color: var(--soft); margin: 10px 0 0; }
+
+/* reimbursements */
+.rb { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 12px 2px; border-bottom: 1px solid var(--hair); }
+.rb .nm { color: var(--ink); font-weight: 600; }
+.rb .meta { font-size: 13px; color: var(--soft); }
+.rb .st { display: flex; gap: 6px; align-items: center; }
+.rb .st button { font: inherit; font-size: 12px; border: 1px solid var(--edge); background: none; border-radius: 99px; padding: 3px 10px; cursor: pointer; color: var(--soft); }
+.rb .st button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+.rb.done .nm { text-decoration: line-through; color: var(--soft); }
+.addr { display: grid; grid-template-columns: minmax(0, 2fr) 110px minmax(0, 1fr) auto; gap: 8px; margin-top: 12px; }
+.addr input { font: inherit; font-size: 14px; padding: 7px 10px; border: 1px solid var(--edge); border-radius: 8px; background: #fff; color: var(--ink); min-width: 0; }
+.addr button { font: inherit; font-size: 14px; border: 0; border-radius: 8px; padding: 7px 14px; background: var(--green); color: #fff; cursor: pointer; }
+@media (max-width: 640px) { .addr { grid-template-columns: 1fr 1fr; } }
+.cn-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 8px 14px; border-radius: 8px; font-size: 13px; }
+.cn-err { color: var(--red); }
+@media (max-width: 640px) {
+  .covey { grid-template-columns: 52px minmax(0, 1fr); padding: 14px 16px; gap: 12px; }
+  .covey img { width: 52px; height: 52px; }
+  .rb { grid-template-columns: 1fr; }
+  .card { grid-template-columns: minmax(0, 1fr) auto; }
+}
