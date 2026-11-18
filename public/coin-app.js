@@ -93,7 +93,7 @@
   function covey(d) {
     const ul = h("ul");
     coveyNotes(d).forEach((n) => ul.append(h("li", { class: n.level }, ...n.text.flat().map((x) => (x && x.b ? h("b", { text: x.b }) : x)))));
-    return h("section", { class: "covey" }, h("img", { src: "/icons/covey.svg", alt: "Covey" }),
+    return h("section", { class: "covey", id: "overview" }, h("img", { src: "/icons/covey.svg", alt: "Covey" }),
       h("div", {}, h("h3", { text: "Covey" }), h("p", { class: "role", text: "Your money coach · reads your cards and statements" }), ul));
   }
 
@@ -113,7 +113,7 @@
       h("div", { class: "tile" + (util > 30 ? " bad" : "") }, h("span", { text: "Credit used" }), h("b", { class: "num", text: util == null ? "—" : util + "%" })));
   }
   function cardsSec(d) {
-    const box = h("section", { class: "cn-sec" }, h("div", { class: "cn-head" }, h("h2", { text: "Cards" }), h("small", { text: "Balances as of the last update" })));
+    const box = h("section", { class: "cn-sec", id: "cards" }, h("div", { class: "cn-head" }, h("h2", { text: "Cards" }), h("small", { text: "Balances as of the last update" })));
     const order = (c) => (c.balance || 0);
     (d.cards || []).slice().sort((a, b) => order(b) - order(a)).forEach((c) => {
       const auto = c.autopay === "Minimum" ? h("span", { class: "chip bad", text: "autopay: minimum" }) : /statement|full/i.test(c.autopay) ? h("span", { class: "chip good", text: "autopay: " + c.autopay.toLowerCase() }) : h("span", { class: "chip", text: "autopay: " + c.autopay.toLowerCase() });
@@ -132,7 +132,7 @@
     return box;
   }
   function paysSec(d) {
-    const box = h("section", { class: "cn-sec" }, h("div", { class: "cn-head" }, h("h2", { text: "Payments" }), h("small", { text: "Made and scheduled" })));
+    const box = h("section", { class: "cn-sec", id: "payments" }, h("div", { class: "cn-head" }, h("h2", { text: "Payments" }), h("small", { text: "Made and scheduled" })));
     if (!(d.payments || []).length) box.append(h("p", { class: "quiet", text: "No payments logged yet." }));
     (d.payments || []).forEach((p) => box.append(h("div", { class: "pay" },
       h("span", { class: "d", text: md(p.date) }),
@@ -140,20 +140,121 @@
       h("span", { class: "a num", text: money(p.amount) }))));
     return box;
   }
+  // ---------------- spending flow (all cards → categories → merchants) ----------------
+  const FLOW_COLORS = ["#3E6A8A", "#B8862F", "#2F5D46", "#A8402B", "#7A5A8C", "#4F8C8A", "#C06A3E", "#5C6F2E", "#8A4F6A", "#6B7FA8", "#9A7B4F", "#5E5E5E"];
+  const SVGNS = "http://www.w3.org/2000/svg";
+  function sv(tag, attrs, ...kids) {
+    const el = document.createElementNS(SVGNS, tag);
+    for (const [k, v] of Object.entries(attrs || {})) if (v != null) el.setAttribute(k, v);
+    for (const kid of kids) if (kid != null) el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+    return el;
+  }
+  const band = (x0, a0, a1, x1, b0, b1) => { const m = (x0 + x1) / 2; return `M${x0},${a0} C${m},${a0} ${m},${b0} ${x1},${b0} L${x1},${b1} C${m},${b1} ${m},${a1} ${x0},${a1} Z`; };
+  function drawFlow(holder, cats, total, onPick) {
+    const W = Math.max(300, Math.round(holder.clientWidth || 800));
+    const wide = W >= 620, BAR = 10, GAP = 8;
+    const fs = wide ? 12.5 : 12;
+    // node heights: proportional, with a floor so every category keeps a readable label
+    const CAT_MIN = 18, H0 = wide ? 440 : 420;
+    const k = (H0 - GAP * (cats.length - 1)) / total;
+    const catH = cats.map((c) => Math.max(CAT_MIN, c.amount * k));
+    let y = 0;
+    const cn = cats.map((c, i) => { const n = { c, i, y0: y, y1: y + catH[i], color: FLOW_COLORS[i % FLOW_COLORS.length] }; y += catH[i] + GAP; return n; });
+    const catTotalH = y - GAP;
+    // merchants: the big ones per category, the rest folded into "Other"
+    const mn = [];
+    if (wide) {
+      let my = 0;
+      cn.forEach((n) => {
+        const scale = (n.y1 - n.y0) / n.c.amount;
+        const big = n.c.top.filter((m) => m.a > 0 && m.a * scale >= 13).slice(0, 4);
+        const rest = n.c.amount - big.reduce((a, m) => a + m.a, 0);
+        const list = big.map((m) => ({ ...m })); if (rest > n.c.amount * 0.01) list.push({ m: big.length ? "Other " + n.c.name.toLowerCase() : "Various", a: rest, n: null, other: true });
+        let src = n.y0;
+        list.forEach((m, j) => {
+          const hgt = Math.max(1.5, m.a * scale);
+          mn.push({ ...m, cat: n, s0: src, s1: src + m.a * scale, y0: my, y1: my + hgt });
+          src += m.a * scale; my += hgt + (j === list.length - 1 ? GAP + 4 : 3);
+        });
+      });
+    }
+    const mTotalH = mn.length ? mn[mn.length - 1].y1 : 0;
+    const H = Math.ceil(Math.max(catTotalH, mTotalH)) + 4;
+    // columns
+    const xL = 0, xC = wide ? Math.round(W * 0.46) : W - BAR, xM = W - BAR;
+    const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: "flow-svg", role: "img", "aria-label": `Card spending ${money(total, false)} split by category` + (wide ? " and top merchants" : "") });
+    // links: all cards → category
+    let ly = 0;
+    cn.forEach((n) => {
+      const share = (n.c.amount / total) * catTotalH;
+      svg.append(sv("path", { d: band(xL + BAR, ly, ly + share, xC, n.y0, n.y1), fill: n.color, opacity: ".22" }));
+      ly += share;
+    });
+    // links: category → merchant
+    mn.forEach((m) => svg.append(sv("path", { d: band(xC + BAR, m.s0, m.s1, xM, m.y0, m.y1), fill: m.cat.color, opacity: m.other ? ".12" : ".24" })));
+    // bars
+    svg.append(sv("rect", { x: xL, y: 0, width: BAR, height: catTotalH, rx: 2, fill: "#1F3350" }));
+    cn.forEach((n) => svg.append(sv("rect", { x: xC, y: n.y0, width: BAR, height: n.y1 - n.y0, rx: 2, fill: n.color })));
+    mn.forEach((m) => svg.append(sv("rect", { x: xM, y: m.y0, width: BAR, height: m.y1 - m.y0, rx: 1.5, fill: m.cat.color, opacity: m.other ? ".55" : "1" })));
+    // labels
+    const lab = (x, yy, anchor, lines, cls) => {
+      const t = sv("text", { x, y: yy, "text-anchor": anchor, class: cls || "fl" });
+      lines.forEach((ln, i) => t.append(sv("tspan", { x, dy: i ? fs + 3 : 0, class: ln.b ? "fb" : null }, ln.t)));
+      return t;
+    };
+    svg.append(lab(xL + BAR + 10, 20, "start", [{ t: "All cards" }, { t: money(total, false), b: true }]));
+    cn.forEach((n) => {
+      const pct = Math.round((n.c.amount / total) * 100);
+      const hgt = n.y1 - n.y0, mid = (n.y0 + n.y1) / 2;
+      const g = sv("g", { class: "fnode", tabindex: "0", role: "button", "aria-label": `${n.c.name} ${money(n.c.amount, false)}, ${pct}%. Show merchants` });
+      g.append(sv("title", {}, `${n.c.name}: ${money(n.c.amount)} · ${n.c.count} charges`));
+      const lines = hgt >= 34 ? [{ t: n.c.name }, { t: `${money(n.c.amount, false)} (${pct}%)`, b: true }] : [{ t: `${n.c.name} · ${money(n.c.amount, false)} (${pct}%)`, b: true }];
+      g.append(lab(xC - 8, mid + (lines.length === 2 ? -2 : 4), "end", lines));
+      g.append(sv("rect", { x: xC - 4, y: n.y0, width: BAR + 8, height: hgt, fill: "transparent" }));
+      g.addEventListener("click", () => onPick(n.c));
+      g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(n.c); } });
+      svg.append(g);
+    });
+    mn.forEach((m) => {
+      const hgt = m.y1 - m.y0; if (hgt < 13) { svg.append(sv("title", {}, `${m.m}: ${money(m.a)}`)); return; }
+      const lines = hgt >= 32 ? [{ t: m.m }, { t: money(m.a, false), b: true }] : [{ t: `${m.m} · ${money(m.a, false)}` }];
+      svg.append(lab(xM - 8, (m.y0 + m.y1) / 2 + (lines.length === 2 ? -2 : 4), "end", lines, "fl fm" + (m.other ? " fo" : "")));
+    });
+    holder.replaceChildren(svg);
+  }
+  function flowSec(cats, total, onPick) {
+    const holder = h("div", { class: "flow" });
+    let last = 0;
+    const paint = () => { const w = holder.clientWidth; if (w && Math.abs(w - last) > 4) { last = w; drawFlow(holder, cats, total, onPick); } };
+    if ("ResizeObserver" in window) new ResizeObserver(paint).observe(holder);
+    requestAnimationFrame(paint);
+    return holder;
+  }
+
   function spendSec(d) {
     const cats = (d.spending || []).slice().sort((a, b) => b.amount - a.amount);
     const total = cats.reduce((a, c) => a + c.amount, 0), max = cats[0] ? cats[0].amount : 1;
     const btn = h("button", { class: "tbtn", type: "button", text: S.all ? "Hide all detail" : "Show all detail" });
-    const box = h("section", { class: "cn-sec" }, h("div", { class: "cn-head" }, h("h2", { text: "Spending by category" }),
+    const box = h("section", { class: "cn-sec", id: "spending" }, h("div", { class: "cn-head" }, h("h2", { text: "Spending by category" }),
       h("small", { text: `${money(total, false)} · ${cats[0] ? cats[0].period : ""}` }), btn));
     const rows = [];
+    const pick = (c) => {
+      const r = rows.find((x) => x[2] === c); if (!r) return;
+      const [row, merch] = r;
+      S.open[c.id] = true; merch.hidden = false; row.setAttribute("aria-expanded", "true");
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+      row.classList.add("flash"); setTimeout(() => row.classList.remove("flash"), 1200);
+    };
+    const flowCats = cats.filter((c) => c.amount > 0);
+    if (flowCats.length && total > 0) box.append(flowSec(flowCats, flowCats.reduce((a, c) => a + c.amount, 0), pick),
+      h("p", { class: "flow-hint", text: "Tap a category to see its merchants below." }));
     cats.forEach((c) => {
       const open = S.all || !!S.open[c.id];
       const merch = h("div", { class: "merch", hidden: !open }, c.top.map((m) => h("div", {}, h("span", { text: m.m }), h("span", { text: m.n > 1 ? m.n + "×" : "" }), h("span", { class: "num", text: money(m.a) }))));
       const big = !/travel|interest/i.test(c.name) && c.amount / total >= 0.15;
       const row = h("button", { class: "cat", type: "button", "aria-expanded": open ? "true" : "false", onclick: () => { S.open[c.id] = !(merch.hidden === false); merch.hidden = !S.open[c.id]; row.setAttribute("aria-expanded", S.open[c.id] ? "true" : "false"); } },
         h("span", { class: "chev", "aria-hidden": "true", text: "›" }),
-        h("span", {}, h("span", { class: "t", text: c.name }), h("div", { class: "bar" + (big || /interest/i.test(c.name) ? " big" : ""), style: `width:${Math.max(2, (c.amount / max) * 100).toFixed(1)}%` })),
+        h("span", {}, h("span", { class: "t", text: c.name }), h("div", { class: "bar" + (big || /interest/i.test(c.name) ? " big" : ""), style: `width:${Math.max(2, (c.amount / max) * 100).toFixed(1)}%;background:${FLOW_COLORS[cats.filter((x) => x.amount > 0).indexOf(c) % FLOW_COLORS.length] || "var(--navy)"}` })),
         h("span", { class: "amt num", text: money(c.amount, false) }),
         h("span", { class: "pct num", text: `${Math.round((c.amount / total) * 100)}% · ${c.count}` }));
       rows.push([row, merch, c]);
@@ -165,7 +266,7 @@
     return box;
   }
   function reimbSec(d) {
-    const box = h("section", { class: "cn-sec" }, h("div", { class: "cn-head" }, h("h2", { text: "Reimbursements" }), h("small", { text: "Paid by you, owed back" })));
+    const box = h("section", { class: "cn-sec", id: "reimbursements" }, h("div", { class: "cn-head" }, h("h2", { text: "Reimbursements" }), h("small", { text: "Paid by you, owed back" })));
     const list = (d.reimbursements || []).slice().sort((a, b) => (a.status === "Paid back") - (b.status === "Paid back"));
     if (!list.length) box.append(h("p", { class: "quiet", text: "Nothing owed back." }));
     list.forEach((r) => {
@@ -202,7 +303,7 @@
   function pointsSec(d) {
     const groups = pointsGroups(d);
     if (!groups.length) return "";
-    const box = h("section", { class: "cn-sec" }, h("div", { class: "cn-head" }, h("h2", { text: "Points & miles" }), h("small", { text: "Cards on the same program share one balance" })));
+    const box = h("section", { class: "cn-sec", id: "points" }, h("div", { class: "cn-head" }, h("h2", { text: "Points & miles" }), h("small", { text: "Cards on the same program share one balance" })));
     let est = 0;
     groups.forEach((e) => {
       const v = e.points != null && e.value ? (e.points * e.value) / 100 : null;
@@ -220,7 +321,27 @@
     const d = S.data, main = $("#main");
     main.replaceChildren(h("h1", { class: "cn-title", text: "Coin" }), h("p", { class: "cn-sub quiet", text: "Your cards, where the money goes, and what you're owed." }),
       covey(d), tiles(d), cardsSec(d), pointsSec(d), spendSec(d), paysSec(d), reimbSec(d));
+    menu();
   }
+  // ---------------- menu ----------------
+  let spy;
+  function menu() {
+    const links = [...document.querySelectorAll("#tabs a")];
+    const secs = links.map((a) => document.getElementById(a.dataset.sec));
+    links.forEach((a, i) => { a.hidden = !secs[i]; });
+    const mark = (id) => links.forEach((a) => (a.dataset.sec === id ? a.setAttribute("aria-current", "true") : a.removeAttribute("aria-current")));
+    if (spy) spy.disconnect();
+    if (!("IntersectionObserver" in window)) return;
+    const seen = new Map();
+    spy = new IntersectionObserver((ents) => {
+      ents.forEach((e) => seen.set(e.target.id, e.isIntersecting));
+      const first = secs.find((s) => s && seen.get(s.id));
+      if (first) { mark(first.id); const a = links.find((x) => x.dataset.sec === first.id); const nav = $("#tabs"); if (a && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, a.offsetLeft - 24); }
+    }, { rootMargin: "-110px 0px -55% 0px" });
+    secs.forEach((s) => s && spy.observe(s));
+    if (!document.querySelector("#tabs a[aria-current]")) mark("overview");
+  }
+
   async function load() {
     try { S.data = await api("GET", "/api/coin"); render(); }
     catch (e) { if (e.message !== "signin") $("#main").replaceChildren(h("p", { class: "cn-err", text: "Couldn't load Coin: " + e.message })); }
