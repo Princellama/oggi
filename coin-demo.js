@@ -3,12 +3,12 @@ let n = 0;
 const day = (k) => { const d = new Date(); d.setDate(d.getDate() + k); return d.toISOString().slice(0, 10); };
 const state = {
   cards: [
-    { id: "c1", name: "Sapphire Preferred", issuer: "Chase", last4: "0188", balance: 5598.26, statement: 5242, minimum: 165, due: day(1), limit: 17800, autopay: "Minimum", interestYtd: 521.32, asOf: day(0), note: "" },
-    { id: "c2", name: "Freedom Unlimited", issuer: "Chase", last4: "3056", balance: 5980.83, statement: 5863.24, minimum: 58, due: day(7), limit: 13800, autopay: "Minimum", interestYtd: null, asOf: day(0), note: "" },
-    { id: "c3", name: "United Explorer", issuer: "Chase", last4: "9683", balance: 6030.52, statement: 6030.52, minimum: 162, due: day(24), limit: 21400, autopay: "Minimum", interestYtd: null, asOf: day(0), note: "" },
-    { id: "c4", name: "Prime Visa", issuer: "Chase", last4: "0528", balance: 1281.06, statement: 0, minimum: 0, due: null, limit: 17778, autopay: "Unknown", interestYtd: null, asOf: day(0), note: "" },
-    { id: "c5", name: "Amex Gold", issuer: "Amex", last4: "2006", balance: 0, statement: 0, minimum: 0, due: null, limit: null, autopay: "Unknown", interestYtd: null, asOf: day(0), note: "Paid in full." },
-    { id: "c6", name: "Delta SkyMiles Reserve", issuer: "Amex", last4: "1003", balance: 0, statement: 0, minimum: 0, due: null, limit: null, autopay: "Minimum", interestYtd: 1079.08, asOf: day(0), note: "" },
+    { id: "c1", name: "Sapphire Preferred", issuer: "Chase", last4: "0188", balance: 5598.26, statement: 5242, minimum: 165, due: day(1), limit: 17800, autopay: "Minimum", interestYtd: 521.32, asOf: day(0), note: "", program: "Chase Ultimate Rewards", points: null, pointsAsOf: null, pointValue: 1.0 },
+    { id: "c2", name: "Freedom Unlimited", issuer: "Chase", last4: "3056", balance: 5980.83, statement: 5863.24, minimum: 58, due: day(7), limit: 13800, autopay: "Minimum", interestYtd: null, asOf: day(0), note: "", program: "Chase Ultimate Rewards", points: null, pointsAsOf: null, pointValue: 1.0 },
+    { id: "c3", name: "United Explorer", issuer: "Chase", last4: "9683", balance: 6030.52, statement: 6030.52, minimum: 162, due: day(24), limit: 21400, autopay: "Minimum", interestYtd: null, asOf: day(0), note: "", program: "United MileagePlus", points: 50773, pointsAsOf: day(-3), pointValue: 1.2 },
+    { id: "c4", name: "Prime Visa", issuer: "Chase", last4: "0528", balance: 1281.06, statement: 0, minimum: 0, due: null, limit: 17778, autopay: "Unknown", interestYtd: null, asOf: day(0), note: "", program: "Amazon rewards", points: null, pointsAsOf: null, pointValue: 1.0 },
+    { id: "c5", name: "Amex Gold", issuer: "Amex", last4: "2006", balance: 0, statement: 0, minimum: 0, due: null, limit: null, autopay: "Unknown", interestYtd: null, asOf: day(0), note: "Paid in full.", program: "Amex Membership Rewards", points: 8287, pointsAsOf: day(-8), pointValue: 1.0 },
+    { id: "c6", name: "Delta SkyMiles Reserve", issuer: "Amex", last4: "1003", balance: 0, statement: 0, minimum: 0, due: null, limit: null, autopay: "Minimum", interestYtd: 1079.08, asOf: day(0), note: "", program: "Delta SkyMiles", points: 53239, pointsAsOf: day(-34), pointValue: 1.1 },
   ],
   payments: [
     { id: "p1", name: "Delta Reserve paid in full", card: "Delta SkyMiles Reserve ···1003", amount: 9556.38, date: day(0), from: "CPB checking ···6755", confirmation: "W1242", kind: "Payment" },

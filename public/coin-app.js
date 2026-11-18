@@ -75,6 +75,16 @@
       const names = [...new Set(owedBack.map((r) => r.owedBy).filter(Boolean))].join(", ");
       notes.push({ level: "watch", text: [`${owedBack.length} reimbursement${owedBack.length === 1 ? "" : "s"} still open`, sum ? [", ", { b: money(sum) }] : "", names ? ` (${names})` : "", ". Send the ask the same week you spend."] });
     }
+    // points & miles
+    const pg = pointsGroups(d).filter((e) => e.points != null);
+    if (pg.length) {
+      const val = pg.reduce((a, e) => a + (e.value ? (e.points * e.value) / 100 : 0), 0);
+      const top = pg[0];
+      const vs = paidInterest > val && val > 0 ? ` That's less than the ${money(paidInterest, false)} in interest you paid, so the points don't make up for carrying a balance.` : "";
+      notes.push({ level: paidInterest > val && val > 0 ? "watch" : "ok", text: ["You have about ", { b: money(val, false) }, ` in points and miles; the biggest pile is ${top.program} (${top.points.toLocaleString()}).${vs}`] });
+      const stale = pg.filter((e) => { const dd = daysTo(e.asOf); return dd != null && dd < -45; });
+      if (stale.length) notes.push({ level: "ok", text: [`${stale.map((e) => e.program).join(", ")} balance is over 45 days old. Send me a fresh screenshot when you can.`] });
+    }
     const rank = { warn: 0, watch: 1, ok: 2 };
     notes.sort((a, b) => rank[a.level] - rank[b.level]);
     if (!notes.length) notes.push({ level: "ok", text: ["All clear. Cards paid, nothing owed back. That's how it should look."] });
@@ -178,10 +188,38 @@
     return box;
   }
 
+  function pointsGroups(d) {
+    const g = new Map();
+    (d.cards || []).filter((c) => c.program).forEach((c) => {
+      const k = c.program, e = g.get(k) || { program: k, points: null, asOf: null, value: null, cards: [] };
+      e.cards.push(`${c.name} ···${c.last4}`);
+      if (c.points != null && (e.points == null || c.points > e.points)) { e.points = c.points; e.asOf = c.pointsAsOf; e.value = c.pointValue; }
+      if (e.value == null && c.pointValue != null) e.value = c.pointValue;
+      g.set(k, e);
+    });
+    return [...g.values()].sort((a, b) => (b.points || -1) - (a.points || -1));
+  }
+  function pointsSec(d) {
+    const groups = pointsGroups(d);
+    if (!groups.length) return "";
+    const box = h("section", { class: "cn-sec" }, h("div", { class: "cn-head" }, h("h2", { text: "Points & miles" }), h("small", { text: "Cards on the same program share one balance" })));
+    let est = 0;
+    groups.forEach((e) => {
+      const v = e.points != null && e.value ? (e.points * e.value) / 100 : null;
+      if (v) est += v;
+      box.append(h("div", { class: "card" },
+        h("div", { class: "nm" }, e.program, h("small", { text: e.cards.join(" · ") })),
+        h("div", { class: "bal num", text: e.points == null ? "—" : e.points.toLocaleString() }),
+        h("div", { class: "meta", text: e.points == null ? "Balance not on file yet" : `as of ${md(e.asOf)}` + (v ? ` · about ${money(v, false)} at ${e.value}¢ each` : "") }),
+        h("div", { class: "right", text: "" })));
+    });
+    if (est) box.append(h("p", { class: "quiet", style: "margin:.4rem 0 0;font-size:.85rem", text: `Rough value of what's on file: ${money(est, false)}. Estimates only; transfers to partners can be worth more.` }));
+    return box;
+  }
   function render() {
     const d = S.data, main = $("#main");
     main.replaceChildren(h("h1", { class: "cn-title", text: "Coin" }), h("p", { class: "cn-sub quiet", text: "Your cards, where the money goes, and what you're owed." }),
-      covey(d), tiles(d), cardsSec(d), spendSec(d), paysSec(d), reimbSec(d));
+      covey(d), tiles(d), cardsSec(d), pointsSec(d), spendSec(d), paysSec(d), reimbSec(d));
   }
   async function load() {
     try { S.data = await api("GET", "/api/coin"); render(); }
