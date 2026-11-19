@@ -850,6 +850,8 @@
     const dial = visit ? null : tel ? h("a", { class: "btn small cl-dial", href: tel, text: "Call" }) : null;
     // A visit starts with a tap on Start visit: it stamps the start time and opens the log.
     const start = visit ? h("button", { type: "button", class: "btn small cl-dial", text: c.dialedAt ? "Started " + fmtClock(c.dialedAt) : c.setting === "Video call" ? "Start call" : "Start visit" }) : null;
+    // Present mode: the needs outline on this laptop, chosen slides and files on their screen, then the close-out.
+    const presentBtn = visit && window.MCPresent ? h("button", { type: "button", class: "btn small cl-present", text: "▶ Present", title: "Present mode: you see the outline and notes; they see only what you choose", onclick: () => openPresent(c) }) : null;
     if (start) start.addEventListener("click", () => {
       log.open = true;
       if (c.dialedAt) return;
@@ -886,7 +888,7 @@
         h("span", { class: "cl-name", text: c.name }), visit ? chip(SETTING_CHIP[c.setting] || c.setting, "ok") : null, status, plaudChip,
         c.type ? chip(c.type, "t-" + c.type.replace(/\s/g, "")) : null,
         h("span", { class: "cl-tag", text: c.tag }),
-        people ? ext(h("a", { class: "textlink", href: people, text: "People row" })) : null, settingSel, start),
+        people ? ext(h("a", { class: "textlink", href: people, text: "People row" })) : null, settingSel, start, presentBtn),
       h("div", { class: "cl-facts" },
         fact("Phone", c.phone, true, tel ? dial : null),
         fact("Email", c.email, true),
@@ -901,6 +903,21 @@
       log);
     paint();
     return li;
+  }
+  function openPresent(c) {
+    S.presenting = true;
+    window.MCPresent.presenter(c, {
+      outcomes: VISIT_OUTCOMES, fmtClock, fmtDay,
+      save: async (fields) => {
+        S.callSaving = (S.callSaving || 0) + 1;
+        try {
+          const fresh = await api("PATCH", "/api/medicare/call/" + c.id, fields);
+          Object.assign(c, fresh);
+          return fresh;
+        } finally { S.callSaving--; }
+      },
+      onClose: () => { S.presenting = false; render(); },
+    });
   }
   // What to collect on this call: what Claude or the wizard listed, plus any gap in the row itself.
   function askFor(c) {
@@ -2259,15 +2276,17 @@ ${WRITEBACK("GHL push", "push")}`;
   }
 
   // ---------------- start ----------------
+  // /medicare/screen is the audience window for Present mode: it shows only what the presenter sends.
+  if (/^\/medicare\/screen\/?$/.test(location.pathname)) { if (window.MCPresent) window.MCPresent.screen(); return; }
   S.tab = tabFromPath();
   render();
   load();
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.data) load(); });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.data && !S.presenting) load(); });
   // Claude writes back after a Quote, Scope or GHL run; pick it up within a minute while the page is open.
   // Skipped while typing, presenting, or with a log row's details open, and redraws only on a change.
   setInterval(async () => {
     if (document.visibilityState !== "visible" || !S.data) return;
-    if (document.querySelector(".mc-full") || document.querySelector(".log-det:not([hidden])") || document.querySelector(".cl-log[open]") || S.callSaving || S.teamSaving || S.annSaving || S.annEdit) return;
+    if (S.presenting || document.querySelector(".mc-full") || document.querySelector(".log-det:not([hidden])") || document.querySelector(".cl-log[open]") || S.callSaving || S.teamSaving || S.annSaving || S.annEdit) return;
     if (document.activeElement && document.activeElement.closest("input:not([type=checkbox]), textarea, select")) return;
     try {
       const fresh = await api("GET", "/api/medicare?d=" + todayISO());

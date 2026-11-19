@@ -50,7 +50,7 @@ app.use((req, res, next) => {
   res.set("X-Robots-Tag", "noindex, nofollow");
   res.set("Referrer-Policy", "no-referrer");
   res.set("X-Content-Type-Options", "nosniff");
-  res.set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: https://covers.openlibrary.org https://archive.org https://*.archive.org; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");
+  res.set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob: https://covers.openlibrary.org https://archive.org https://*.archive.org; frame-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");
   next();
 });
 
@@ -460,6 +460,13 @@ app.patch("/api/medicare/call/:id", requireAuth, wrap(async (req, res) => {
   if ("nextDate" in b) { if (!isDay(b.nextDate || null)) return res.status(400).json({ error: "nextDate" }); f.nextDate = b.nextDate || null; }
   for (const [k, max] of [["nextStep", 300], ["notes", 1900], ["newEmail", 200], ["newAddress", 300], ["newPhone", 40],
     ["context", 1500], ["script", 3800], ["voicemail", 600], ["missing", 300]]) if (k in b) f[k] = String(b[k] || "").slice(0, max);
+  // Present mode keeps its outline, points shown and close-out checklist as one JSON string.
+  if ("presentation" in b) {
+    const t = String(b.presentation || "");
+    if (t.length > 19000) return res.status(413).json({ error: "presentation too long" });
+    if (t) { try { const o = JSON.parse(t); if (!o || typeof o !== "object" || !Array.isArray(o.sections)) throw 0; } catch { return res.status(400).json({ error: "presentation" }); } }
+    f.presentation = t;
+  }
   // The script wizard in Agent Tools sets the call type and marks its draft.
   if ("type" in b) { if (b.type && !CALL_TYPES.includes(b.type)) return res.status(400).json({ error: "type" }); f.type = b.type || null; }
   if ("scriptBy" in b) { if (b.scriptBy && !["Oggi draft", "Claude"].includes(b.scriptBy)) return res.status(400).json({ error: "scriptBy" }); f.scriptBy = b.scriptBy || null; }

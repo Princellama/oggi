@@ -77,6 +77,13 @@ state.calls = [
   { name: "Lani Fujimoto", band: "Waiting on them", tag: "Humana PPO", phone: "808-555-0119", email: "lani@example.com", address: "", mbiOn: "GHL",
     why: "You asked for her new doctor's name five days ago.", say: "“Did you get your new doctor's name? I'll check the network before anything changes.”", ready: "The provider search open." },
   { name: "Rogelio Tabura", setting: "In person", band: "Lead", tag: "A+B only · Kalihi", phone: "808-555-0163", email: "", address: "77 Example Ave, Wahiawa", mbiOn: "",
+    presentation: JSON.stringify({ v: 1, title: "Rogelio's Medicare review", sections: [
+      { id: "welcome", t: "Welcome", lead: "Today we look at what matters to you, then the plans side by side. You decide; I explain.", points: [{ k: "plan", t: "What's important to you" }, { k: "plan", t: "Your doctors and medicines" }, { k: "plan", t: "Plans side by side" }], notes: "Plaud on. Disclaimer in the first minute. Scope before plan talk." },
+      { id: "now", t: "Where you are today", points: [{ k: "said", t: "You told me you have Parts A and B only" }, { k: "ask", t: "Do you have drug coverage anywhere else?" }] },
+      { id: "dental", t: "Dental", points: [{ k: "said", t: "You said dental was important to you" }, { k: "asked", t: "You asked whether implants are covered" }], notes: "Check the dental max and implant coverage in each SB." },
+      { id: "compare", t: "The plans, side by side", exhibit: "sample-comparison.png", points: [{ k: "plan", t: "We'll narrow it to the plans that fit what you told me" }] },
+      { id: "next", t: "Next steps", points: [{ k: "plan", t: "Annual Enrollment ends December 7" }] },
+    ], links: [{ t: "Sunfire: plan search", u: "https://www.sunfirematrix.com/" }], close: {}, closeNote: "" }),
     why: "Original Medicare only; he may not know what drug coverage would add.", say: "“You mentioned you only have Parts A and B. Would you like to go over drug coverage?”", ready: "Whether he has drug coverage anywhere else." },
 ].map((r, i) => ({ id: id(), url: null, key: "", date: iso(0), order: i + 1, person: null, ghlContact: "", outcome: null, recording: false, verified: false, disclaimer: false, soa: false, nextStep: "", nextDate: null, notes: "", newEmail: "", newAddress: "", newPhone: "", calledAt: null, filed: false, ...r }));
 

@@ -150,6 +150,8 @@ function toCall(pg) {
     // The script for this person (Agent Tools wizard or Claude's script-builder skill).
     type: read(p["Type"]) || null, context: read(p["Context"]) || "", script: read(p["Script"]) || "",
     voicemail: read(p["Voicemail"]) || "", missing: read(p["Missing"]) || "", scriptBy: read(p["Script by"]) || null,
+    // Present mode (in-person and video visits): the needs outline and close-out, as JSON text.
+    presentation: read(p["Presentation"]) || "",
   };
 }
 async function getCalls(today) {
@@ -160,7 +162,7 @@ async function getCalls(today) {
   return rows.map(toCall);
 }
 const CALL_TEXT = [["nextStep", "Next step"], ["notes", "Notes"], ["newEmail", "New email"], ["newAddress", "New address"], ["newPhone", "New phone"],
-  ["context", "Context"], ["script", "Script"], ["voicemail", "Voicemail"], ["missing", "Missing"]];
+  ["context", "Context"], ["script", "Script"], ["voicemail", "Voicemail"], ["missing", "Missing"], ["presentation", "Presentation"]];
 const CALL_BOX = [["recording", "Recording on"], ["verified", "Identity verified"], ["disclaimer", "Disclaimer read"], ["soa", "SOA"], ["plaud", "Plaud note"]];
 async function updateCall(id, f) {
   const props = {};
