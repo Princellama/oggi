@@ -24,6 +24,7 @@ const fitstore = DEMO ? require("./fit-demo") : require("./fit");
 const jwstore = DEMO ? require("./jw-demo") : require("./jw");
 const libri = DEMO ? require("./libri-demo") : require("./libri");
 const coinstore = DEMO ? require("./coin-demo") : require("./coin");
+const techstack = DEMO ? require("./techstack-demo") : require("./techstack");
 
 const PORT = process.env.PORT || 8080;
 const SECRET = process.env.SESSION_SECRET || (DEMO ? "demo-secret" : null);
@@ -707,6 +708,23 @@ app.post("/api/coach", requireAuth, wrap(async (req, res) => {
 app.get(["/coach", "/coach/*"], (req, res) => {
   res.set("Cache-Control", "no-cache");
   res.sendFile(path.join(__dirname, "public", "coach.html"));
+});
+
+// ---------- /techstack ----------
+// Claude skills (with their flow diagrams), the apps Eric built, and his software and SaaS. Read live from Notion:
+// Apps & AI Projects and Tech Stack Inventory. Diagrams are private Notion files, so they come through here.
+app.get("/api/techstack", requireAuth, wrap(async (req, res) => { res.set("Cache-Control", "no-store"); res.json(await techstack.list(req.query.fresh === "1")); }));
+app.get("/api/techstack/img/:id", requireAuth, wrap(async (req, res) => {
+  if (!/^[0-9a-z-]{4,40}$/i.test(req.params.id)) throw bad("id");
+  const img = await techstack.image(req.params.id);
+  if (!img) { res.set("Content-Type", "image/svg+xml"); res.set("Cache-Control", "no-store"); return res.send(PLACEHOLDER); }
+  res.set("Content-Type", img.type);
+  res.set("Cache-Control", "private, max-age=600");
+  res.send(img.buf);
+}));
+app.get(["/techstack", "/techstack/"], (req, res) => {
+  res.set("Cache-Control", "no-cache");
+  res.sendFile(path.join(__dirname, "public", "techstack.html"));
 });
 
 // ---------- /libri (books) ----------
