@@ -187,6 +187,43 @@ window.MC_DATA = {
     ],
   },
 
+  // UHC 2027 Hawaii D-SNP At a Glance (agent-only guide dated 10.1.2025, valid for plan year 2027).
+  dsnp: {
+    updated: "2026-11-19",
+    guide: { title: "UHC 2027 D-SNP At a Glance · Hawaii", sub: "UnitedHealthcare · 1-page PDF · For agent use only (not a client handout)",
+      url: "https://drive.google.com/file/d/1eKuLa41ClMBZyVsus3a6VyMmuP5e37oM/view", folder: "https://drive.google.com/drive/folders/1tsD0mRxCRJbyl6tVmhYS_8F8T0Noq7ZO" },
+    rules: [
+      "New for 2027 (exclusively aligned enrollment): full duals (FBDE, QMB+, SLMB+) must be in UHC's Medicaid plan, UnitedHealthcare Community Plan, before they can join a UHC D-SNP.",
+      "One full-dual plan per service area: HI-YL if they have LTSS (long-term services and supports), HI-Y1 if they don't.",
+      "Agents may not help anyone sign up for a Medicaid managed care plan. Point them to Med-QUEST (below) and let them choose UnitedHealthcare Community Plan themselves.",
+      "UHC's MMV eligibility tool doesn't work in Hawaii. Verify D-SNP eligibility with the Producer Help Desk: 1-888-381-8581, option 2.",
+      "Med-QUEST plan changes: allowed any time after 12 months in the current QUEST plan; within 15 days if Med-QUEST assigned the plan. Changes usually start the 1st of the second month after the request.",
+      "Med-QUEST moved most D-SNP members to their D-SNP's Medicaid plan for Jan 1, 2027 (processed end of Sep 2026). During Q4 2026 members may not be allowed to change QUEST plans.",
+      "Integrated Care SEP: full duals can join outside AEP/OEP (plus any special-circumstance SEP), but only once they have UHC Medicaid.",
+    ],
+    plans: [
+      { name: "UHC Dual Complete HI-YL", type: "Local PPO D-SNP", id: "H6824-003-000",
+        fit: "Full dual (FBDE, QMB+, SLMB+) with LTSS", must: "Must have UHC Medicaid (UnitedHealthcare Community Plan)",
+        who: "Full Medicaid benefits plus long-term services and supports. One combined Medicare and Medicaid plan." },
+      { name: "UHC Dual Complete HI-Y1", type: "Local PPO D-SNP", id: "H6824-002-000",
+        fit: "Full dual (FBDE, QMB+, SLMB+), no LTSS", must: "Must have UHC Medicaid (UnitedHealthcare Community Plan)",
+        who: "Full Medicaid benefits. One combined Medicare and Medicaid plan." },
+    ],
+    medicaid: [
+      { t: "Med-QUEST phone", v: "1-800-316-8005 (TTY 1-855-889-4325 or 711), toll-free" },
+      { t: "Online", v: "medquest.hawaii.gov · medical.mybenefits.hawaii.gov" },
+      { t: "In person", v: "The nearest Med-QUEST Division eligibility office" },
+      { t: "By mail", v: "Eligible people get a packet asking them to choose a health plan; choose UnitedHealthcare Community Plan by the date shown." },
+    ],
+    footprint: "All Hawaii counties are Medicaid-first. UHC D-SNP service area: about 52K dual eligibles (43K full duals, 837 QMB-only, 8K partial duals; June 2026 CMS data).",
+    jarvis: "Jarvis > Knowledge Center > Medicare Product Resources > Dual Special Needs Plans",
+    links: [
+      { t: "Med-QUEST: Dual Eligible Special Needs Plans in Hawaii", u: "https://medquest.hawaii.gov/en/members-applicants/Dual-Eligible-Special-Needs-Plan.html" },
+      { t: "Med-QUEST: apply or change plans", u: "https://medical.mybenefits.hawaii.gov" },
+      { t: "Medicare.gov: Special Needs Plans", u: "https://www.medicare.gov/health-drug-plans/health-plans/your-coverage-options/SNP" },
+    ],
+  },
+
   // 2027 Plans: one entry per carrier. status "ready" shows the plans; "coming" shows a placeholder.
   plans2027: {
     order: ["Devoted", "Humana", "UHC"],

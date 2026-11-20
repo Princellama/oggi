@@ -79,7 +79,7 @@
   // ---------------- routing ----------------
   // /medicare/carriers/2027[/Devoted] is the 2027 Plans page, shown under the Carriers tab.
   // /medicare/specialized[/veterans|/csnp] is the Specialized area; the old /medicare/veterans still lands there.
-  const SPECS = ["veterans", "csnp"];
+  const SPECS = ["veterans", "csnp", "dsnp"];
   function routeFromPath() {
     let [t, sub, c] = location.pathname.replace(/^\/medicare\/?/, "").split("/");
     if (t === "veterans") { t = "specialized"; sub = "veterans"; history.replaceState({}, "", "/medicare/specialized/veterans"); }
@@ -1865,6 +1865,7 @@
   const SPEC_CARDS = [
     { k: "veterans", t: "Veterans", s: "TRICARE For Life or VA care: Medicare Advantage plans with no drug coverage, and how they fit with the VA." },
     { k: "csnp", t: "Chronic conditions (C-SNP)", s: "Diabetes or a heart condition: who qualifies, the Med-QUEST level that picks the plan, the questions to ask." },
+    { k: "dsnp", t: "Medicare + Medicaid (D-SNP)", s: "Full duals on Med-QUEST: UHC's 2027 Dual Complete plans, the Medicaid-first rule, and the agent guide to send." },
   ];
   function specialized(main) {
     main.append(h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Specialized" }), h("span", { class: "quiet", text: "Oahu · 2027" })));
@@ -1875,6 +1876,47 @@
         h("span", { class: "spec-t", text: c.t }), S.spec ? null : h("span", { class: "spec-s", text: c.s }), S.spec ? null : h("span", { class: "pin-go", text: "→" })))));
     if (S.spec === "veterans") veterans(main);
     if (S.spec === "csnp") csnp(main);
+    if (S.spec === "dsnp") dsnp(main);
+  }
+
+  function dsnp(main) {
+    const D = MC_DATA.dsnp;
+    main.append(h("p", { class: "mc-lede", text: "UnitedHealthcare's 2027 D-SNPs for full duals. New for 2027: the person must already be in UHC's Medicaid plan before they can join. Confirm the Med-QUEST level and plan first, and talk plans only after a signed Scope." }));
+    main.append(jump([["ds-guide", "Guide"], ["ds-rules", "2027 rules"], ["ds-plans", "Plans"], ["ds-medicaid", "Medicaid first"], ["ds-links", "Links"]]));
+
+    const g = h("section", { class: "mc-sec", id: "ds-guide" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Guide" }),
+      ext(h("a", { class: "btn small ghost", href: D.guide.folder, text: "Drive folder" }))));
+    g.append(h("a", { class: "vet-doc", href: D.guide.url, target: "_blank", rel: "noopener noreferrer" },
+      h("span", { class: "vd-k", text: "UHC · in Drive, Claude Medicare › Carrier guides" }),
+      h("span", { class: "vd-t", text: D.guide.title }),
+      h("span", { class: "vd-s", text: D.guide.sub })));
+    g.append(h("p", { class: "quiet", text: "Marked for agent use only: fine to send to another agent or your team, not to clients. Ask Claude to email it and it will attach the PDF from Drive. Also in Jarvis: " + D.jarvis + "." }));
+    main.append(g);
+
+    const r = h("section", { class: "mc-sec", id: "ds-rules" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "2027 rules" }), copyBtn(() => D.rules.map((t) => "- " + t).join("\n"), "Copy")));
+    r.append(h("ol", { class: "script" }, ...D.rules.map((t) => h("li", { text: t }))));
+    r.append(h("div", { class: "cap" }, h("div", { class: "lab" }, h("span", { text: "Producer Help Desk (verify eligibility)" }), copyBtn(() => "1-888-381-8581, option 2")), h("p", { class: "txt", text: "1-888-381-8581, option 2" })));
+    main.append(r);
+
+    const ps = h("section", { class: "mc-sec", id: "ds-plans" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Plans" }), h("span", { class: "quiet", text: "Plan year 2027 only" })));
+    ps.append(h("div", { class: "vet-plans" }, ...D.plans.map((p) => h("article", { class: "vplan k-UHC" },
+      h("div", { class: "chips" }, chip("UHC", "c-UHC"), chip(p.type)),
+      h("h3", { text: p.name }),
+      h("p", { class: "who", text: "Fits: " + p.fit }),
+      h("p", { class: "who", text: p.must }),
+      h("p", { class: "who", text: p.who }),
+      h("p", { class: "quiet", text: p.id })))));
+    ps.append(h("p", { class: "quiet", style: "margin-top:12px", text: D.footprint }));
+    main.append(ps);
+
+    const m = h("section", { class: "mc-sec", id: "ds-medicaid" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Medicaid first: where to send them" })));
+    m.append(h("p", { class: "mc-lede", text: "You can't enroll them in the Medicaid plan or fill it out for them. Give them these and let them choose UnitedHealthcare Community Plan." }));
+    m.append(h("div", { class: "cs-find" }, ...D.medicaid.map((x) => h("div", {}, h("h3", { text: x.t }), h("p", { text: x.v })))));
+    main.append(m);
+
+    const l = h("section", { class: "mc-sec", id: "ds-links" }, h("div", { class: "mc-head" }, h("h2", { class: "sec", text: "Links" })));
+    l.append(h("ul", { class: "vet-checks" }, ...D.links.map((x) => h("li", {}, ext(h("a", { class: "textlink", href: x.u, text: x.t }))))));
+    main.append(l);
   }
 
   function jump(items) {
