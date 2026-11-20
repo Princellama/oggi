@@ -101,6 +101,7 @@ async function getAll() {
     callSessions: { rows: copy(state.callSessions) },
     team: { rows: copy(state.team) },
     announcements: { rows: copy(state.announcements) },
+    comms: { rows: copy(state.comms) },
   };
 }
 const find = (t, i) => { const r = state[t].find((x) => x.id === i); if (!r) throw Object.assign(new Error("not found"), { status: 404 }); return r; };
@@ -131,6 +132,13 @@ state.announcements = [
   { title: "AEP final stretch", message: "Aloha team! AEP ends Monday, December 7. If you have clients you haven't reviewed yet, now's the time to reach out. Mahalo!", date: iso(0), status: "Ready", postedOn: null, pinned: true, from: "Claude" },
   { title: "Kiosk schedule", message: "This week's kiosk days: Salt Lake Wed and Thu, 8 to 12.", date: iso(-4), status: "Posted", postedOn: iso(-4), pinned: false, from: "Eric" },
 ].map((r) => ({ id: id(), url: null, created: new Date().toISOString(), ...r }));
+state.comms = [
+  { name: (state.calls[0] || {}).name + ": wants to keep his doctors; asked about dental", when: new Date(Date.now() - 3 * 3600e3).toISOString(), source: "Text", direction: "Both",
+    snippet: 'Eric: "Aloha! Thanks for stopping by the kiosk. Would Tuesday or Wednesday work to go over your plan?"\n\nThem: "Wednesday morning is good. I want to keep Dr. Lee and I need dental work next year."',
+    takeaways: "Wants to keep Dr. Lee.\nDental work coming next year.", person: (state.calls[0] || {}).person || null, ghlContact: "", ghl: true, key: "comm-demo-1" },
+  { name: "Someone not on the list: HMSA coverage ends Dec 1", when: new Date(Date.now() - 26 * 3600e3).toISOString(), source: "Gmail", direction: "From them",
+    snippet: 'Them: "My HMSA group plan ends December 1, so I need something new by then."', takeaways: "Needs coverage from Dec 1.", person: null, ghlContact: "", ghl: false, key: "comm-demo-2" },
+].map((r) => ({ id: id(), url: null, ...r }));
 async function updateTeamMeeting(i, f) { return copy(Object.assign(find("team", i), f)); }
 async function createTeamMeeting(f) { const r = { id: id(), url: null, agenda: [], strategy: "", goals: "", team: "", notes: "", decisions: "", followups: "", plaud: false, plaudMatch: "", processed: false, brief: null, key: "", with: "", org: "", ...f }; state.team.unshift(r); return copy(r); }
 async function updateAnnouncement(i, f) { return copy(Object.assign(find("announcements", i), f)); }

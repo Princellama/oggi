@@ -18,6 +18,7 @@ const DS = {
   callSessions: process.env.NOTION_CALL_SESSIONS_DS || "15f4273f-7ab9-439d-8178-de3f14147f36",
   team: process.env.NOTION_TEAM_MEETINGS_DS || "4198f469-b674-81ad-9cc2-000b1f3828ae",
   announce: process.env.NOTION_ANNOUNCEMENTS_DS || "4198f469-b674-8172-91fc-000b197e6166",
+  comms: process.env.NOTION_COMMS_DS || "41e8f469-b674-8108-9e1e-000b25582876",
 };
 
 function read(p) {
@@ -179,6 +180,25 @@ async function updateCall(id, f) {
   return toCall(await call("PATCH", `/pages/${id}`, { properties: props }));
 }
 
+// Medicare Communications: texts, emails, calls and voicemails with a person, snipped verbatim by Claude
+// (source, when, who said what, what it changes). Shown on the Calls tab under Communication and on
+// that person's call card. Medicare numbers never go in this table.
+function toComm(pg) {
+  const p = pg.properties;
+  return {
+    id: pg.id, url: pg.url, name: read(p["Name"]) || "", when: read(p["When"]), source: read(p["Source"]) || "",
+    direction: read(p["Direction"]) || "", snippet: read(p["Snippet"]) || "", takeaways: read(p["Takeaways"]) || "",
+    person: (read(p["Person"]) || [])[0] || null, ghlContact: read(p["GHL contact ID"]) || "", ghl: read(p["Logged to GHL"]), key: read(p["Key"]) || "",
+  };
+}
+async function getComms(today) {
+  const rows = await queryAll(DS.comms, {
+    filter: { property: "When", date: { on_or_after: isoDay(today, -60) } },
+    sorts: [{ property: "When", direction: "descending" }],
+  });
+  return rows.map(toComm);
+}
+
 // Medicare Call Sessions: Start/End from the Calls tab. Calls dialed in a session carry its Key, and
 // Claude uses Started/Ended to find the Plaud recordings made during it.
 function toCallSession(pg) {
@@ -287,7 +307,7 @@ async function part(fn) {
 }
 
 async function getAll(today) {
-  const [pulse, campaigns, content, partners, field, portals, log, calls, callSessions, team, announcements] = await Promise.all([
+  const [pulse, campaigns, content, partners, field, portals, log, calls, callSessions, team, announcements, comms] = await Promise.all([
     part(async () => (await queryAll(DS.pulse, {
       filter: { property: "Status", select: { does_not_equal: "Archived" } },
       sorts: [{ property: "Date", direction: "descending" }],
@@ -305,8 +325,9 @@ async function getAll(today) {
     part(() => getCallSessions(today)),
     part(async () => (await queryAll(DS.team, { sorts: [{ property: "When", direction: "descending" }] })).slice(0, 80).map(toTeamMeeting)),
     part(async () => (await queryAll(DS.announce, { sorts: [{ property: "Date", direction: "descending" }] })).slice(0, 40).map(toAnnouncement)),
+    part(() => getComms(today)),
   ]);
-  return { pulse, campaigns, content, partners, field, portals, log, calls, callSessions, team, announcements };
+  return { pulse, campaigns, content, partners, field, portals, log, calls, callSessions, team, announcements, comms };
 }
 
 // ---------- writes ----------

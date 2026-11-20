@@ -898,6 +898,7 @@
       c.say ? h("div", { class: "cl-row" }, h("span", { text: "Say" }), h("p", { text: c.say })) : null,
       c.ready ? h("div", { class: "cl-row" }, h("span", { text: "Have ready" }), h("p", { text: c.ready })) : null,
       c.claudeNext ? h("div", { class: "cl-row cl-claude" }, h("span", { text: "Claude" }), h("p", { text: c.claudeNext })) : null,
+      commBox(c),
       askFor(c),
       scriptBox(c),
       log);
@@ -940,6 +941,40 @@
         h("p", { class: "cl-meta" }, copyBtn(() => c.script, "Copy script"), h("button", { type: "button", class: "textlink cl-linkbtn", text: "Edit with Roger", onclick: build }),
           ext(h("a", { class: "textlink", href: claude(PROMPTS.script(c)), text: "Rewrite with Claude" })))));
   }
+  // Communication: texts, emails, calls and voicemails Claude snipped into Medicare Communications,
+  // each with where it came from and when. Rendered as text only.
+  const commsFor = (c) => rows("comms").filter((m) => (c.person && m.person === c.person) || (!m.person && c.name && m.name.toLowerCase().startsWith(c.name.toLowerCase())));
+  const commWho = (m) => { const i = m.name.indexOf(":"); return i > 0 ? m.name.slice(0, i) : m.name; };
+  const commWhat = (m) => { const i = m.name.indexOf(":"); return i > 0 ? m.name.slice(i + 1).trim() : ""; };
+  const commWhen = (m) => (m.when ? fmtWeekday(m.when) + " " + fmtDay(m.when) + (m.when.length > 10 ? " · " + fmtClock(m.when) : "") : "");
+  function commItem(m, withWho) {
+    const lines = String(m.takeaways || "").split(/\n+/).map((x) => x.trim()).filter(Boolean);
+    return h("li", { class: "cm-item" },
+      h("div", { class: "cl-top" },
+        withWho ? h("span", { class: "cl-name", text: commWho(m) }) : null,
+        m.source ? h("span", { class: "chip cm-src", text: m.source }) : null,
+        h("span", { class: "cl-tag", text: [commWhen(m), m.direction].filter(Boolean).join(" · ") }),
+        m.ghl ? h("span", { class: "chip ok", text: "In GHL" }) : null),
+      commWhat(m) ? h("p", { class: "cm-what", text: commWhat(m) }) : null,
+      m.snippet ? h("blockquote", { class: "cm-snip", text: m.snippet }) : null,
+      lines.length ? h("ul", { class: "cm-take" }, ...lines.map((t) => h("li", { text: t }))) : null);
+  }
+  function commBox(c) {
+    const list = commsFor(c);
+    if (!list.length) return null;
+    return h("details", { class: "cl-own cm-box" },
+      h("summary", {}, "Communication", h("small", { text: ` · ${list.length} · last ${commWhen(list[0])}${list[0].source ? " by " + list[0].source.toLowerCase() : ""}` })),
+      h("ul", { class: "cm-list" }, ...list.map((m) => commItem(m, false))));
+  }
+  function commSection(main) {
+    const list = rows("comms").slice(0, 30);
+    main.append(h("section", { class: "mc-sec cl-band", id: "communication" },
+      h("h3", { class: "sec", text: "Communication" }),
+      h("p", { class: "mc-lede", text: list.length
+        ? "Texts, emails, calls and voicemails from the last 60 days, newest first, snipped word for word with where and when. Send Claude a screenshot or say “log this” and it lands here, on the person's call card and in GHL."
+        : "Nothing logged yet. Send Claude a screenshot of a text or email, or say “log this”, and it lands here with where and when." }),
+      list.length ? h("ul", { class: "cm-list" }, ...list.map((m) => commItem(m, true))) : null));
+  }
   function calls(main) {
     const { day, days, list } = callDay();
     const logged = list.filter((c) => c.outcome).length, toFile = list.filter((c) => c.outcome && !c.filed).length;
@@ -956,6 +991,7 @@
         toFile ? ext(h("a", { class: "btn small", href: claude(PROMPTS.fileCalls(day)), text: `File ${toFile} call${toFile === 1 ? "" : "s"}` })) : null)));
     if (!list.length) {
       main.append(h("p", { class: "mc-lede", text: "No call list yet. Ask Claude “who do I call?” and the list lands here, with a script and a call log for each person." }));
+      commSection(main);
       return;
     }
     main.append(sessionBar(list));
@@ -975,6 +1011,7 @@
         h("ul", { class: "cl-list" }, ...bl.map(callCard))));
     }
     followUps(main, day);
+    commSection(main);
   }
   let refreshDash = () => {};
   function sessionBar(list) {
