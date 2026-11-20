@@ -299,10 +299,74 @@ async function addToCall(oppId, today) {
   return { ok: true, name: l.name, order };
 }
 
+// ---------- call cards (/medicare/calls) ----------
+// Each card shows the person's GHL opportunities in any pipeline (Pipeline.Book included once it exists):
+// the stage and status as a badge, and a link that opens the opportunity in GHL. Read-only. A call row
+// may hold several contact ids ("Gail … · Dexter …"); a row with none is looked up by phone, then email.
+const ghlReady = () => !!process.env.GHL_TOKEN;
+const APP = process.env.GHL_APP_URL || "https://app.gohighlevel.com";
+const oppLink = (id) => `${APP}/v2/location/${LOCATION}/opportunities/list/${id}?tab=OpportunityDetails`;
+const contactLink = (id) => `${APP}/v2/location/${LOCATION}/contacts/detail/${id}`;
+const TTL = 5 * 60_000;
+const memo = new Map(); // key -> { at, v }
+async function cached(key, ttl, fn) {
+  const hit = memo.get(key);
+  if (hit && Date.now() - hit.at < ttl) return hit.v;
+  const v = await fn();
+  memo.set(key, { at: Date.now(), v });
+  if (memo.size > 2000) memo.delete(memo.keys().next().value);
+  return v;
+}
+const ID_RE = /\b[A-Za-z0-9]{20}\b/g;
+const idsIn = (s) => [...new Set(String(s || "").match(ID_RE) || [])];
+async function findContact(phone, email) {
+  const tries = [];
+  if (digits(phone).length === 10) tries.push(["number", "+1" + digits(phone)]);
+  if (/@/.test(email || "")) tries.push(["email", String(email).trim().toLowerCase()]);
+  for (const [k, v] of tries) {
+    const id = await cached(`dup:${k}:${v}`, 30 * 60_000, async () => {
+      const j = await ghl("GET", `/contacts/search/duplicate?${new URLSearchParams({ locationId: LOCATION, [k]: v })}`).catch(() => ({}));
+      return (j.contact && j.contact.id) || null;
+    });
+    if (id) return id;
+  }
+  return null;
+}
+const STATUS_ORDER = { open: 0, won: 1, lost: 2, abandoned: 3 };
+async function oppsOf(contactId, pipes) {
+  const list = await cached(`opps:${contactId}`, TTL, async () => {
+    const q = new URLSearchParams({ locationId: LOCATION, contactId, status: "all", limit: "20" });
+    return (await ghl("GET", `/opportunities/search?${q}`)).opportunities || [];
+  });
+  return list.filter((o) => o.contactId === contactId).map((o) => {
+    const p = pipes.get(o.pipelineId) || { name: "", stages: [] };
+    const st = p.stages.find((s) => s.id === o.pipelineStageId);
+    return {
+      id: o.id, contactId, who: (o.contact && o.contact.name) || "", pipeline: p.name, stage: st ? st.name : "",
+      status: o.status || "", value: o.monetaryValue || 0, updated: o.updatedAt || o.lastStageChangeAt || "", link: oppLink(o.id),
+    };
+  }).sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9) || String(b.updated).localeCompare(String(a.updated)));
+}
+// calls: [{ id, contact, phone, email }] -> { configured, byCall: { id: { contacts: [{ id, link, found }], opps: [...] } } }
+async function callOpps(calls) {
+  if (!ghlReady()) return { configured: false, byCall: {} };
+  const pipes = await cached("pipelines", 30 * 60_000, ghlPipelines);
+  const byCall = {};
+  await Promise.all((calls || []).slice(0, 80).map(async (c) => {
+    try {
+      let ids = idsIn(c.contact), found = false;
+      if (!ids.length) { const id = await findContact(c.phone, c.email); if (id) { ids = [id]; found = true; } }
+      const opps = (await Promise.all(ids.map((id) => oppsOf(id, pipes)))).flat();
+      byCall[c.id] = { contacts: ids.map((id) => ({ id, link: contactLink(id), found })), opps };
+    } catch (e) { byCall[c.id] = { error: e.message }; }
+  }));
+  return { configured: true, byCall };
+}
+
 function start() {
   if (!configured()) { console.log("leads: not configured (" + missing().join(", ") + ")"); return; }
   setTimeout(() => sync("start"), 20_000);
   setInterval(() => sync("timer"), 15 * 60_000);
 }
 
-module.exports = { get, sync, status, addToCall, start, configured };
+module.exports = { get, sync, status, addToCall, start, configured, callOpps };

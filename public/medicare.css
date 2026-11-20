@@ -376,6 +376,16 @@ ol.script li { margin-bottom: 10px; }
 .cl-row { display: grid; grid-template-columns: 92px 1fr; gap: 10px; font-size: 14px; }
 .cl-row span { color: var(--grey); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding-top: 3px; }
 .cl-row p { margin: 0; color: var(--ink); min-width: 0; }
+/* GHL on a call card: stage · status badge, linked to the opportunity in its pipeline */
+.cl-row .cl-ghl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.cl-row .cl-ghl span { padding-top: 0; font-size: 13px; font-weight: 400; letter-spacing: 0; text-transform: none; color: inherit; }
+.cl-row .cl-ghl .quiet { color: var(--grey); }
+.cl-row .cl-ghl .ghl-opp { display: inline-flex; align-items: center; gap: 6px; }
+.cl-ghl .ghl-link { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: inherit; }
+.cl-row .cl-ghl .chip.ghl-badge { font-size: 11.5px; font-weight: 600; letter-spacing: .02em; text-transform: none; color: var(--ink); padding: 1px 9px; }
+.cl-row .cl-ghl .chip.ghl-badge.s-won { color: var(--ok); border-color: #CFE2D3; background: #EEF5EF; }
+.cl-row .cl-ghl .chip.ghl-badge.s-lost, .cl-row .cl-ghl .chip.ghl-badge.s-abandoned { color: var(--grey); text-decoration: line-through; }
+.cl-row .cl-ghl .textlink { font-size: 12.5px; color: var(--grey); }
 .cl-log { border-top: 1px solid var(--hair); padding-top: 10px; }
 .cl-log summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--clay-h); }
 .cl-body { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }

@@ -801,6 +801,55 @@
         step("7 · Close", say("“So the next step is [step] on [day]. Mahalo for your time.”")),
         step("Voicemail", say("“Hi [name], Eric Barayuga, licensed Medicare agent, following up on [reason]. Please call me back at [your number]. Mahalo.”"), " No plan names or benefits in a voicemail.")));
   }
+  // GHL on each call card: the person's opportunity in whatever pipeline it sits in, a badge with the
+  // stage and status ("Sold · open") and a link that opens it in GHL. Loaded once per list, after the
+  // cards are drawn, so a slow GHL never holds up the page. Read-only.
+  const ghlSlots = new Map();
+  let ghlFor = null;
+  function ghlRow(c) {
+    const slot = h("p", { class: "cl-ghl" }, h("span", { class: "quiet", text: "Looking in GHL…" }));
+    ghlSlots.set(c.id, slot);
+    if (S.callOpps && S.callOpps.byCall && c.id in S.callOpps.byCall) paintGhl(c.id);
+    return h("div", { class: "cl-row" }, h("span", { text: "GHL" }), slot);
+  }
+  const statusWord = (s) => ({ won: "won", lost: "lost", abandoned: "abandoned", open: "open" }[s] || s || "");
+  function paintGhl(id) {
+    const slot = ghlSlots.get(id);
+    if (!slot) return;
+    const all = S.callOpps || {};
+    const r = (all.byCall || {})[id];
+    slot.replaceChildren();
+    if (all.configured === false) { slot.append(h("span", { class: "quiet", text: "GHL isn't connected to Oggi yet (GHL_TOKEN on Railway)." })); return; }
+    if (!r) { slot.append(h("span", { class: "quiet", text: "Couldn't reach GHL just now." })); return; }
+    if (r.error) { slot.append(h("span", { class: "quiet", text: "Couldn't read GHL: " + r.error })); return; }
+    if (!r.contacts.length) { slot.append(h("span", { class: "quiet", text: "Not found in GHL by contact id, phone or email." })); return; }
+    const many = r.contacts.length > 1;
+    const opps = r.opps.slice(0, 4);
+    if (!opps.length) {
+      slot.append(h("span", { class: "quiet", text: "No opportunity in any pipeline. " }),
+        ...r.contacts.map((ct) => safeUrl(ct.link) ? ext(h("a", { class: "textlink", href: ct.link, text: "Open contact" })) : null));
+      return;
+    }
+    for (const o of opps) {
+      const href = safeUrl(o.link);
+      const badge = h("span", { class: "chip ghl-badge s-" + (o.status || "open"), text: [o.stage || "No stage", statusWord(o.status)].filter(Boolean).join(" · "), title: (o.pipeline || "Pipeline") + (o.value ? " · $" + o.value : "") });
+      slot.append(h("span", { class: "ghl-opp" },
+        many && o.who ? h("b", { text: o.who.split(" ")[0] + " " }) : null,
+        href ? ext(h("a", { class: "ghl-link", href, title: "Open this opportunity in GHL" }, badge, h("span", { class: "textlink", text: (o.pipeline || "GHL") + " ↗" }))) : badge));
+    }
+    if (r.opps.length > opps.length) slot.append(h("span", { class: "quiet", text: ` +${r.opps.length - opps.length} more` }));
+    if (r.contacts.some((ct) => ct.found)) slot.append(h("span", { class: "quiet", text: " · matched by phone or email" }));
+  }
+  async function loadGhl(list) {
+    const key = list.map((c) => c.id + ":" + (c.ghlContact || "")).join(",");
+    if (ghlFor === key && S.callOpps) { for (const id of ghlSlots.keys()) paintGhl(id); return; }
+    ghlFor = key;
+    try {
+      S.callOpps = await api("POST", "/api/medicare/call-opps", { calls: list.map((c) => ({ id: c.id, contact: c.ghlContact || "", phone: c.phone || "", email: c.email || "" })) });
+    } catch { S.callOpps = { byCall: {} }; ghlFor = null; }
+    if (ghlFor !== null && ghlFor !== key) return;
+    for (const id of ghlSlots.keys()) paintGhl(id);
+  }
   function callCard(c) {
     const visit = isVisit(c);
     const flag = h("span", { class: "cl-flag", "aria-live": "polite" });
@@ -894,6 +943,7 @@
         fact("Email", c.email, true),
         fact("Address", c.address, false, maps ? ext(h("a", { class: "textlink", href: maps, text: "Map" })) : null),
         fact("Medicare #", c.mbiOn ? "On file in " + c.mbiOn : "", false)),
+      ghlRow(c),
       c.why ? h("div", { class: "cl-row" }, h("span", { text: "Why" }), h("p", { text: c.why })) : null,
       c.say ? h("div", { class: "cl-row" }, h("span", { text: "Say" }), h("p", { text: c.say })) : null,
       c.ready ? h("div", { class: "cl-row" }, h("span", { text: "Have ready" }), h("p", { text: c.ready })) : null,
@@ -1012,6 +1062,7 @@
     }
     followUps(main, day);
     commSection(main);
+    loadGhl(list);
   }
   let refreshDash = () => {};
   function sessionBar(list) {

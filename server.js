@@ -572,6 +572,21 @@ app.post("/api/medicare/leads/:oppId/call", requireAuth, wrap(async (req, res) =
   res.json(await leadsStore.addToCall(req.params.oppId, localDate(req)));
 }));
 
+// Call cards: each person's GHL opportunity (any pipeline) with its stage and status, and a link into GHL.
+app.post("/api/medicare/call-opps", requireAuth, wrap(async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  const calls = (Array.isArray(req.body && req.body.calls) ? req.body.calls : []).slice(0, 80)
+    .filter((c) => c && typeof c.id === "string")
+    .map((c) => ({ id: c.id.slice(0, 64), contact: String(c.contact || "").slice(0, 300), phone: String(c.phone || "").slice(0, 40), email: String(c.email || "").slice(0, 120) }));
+  if (DEMO) {
+    const demo = [["Sold", "open", "Pipeline.Book"], ["App Scheduled", "open", "Pipeline.RetailMarket"], ["Enrolled", "won", "Pipeline.T65"]];
+    const byCall = {};
+    calls.forEach((c, i) => { const [stage, status, pipeline] = demo[i % demo.length]; byCall[c.id] = { contacts: [{ id: "demo", link: "#", found: false }], opps: [{ id: "o" + i, who: "", pipeline, stage, status, value: 363, link: "https://app.gohighlevel.com/" }] }; });
+    return res.json({ configured: true, byCall });
+  }
+  res.json(await leadsStore.callOpps(calls));
+}));
+
 // Photos and thumbnails are private Notion files with short-lived URLs, so they come through here.
 const PLACEHOLDER = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#EDECE6"/><path d="M30 64 L44 48 L54 58 L62 50 L72 64 Z" fill="#D6D5CC"/><circle cx="62" cy="38" r="5" fill="#D6D5CC"/></svg>');
 app.get("/api/medicare/img/:id", requireAuth, wrap(async (req, res) => {
