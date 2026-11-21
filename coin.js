@@ -24,6 +24,8 @@ const toCard = (pg) => { const p = pg.properties; return {
   due: read(p["Due date"]), limit: num(read(p["Credit limit"])), autopay: read(p["Autopay"]) || "Unknown",
   interestYtd: num(read(p["Interest YTD"])), asOf: read(p["As of"]), note: read(p["Note"]) || "",
   program: read(p["Rewards program"]) || "", points: num(read(p["Points"])), pointsAsOf: read(p["Points as of"]), pointValue: num(read(p["Point value"])),
+  apr: num(read(p["APR"])), annualFee: num(read(p["Annual fee"])), loginUrl: read(p["Login URL"]) || "", perks: read(p["Perks"]) || "",
+  useFor: Array.isArray(read(p["Use for"])) ? read(p["Use for"]) : [],
 }; };
 const toPay = (pg) => { const p = pg.properties; return {
   id: pg.id, name: read(p["Name"]) || "", card: read(p["Card"]) || "", amount: num(read(p["Amount"])), date: read(p["Date"]),

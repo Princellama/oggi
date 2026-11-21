@@ -122,8 +122,9 @@
       const row = h("div", { class: "card" },
         h("div", { class: "nm" }, c.name, h("small", { text: `${c.issuer} ···${c.last4}` }), auto),
         h("div", { class: "bal num", text: money(c.balance) }),
-        h("div", { class: "meta", text: dueTxt + (c.note ? " · " + c.note : "") }),
-        h("div", { class: "right", text: c.limit ? `of ${money(c.limit, false)}` : "" }));
+        h("div", { class: "meta", text: [dueTxt, c.apr != null ? `APR ${c.apr}%` : "APR not on file", c.annualFee != null ? (c.annualFee ? `${money(c.annualFee, false)}/yr fee` : "no annual fee") : "", c.note].filter(Boolean).join(" · ") }),
+        h("div", { class: "right" }, c.limit ? `of ${money(c.limit, false)}` : "", /^https:\/\//.test(c.loginUrl) ? h("a", { class: "login", href: c.loginUrl, target: "_blank", rel: "noopener noreferrer", text: "Log in ↗" }) : ""));
+      if (c.perks) row.append(h("div", { class: "perks", text: c.perks }));
       if (c.limit) { const p = Math.min(100, (c.balance / c.limit) * 100); row.append(h("div", { class: "util" }, h("i", { class: p > 50 ? "hi" : p > 30 ? "mid" : "", style: `width:${p.toFixed(1)}%` }))); }
       box.append(row);
     });
@@ -317,10 +318,23 @@
     if (est) box.append(h("p", { class: "quiet", style: "margin:.4rem 0 0;font-size:.85rem", text: `Rough value of what's on file: ${money(est, false)}. Estimates only; transfers to partners can be worth more.` }));
     return box;
   }
+  // ---------------- which card for what (from each card's "Use for") ----------------
+  const USE_ORDER = ["Dining", "US groceries", "Amazon and Whole Foods", "Gas and transit", "Drugstores", "Streaming", "Software and subscriptions", "Delta flights", "United flights", "Other flights", "Hotels and car rentals", "Overseas", "Everything else"];
+  function whichSec(d) {
+    const by = new Map();
+    (d.cards || []).forEach((c) => (c.useFor || []).forEach((u) => { if (!by.has(u)) by.set(u, []); by.get(u).push(c); }));
+    if (!by.size) return "";
+    const keys = [...by.keys()].sort((a, b) => (USE_ORDER.indexOf(a) + 1 || 99) - (USE_ORDER.indexOf(b) + 1 || 99));
+    const box = h("section", { class: "cn-sec", id: "which" }, h("div", { class: "cn-head" }, h("h2", { text: "Which card for what" }), h("small", { text: "Best rewards for each kind of spending" })));
+    keys.forEach((k) => box.append(h("div", { class: "use" }, h("span", { class: "k", text: k }), h("span", { class: "v", text: by.get(k).map((c) => `${c.name} ···${c.last4}`).join(" or ") }))));
+    const idle = (d.cards || []).filter((c) => !(c.useFor || []).length);
+    if (idle.length) box.append(h("p", { class: "quiet", style: "margin:.4rem 0 0;font-size:.85rem", text: "Keep open, don't use: " + idle.map((c) => `${c.name} ···${c.last4}`).join(", ") + "." }));
+    return box;
+  }
   function render() {
     const d = S.data, main = $("#main");
     main.replaceChildren(h("h1", { class: "cn-title", text: "Coin" }), h("p", { class: "cn-sub quiet", text: "Your cards, where the money goes, and what you're owed." }),
-      covey(d), tiles(d), cardsSec(d), pointsSec(d), spendSec(d), paysSec(d), reimbSec(d));
+      covey(d), tiles(d), cardsSec(d), whichSec(d), pointsSec(d), spendSec(d), paysSec(d), reimbSec(d));
     menu();
   }
   // ---------------- menu ----------------

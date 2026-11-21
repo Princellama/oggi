@@ -43,6 +43,13 @@ body.cn { height: auto; min-height: 100%; overflow-x: hidden; }
 .card .bal { text-align: right; font: 600 18px var(--serif); color: var(--ink); }
 .card .meta { font-size: 13px; color: var(--soft); }
 .card .right { text-align: right; font-size: 13px; color: var(--soft); }
+.card .right .login { display: block; margin-top: 2px; color: var(--ink); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.card .right .login:hover { text-decoration: underline; }
+.card .perks { grid-column: 1 / -1; font-size: 12.5px; color: var(--soft); line-height: 1.45; }
+.use { display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr); gap: 12px; padding: 8px 2px; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.use .k { color: var(--soft); }
+.use .v { color: var(--ink); font-weight: 600; }
+@media (max-width: 560px) { .use { grid-template-columns: 1fr; gap: 2px; } }
 .chip { display: inline-block; font-size: 11.5px; padding: 2px 8px; border-radius: 99px; margin-left: 6px; background: var(--hair); color: var(--ink); }
 .chip.bad { background: var(--red-w); color: var(--red); }
 .chip.good { background: var(--green-w); color: var(--green); }
