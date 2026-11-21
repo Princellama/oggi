@@ -1009,7 +1009,7 @@ const CPA = {
   entity: ["S corp", "LLC", "Sole prop", "C corp", "Partnership", "Individual", "Trust"],
   cadence: ["Monthly", "Quarterly", "Annual", "As needed"],
   services: ["Bookkeeping", "Payroll", "GE tax", "Estimates", "Business return", "Personal return", "Advisory", "Sales tax"],
-  cstatus: ["Active", "Paused", "Former"],
+  cstatus: ["Active", "Paused", "Former", "Prospect"],
   type: ["Monthly", "Quarterly", "Year-end", "Annual", "Ad hoc"],
   mstatus: ["Planned", "Prepped", "Held", "Followed up", "Cancelled"],
 };

@@ -351,10 +351,16 @@
       '<div class="full cp-row"><button class="btn primary" type="submit">Add client</button><button class="btn" type="button" data-cancel>Cancel</button></div></form>';
   }
   function renderClients() {
-    const list = data.clients.filter((c) => c.status !== "Former");
+    const list = data.clients.filter((c) => c.status !== "Former" && c.status !== "Prospect");
+    // Prospects: a proposal waiting on a yes. The Notion page holds the projection, market check and engagement letter.
+    const props = data.clients.filter((c) => c.status === "Prospect");
     main.innerHTML = '<section class="cp-sec"><div class="cp-spread"><h2 class="cp-h2">Clients</h2><button class="btn" data-new="client">+ Add client</button></div>' +
       (showNew === "client" ? newClientForm() : "") +
-      (list.length ? list.map(clientCard).join("") : '<p class="quiet">No clients yet.</p>') + "</section>";
+      (list.length ? list.map(clientCard).join("") : '<p class="quiet">No clients yet.</p>') + "</section>" +
+      (props.length ? '<section class="cp-sec"><h2 class="cp-h2">Proposals</h2>' + props.map((c) =>
+        '<div class="dl"><div class="dl-d">Open</div><div><div class="dl-what">' + esc(c.name) + '</div><div class="dl-who">' +
+        esc([c.projectedNet != null ? "Year-1 net after tax reserve " + money(c.projectedNet) : "", c.notes || c.owner || ""].filter(Boolean).join(" · ")) + "</div></div>" +
+        (c.url ? '<a class="btn" href="' + esc(c.url) + '" target="_blank" rel="noopener">Open proposal</a>' : "") + "</div>").join("") + "</section>" : "");
     if (location.hash) { const el = document.getElementById(location.hash.slice(1)); if (el) el.scrollIntoView(); }
   }
 

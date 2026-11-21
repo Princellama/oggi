@@ -18,7 +18,13 @@ const mori = {
   services: ["Personal return", "GE tax"], status: "Active", through: null, ytdRevenue: null, ytdNet: null, projectedNet: null,
   priorTax: 18400, fedPaid: 9000, statePaid: 3000, withholding: 0, estimateCall: "", watch: "", qbo: null, taxdome: null, notes: "",
 };
-state.clients.push(ekahi, mori);
+const prospect = {
+  id: id(), url: "https://www.notion.so/", name: "Kalani Clinic group (proposal)", owner: "Dr. Kalani", entity: null, cadence: "Monthly",
+  services: ["Payroll", "GE tax", "Business return"], status: "Prospect", through: null, ytdRevenue: null, ytdNet: null, projectedNet: 6153,
+  priorTax: null, fedPaid: null, statePaid: null, withholding: null, estimateCall: "", watch: "", qbo: null, taxdome: null,
+  notes: "Quote: $1,500/mo for 3 units; returns $4,500-6,000.",
+};
+state.clients.push(ekahi, mori, prospect);
 state.meetings.push(
   { id: id(), url: null, title: "Ekahi Q3 review and year-end estimate", when: iso(0) + "T16:00:00.000-10:00", type: "Quarterly", status: "Prepped", link: "https://meet.google.com/", client: ekahi.id, agenda: null, notes: "", decisions: "", followups: "", brief: null },
   { id: id(), url: null, title: "Ekahi year-end: W-2s, Q4 estimate, 2027 plan", when: iso(66), type: "Year-end", status: "Planned", link: null, client: ekahi.id, agenda: null, notes: "", decisions: "", followups: "", brief: null },
