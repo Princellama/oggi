@@ -30,6 +30,18 @@
 
   const S = { data: null, open: {}, all: false };
 
+  // ---------------- Clean / Vice switch (remembered on this device) ----------------
+  function setMode(vice) {
+    document.body.classList.toggle("vice", vice);
+    const b = $("#mode");
+    if (b) { b.textContent = vice ? "Clean mode" : "Vice mode"; b.setAttribute("aria-pressed", String(vice)); }
+    const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute("content", vice ? "#170A2B" : "#F9F9F7");
+    try { localStorage.setItem("coin-theme", vice ? "vice" : "clean"); } catch {}
+  }
+  let startVice = false; try { startVice = localStorage.getItem("coin-theme") === "vice"; } catch {}
+  setMode(startVice);
+  $("#mode")?.addEventListener("click", () => setMode(!document.body.classList.contains("vice")));
+
   // ---------------- Covey ----------------
   // Plain rules over the numbers. Each note: { level: "warn" | "watch" | "ok", text: [strings and {b}] }.
   function coveyNotes(d) {
