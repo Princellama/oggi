@@ -112,6 +112,52 @@
       h("div", { class: "tile" + (interest > 0 ? " bad" : "") }, h("span", { text: "Interest paid this year" }), h("b", { class: "num", text: money(interest, false) })),
       h("div", { class: "tile" + (util > 30 ? " bad" : "") }, h("span", { text: "Credit used" }), h("b", { class: "num", text: util == null ? "—" : util + "%" })));
   }
+  // ---------------- card art and icons (drawn here, no images to download) ----------------
+  const ICONS = {
+    dining: ["M7 2v20", "M4 2v6a3 3 0 0 0 6 0V2", "M18 2c-2 1-3.5 3.5-3.5 7v4H18v9"],
+    cart: ["M2 3h3l2.6 11.4a1 1 0 0 0 1 .8h9.3a1 1 0 0 0 1-.8L21 7H6.2", "C9 20 1.5", "C18 20 1.5"],
+    box: ["M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z", "M3 7.5l9 4.5 9-4.5", "M12 12v9"],
+    fuel: ["M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16", "M3 21h12", "M7 8h4", "M14 10h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V8l-3-3"],
+    pill: ["M10.5 3.5a5 5 0 0 1 7 7l-7 7a5 5 0 0 1-7-7z", "M7 7l10 10"],
+    tv: ["M3 7h18v13H3z", "M8 2l4 5 4-5"],
+    laptop: ["M4 5h16v11H4z", "M2 20h20", "M10 8.5l-2 2 2 2", "M14 8.5l2 2-2 2"],
+    plane: ["M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"],
+    bed: ["M2 20V7", "M2 15h20v5", "M22 15v-2a3 3 0 0 0-3-3h-8v5", "C6.5 12 1.8"],
+    globe: ["C12 12 9", "M3 12h18", "M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9", "M12 3C9.5 5.6 8.2 8.6 8.2 12s1.3 6.4 3.8 9"],
+    star: ["M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.5l-5.4 3 1.2-6-4.5-4.2 6.1-.7z"],
+  };
+  const USE_ICON = { "Dining": "dining", "US groceries": "cart", "Amazon and Whole Foods": "box", "Gas and transit": "fuel", "Drugstores": "pill", "Streaming": "tv", "Software and subscriptions": "laptop", "Delta flights": "plane", "United flights": "plane", "Other flights": "plane", "Hotels and car rentals": "bed", "Overseas": "globe", "Everything else": "star" };
+  function icon(name, cls) {
+    const svg = document.createElementNS(SVGNS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("class", "ico " + (cls || ""));
+    (ICONS[name] || ICONS.star).forEach((d) => {
+      let el;
+      if (d[0] === "C") { const [x, y, r] = d.slice(1).trim().split(" "); el = document.createElementNS(SVGNS, "circle"); el.setAttribute("cx", x); el.setAttribute("cy", y); el.setAttribute("r", r); }
+      else { el = document.createElementNS(SVGNS, "path"); el.setAttribute("d", d); }
+      svg.append(el);
+    });
+    return svg;
+  }
+  // Each card gets its colours from its name; anything unknown falls back to the issuer.
+  function artKey(c) {
+    const n = (c.name || "").toLowerCase();
+    if (/gold/.test(n)) return "gold";
+    if (/reserve/.test(n)) return "graphite";
+    if (/delta|skymiles/.test(n)) return "delta";
+    if (/sapphire/.test(n)) return "sapphire";
+    if (/prime|amazon/.test(n)) return "prime";
+    if (/freedom/.test(n)) return "freedom";
+    if (/united/.test(n)) return "united";
+    if (/venture|capital/.test(n)) return "venture";
+    if (/ink/.test(n)) return "ink";
+    return (c.issuer || "other").toLowerCase();
+  }
+  function cardArt(c, small) {
+    const short = (c.name || "").replace(/^(Delta SkyMiles|Capital One|Amex)\s*/i, "").split(" ")[0] || c.name;
+    return h("div", { class: `art art-${artKey(c)}${small ? " sm" : ""}`, "aria-hidden": "true" },
+      h("span", { class: "chip-ic" }), h("span", { class: "iss", text: c.issuer === "Other" ? "" : c.issuer }),
+      small ? "" : h("span", { class: "cn", text: short }), h("span", { class: "l4", text: "···" + (c.last4 || "") }));
+  }
   function cardsSec(d) {
     const box = h("section", { class: "cn-sec", id: "cards" }, h("div", { class: "cn-head" }, h("h2", { text: "Cards" }), h("small", { text: "Balances as of the last update" })));
     const order = (c) => (c.balance || 0);
@@ -119,12 +165,18 @@
       const auto = c.autopay === "Minimum" ? h("span", { class: "chip bad", text: "autopay: minimum" }) : /statement|full/i.test(c.autopay) ? h("span", { class: "chip good", text: "autopay: " + c.autopay.toLowerCase() }) : h("span", { class: "chip", text: "autopay: " + c.autopay.toLowerCase() });
       const dd = daysTo(c.due);
       const dueTxt = c.statement > 0 && c.due ? `Statement ${money(c.statement)} · min ${money(c.minimum)} · due ${md(c.due)}${dd != null && dd <= 3 && dd >= 0 ? (dd === 0 ? " (today)" : dd === 1 ? " (tomorrow)" : ` (in ${dd} days)`) : ""}` : (c.balance || 0) === 0 ? "Paid off" : "No statement balance due";
+      const aprChip = c.apr == null ? h("span", { class: "chip", text: "APR ?" }) : h("span", { class: "chip apr" + (c.apr === 0 ? " zero" : c.apr >= 25 ? " hot" : ""), text: `APR ${c.apr}%` });
       const row = h("div", { class: "card" },
-        h("div", { class: "nm" }, c.name, h("small", { text: `${c.issuer} ···${c.last4}` }), auto),
-        h("div", { class: "bal num", text: money(c.balance) }),
-        h("div", { class: "meta", text: [dueTxt, c.apr != null ? `APR ${c.apr}%` : "APR not on file", c.annualFee != null ? (c.annualFee ? `${money(c.annualFee, false)}/yr fee` : "no annual fee") : "", c.note].filter(Boolean).join(" · ") }),
-        h("div", { class: "right" }, c.limit ? `of ${money(c.limit, false)}` : "", /^https:\/\//.test(c.loginUrl) ? h("a", { class: "login", href: c.loginUrl, target: "_blank", rel: "noopener noreferrer", text: "Log in ↗" }) : ""));
-      if (c.perks) row.append(h("div", { class: "perks", text: c.perks }));
+        cardArt(c),
+        h("div", { class: "mid" },
+          h("div", { class: "nm" }, c.name, h("small", { text: `${c.issuer} ···${c.last4}` })),
+          h("div", { class: "chips" }, aprChip, auto, c.annualFee != null ? h("span", { class: "chip", text: c.annualFee ? `${money(c.annualFee, false)}/yr` : "no annual fee" }) : ""),
+          h("div", { class: "meta", text: [dueTxt, c.note].filter(Boolean).join(" · ") }),
+          c.perks ? h("div", { class: "perks", text: c.perks }) : ""),
+        h("div", { class: "side" },
+          h("div", { class: "bal num", text: money(c.balance) }),
+          h("div", { class: "right", text: c.limit ? `of ${money(c.limit, false)}` : "" }),
+          /^https:\/\//.test(c.loginUrl) ? h("a", { class: "login", href: c.loginUrl, target: "_blank", rel: "noopener noreferrer", text: "Log in ↗" }) : ""));
       if (c.limit) { const p = Math.min(100, (c.balance / c.limit) * 100); row.append(h("div", { class: "util" }, h("i", { class: p > 50 ? "hi" : p > 30 ? "mid" : "", style: `width:${p.toFixed(1)}%` }))); }
       box.append(row);
     });
@@ -326,7 +378,10 @@
     if (!by.size) return "";
     const keys = [...by.keys()].sort((a, b) => (USE_ORDER.indexOf(a) + 1 || 99) - (USE_ORDER.indexOf(b) + 1 || 99));
     const box = h("section", { class: "cn-sec", id: "which" }, h("div", { class: "cn-head" }, h("h2", { text: "Which card for what" }), h("small", { text: "Best rewards for each kind of spending" })));
-    keys.forEach((k) => box.append(h("div", { class: "use" }, h("span", { class: "k", text: k }), h("span", { class: "v", text: by.get(k).map((c) => `${c.name} ···${c.last4}`).join(" or ") }))));
+    keys.forEach((k) => box.append(h("div", { class: "use" },
+      h("span", { class: "ic" }, icon(USE_ICON[k] || "star")),
+      h("span", { class: "k", text: k }),
+      h("span", { class: "v" }, ...by.get(k).map((c) => h("span", { class: "pick" }, cardArt(c, true), `${c.name} ···${c.last4}`))))));
     const idle = (d.cards || []).filter((c) => !(c.useFor || []).length);
     if (idle.length) box.append(h("p", { class: "quiet", style: "margin:.4rem 0 0;font-size:.85rem", text: "Keep open, don't use: " + idle.map((c) => `${c.name} ···${c.last4}`).join(", ") + "." }));
     return box;

@@ -129,3 +129,132 @@ html { scroll-behavior: smooth; }
 .flow-svg .fnode:focus-visible rect { stroke: var(--ink); stroke-width: 1.5; }
 .flow-hint { font-size: 12.5px; color: var(--soft); margin: 4px 0 14px; }
 .cat.flash { background: var(--gold-w); transition: background .4s; }
+
+/* ================= Vice City sunset theme (Coin only) =================
+   Neon pink, sunset orange and teal on a night-purple sky, heavy italic headings.
+   Re-points the shared tokens so every section above picks it up. */
+body.cn {
+  --bg: #170A2B; --wash: rgba(255,255,255,.045); --ink: #FFF3F8; --soft: #C7B2DC; --hair: rgba(255,255,255,.09); --edge: rgba(255,255,255,.14);
+  --green: #19E3C8; --green-w: rgba(25,227,200,.13); --red: #FF4F93; --red-w: rgba(255,79,147,.15); --gold: #FFB547; --gold-w: rgba(255,181,71,.16); --navy: #A78BFA;
+  --pink: #FF3D9A; --orange: #FF8A3D; --sun: #FFD166; --teal: #19E3C8;
+  --display: "Avenir Next Condensed", "Futura", "Arial Narrow", "Helvetica Neue", var(--sans);
+  color: var(--soft); background: #170A2B;
+  background-image:
+    radial-gradient(120% 60% at 50% -10%, rgba(255,61,154,.35), transparent 60%),
+    radial-gradient(80% 50% at 100% 0%, rgba(255,138,61,.22), transparent 60%),
+    linear-gradient(180deg, #2A0F45 0%, #170A2B 38%, #120821 100%);
+  background-attachment: fixed;
+}
+body.cn .cn-top {
+  background: linear-gradient(90deg, rgba(42,15,69,.92), rgba(23,10,43,.92));
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-bottom: 0; box-shadow: 0 1px 0 rgba(255,255,255,.06);
+}
+body.cn .cn-top::after { content: ""; display: block; height: 3px; background: linear-gradient(90deg, var(--pink), var(--orange), var(--sun), var(--teal)); }
+body.cn .cn-back { color: var(--soft); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; font-size: 12px; }
+body.cn .cn-back:hover { color: var(--sun); }
+body.cn .cn-tabs a { color: var(--soft); text-transform: uppercase; letter-spacing: .06em; font-size: 12.5px; font-weight: 600; }
+body.cn .cn-tabs a:hover { color: var(--ink); }
+body.cn .cn-tabs a[aria-current] { color: var(--ink); border-bottom-color: var(--pink); }
+
+/* hero: big italic sunset title over a palm skyline */
+body.cn .cn-title {
+  font: italic 900 64px/0.95 var(--display); letter-spacing: -.01em; text-transform: uppercase; margin: 6px 0 6px;
+  background: linear-gradient(180deg, var(--sun) 0%, var(--orange) 45%, var(--pink) 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 3px 0 rgba(0,0,0,.35)) drop-shadow(0 0 18px rgba(255,61,154,.35));
+  padding: 34px 0 0; position: relative;
+}
+body.cn .cn-sub { color: var(--soft); font-size: 14px; letter-spacing: .02em; padding-bottom: 26px; margin-bottom: 26px; position: relative;
+  background: no-repeat right bottom / 300px 90px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 90'%3E%3Cg fill='%23000' fill-opacity='.55'%3E%3Cpath d='M40 90V40c0-8 2-14 3-20h3c-1 6-2 12-2 20v50z'/%3E%3Cpath d='M44 22c-10-6-24-5-32 2 10-2 20-1 30 2-9 1-17 5-22 11 8-5 16-8 24-9-5 4-8 10-9 16 4-6 8-11 12-14 2 5 6 9 11 12-3-6-5-11-6-15 7 1 14 4 20 9-5-7-12-11-19-12 8-3 17-3 25 0-8-5-18-6-27-4 5-5 12-8 20-9-10-2-20 1-27 7z'/%3E%3Cpath d='M250 90V52c0-6 1-11 2-15h3c-1 4-2 9-2 15v38z'/%3E%3Cpath d='M253 38c-8-5-19-4-25 1 8-1 15 0 23 2-7 1-13 4-17 9 6-4 12-6 18-7-4 3-6 8-7 12 3-4 6-8 9-10 2 4 5 7 9 9-2-4-4-8-5-11 6 1 11 3 16 7-4-5-9-8-15-9 7-2 13-2 19 0-6-4-14-5-21-3 4-4 9-6 15-7-8-1-15 1-20 6z'/%3E%3Crect x='90' y='62' width='14' height='28'/%3E%3Crect x='108' y='48' width='18' height='42'/%3E%3Crect x='130' y='56' width='12' height='34'/%3E%3Crect x='146' y='40' width='16' height='50'/%3E%3Crect x='166' y='58' width='14' height='32'/%3E%3Crect x='184' y='50' width='20' height='40'/%3E%3Crect x='208' y='64' width='12' height='26'/%3E%3C/g%3E%3C/svg%3E");
+}
+body.cn .cn-sub::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--pink), var(--orange), transparent); opacity: .8; }
+
+/* sections become glowing panels */
+body.cn .cn-sec { border-top: 0; background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.025)); border: 1px solid var(--edge); border-radius: 18px; padding: 20px 20px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+body.cn .cn-head h2 { font: italic 800 26px var(--display); text-transform: uppercase; letter-spacing: .01em; color: var(--ink); }
+body.cn .cn-head h2::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; transform: skewX(-14deg); margin-right: 10px; vertical-align: 3px; background: linear-gradient(135deg, var(--pink), var(--orange)); box-shadow: 0 0 12px var(--pink); }
+
+/* Covey and tiles */
+body.cn .covey { background: linear-gradient(135deg, rgba(255,61,154,.16), rgba(25,227,200,.10)); border: 1px solid rgba(255,61,154,.35); box-shadow: 0 0 0 1px rgba(255,255,255,.03), 0 12px 34px rgba(255,61,154,.12); }
+body.cn .covey img { box-shadow: 0 0 0 3px var(--teal), 0 0 18px rgba(25,227,200,.5); }
+body.cn .covey h3 { font: italic 800 22px var(--display); text-transform: uppercase; color: var(--teal); }
+body.cn .tile { background: rgba(255,255,255,.05); border: 1px solid var(--edge); border-radius: 14px; position: relative; overflow: hidden; }
+body.cn .tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: linear-gradient(180deg, var(--teal), var(--pink)); }
+body.cn .tile span { text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+body.cn .tile b { font: italic 800 28px/1.15 var(--display); color: var(--ink); }
+body.cn .tile.bad b { color: var(--pink); text-shadow: 0 0 14px rgba(255,61,154,.45); }
+
+/* card rows with drawn card art */
+body.cn .card { grid-template-columns: 96px minmax(0, 1fr) auto; gap: 6px 16px; align-items: start; padding: 16px 4px; }
+body.cn .card .mid { display: grid; gap: 5px; min-width: 0; }
+body.cn .card .side { text-align: right; display: grid; gap: 2px; justify-items: end; }
+body.cn .card .bal { font: italic 800 24px var(--display); color: var(--ink); }
+body.cn .card .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+body.cn .card .chips .chip { margin-left: 0; }
+body.cn .card .nm small { color: var(--soft); }
+body.cn .card .perks { grid-column: auto; color: var(--soft); opacity: .9; }
+body.cn .card .util { grid-column: 2 / -1; }
+body.cn .card .right .login, body.cn .card .side .login { display: inline-block; margin-top: 6px; padding: 5px 12px; border-radius: 99px; font: 700 12px var(--sans); letter-spacing: .04em; text-transform: uppercase; color: #170A2B; background: linear-gradient(90deg, var(--sun), var(--orange)); text-decoration: none; box-shadow: 0 4px 14px rgba(255,138,61,.35); }
+body.cn .card .side .login:hover { filter: brightness(1.08); text-decoration: none; }
+body.cn .chip { background: rgba(255,255,255,.08); color: var(--ink); font-weight: 600; }
+body.cn .chip.bad { background: var(--red-w); color: var(--pink); }
+body.cn .chip.good { background: var(--green-w); color: var(--teal); }
+body.cn .chip.apr { background: rgba(167,139,250,.18); color: #D9CCFF; }
+body.cn .chip.apr.hot { background: var(--red-w); color: var(--pink); }
+body.cn .chip.apr.zero { background: var(--green-w); color: var(--teal); }
+body.cn .util { background: rgba(255,255,255,.08); }
+body.cn .util i { background: linear-gradient(90deg, var(--teal), #6EF3E0); box-shadow: 0 0 10px rgba(25,227,200,.6); }
+body.cn .util i.mid { background: linear-gradient(90deg, var(--sun), var(--orange)); box-shadow: 0 0 10px rgba(255,138,61,.6); }
+body.cn .util i.hi { background: linear-gradient(90deg, var(--orange), var(--pink)); box-shadow: 0 0 10px rgba(255,61,154,.6); }
+
+.art { position: relative; width: 96px; height: 61px; border-radius: 8px; overflow: hidden; color: rgba(255,255,255,.92); font: 700 8px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; box-shadow: 0 6px 16px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.18); }
+.art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255,255,255,.28) 0%, rgba(255,255,255,0) 38%, rgba(255,255,255,0) 70%, rgba(255,255,255,.08) 100%); pointer-events: none; }
+.art .chip-ic { position: absolute; left: 10px; top: 21px; width: 15px; height: 11px; border-radius: 2px; background: linear-gradient(135deg, #F7E2A0, #C9A54A); box-shadow: inset 0 0 0 1px rgba(0,0,0,.2); }
+.art .iss { position: absolute; right: 8px; bottom: 7px; opacity: .85; font-size: 7px; }
+.art .cn { position: absolute; left: 10px; top: 7px; font-size: 9px; letter-spacing: .04em; }
+.art .l4 { position: absolute; left: 10px; bottom: 7px; font: 600 9px var(--sans); letter-spacing: .1em; opacity: .9; }
+.art.sm { width: 38px; height: 24px; border-radius: 4px; display: inline-block; vertical-align: middle; margin-right: 8px; box-shadow: 0 2px 6px rgba(0,0,0,.4), inset 0 0 0 1px rgba(255,255,255,.2); }
+.art.sm .chip-ic { left: 5px; top: 8px; width: 7px; height: 5px; }
+.art.sm .iss, .art.sm .l4 { display: none; }
+.art-gold { background: linear-gradient(135deg, #F3D9A4 0%, #D9B06A 45%, #B98A3E 100%); color: #3B2A10; }
+.art-graphite { background: linear-gradient(135deg, #5B6470 0%, #2E343C 55%, #1C2026 100%); }
+.art-delta { background: linear-gradient(135deg, #3FA2F0 0%, #1565C0 60%, #0D3E80 100%); }
+.art-sapphire { background: linear-gradient(135deg, #2D4A8A 0%, #172B5C 55%, #0C1A3C 100%); }
+.art-prime { background: linear-gradient(135deg, #1F3A5A 0%, #0F1E33 60%, #070F1C 100%); }
+.art-freedom { background: linear-gradient(135deg, #4FA3E3 0%, #1E6FBF 55%, #124C8C 100%); }
+.art-united { background: linear-gradient(135deg, #2B4C86 0%, #12275A 60%, #0A1838 100%); }
+.art-venture { background: linear-gradient(135deg, #5C6B7E 0%, #34414F 55%, #1E2731 100%); }
+.art-ink { background: linear-gradient(135deg, #3A3A3A 0%, #1B1B1B 100%); }
+.art-chase { background: linear-gradient(135deg, #2C5EA8, #123A75); }
+.art-amex { background: linear-gradient(135deg, #3E8ED0, #1A5C99); }
+.art-other { background: linear-gradient(135deg, #6B5B95, #3A2E5C); }
+
+/* which card for what */
+body.cn .use { grid-template-columns: 40px minmax(0, 190px) minmax(0, 1fr); align-items: center; gap: 12px; padding: 10px 2px; }
+body.cn .use .ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: linear-gradient(135deg, rgba(255,61,154,.25), rgba(255,138,61,.2)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12), 0 0 14px rgba(255,61,154,.2); }
+body.cn .use .k { color: var(--ink); font-weight: 600; }
+body.cn .use .v { display: flex; flex-wrap: wrap; gap: 6px 14px; font-weight: 600; color: var(--ink); }
+body.cn .use .pick { display: inline-flex; align-items: center; white-space: nowrap; }
+.ico { width: 20px; height: 20px; fill: none; stroke: var(--sun); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 560px) { body.cn .use { grid-template-columns: 40px minmax(0, 1fr); } body.cn .use .v { grid-column: 2; } }
+
+/* lists, inputs and the rest on the dark sky */
+body.cn .cat:hover, body.cn .tbtn:hover { background: rgba(255,255,255,.06); }
+body.cn .cat .bar { background: linear-gradient(90deg, var(--navy), var(--teal)); opacity: 1; }
+body.cn .cat .bar.big { background: linear-gradient(90deg, var(--orange), var(--pink)); }
+body.cn .cat.flash { background: var(--gold-w); }
+body.cn .addr input { background: rgba(255,255,255,.06); color: var(--ink); border-color: var(--edge); }
+body.cn .addr button { background: linear-gradient(90deg, var(--pink), var(--orange)); color: #fff; font-weight: 700; }
+body.cn .rb .st button[aria-pressed="true"] { background: var(--teal); color: #170A2B; border-color: var(--teal); }
+body.cn .cn-toast { background: var(--pink); color: #fff; }
+body.cn .quiet { color: var(--soft); }
+@media (max-width: 640px) {
+  body.cn .cn-title { font-size: 48px; }
+  body.cn .cn-sub { background-size: 200px 60px; }
+  body.cn .card { grid-template-columns: 72px minmax(0, 1fr); }
+  body.cn .card .side { grid-column: 2; justify-items: start; text-align: left; }
+  body.cn .art:not(.sm) { width: 72px; height: 46px; }
+  body.cn .art:not(.sm) .cn { display: none; }
+  body.cn .art:not(.sm) .chip-ic { top: 16px; }
+  body.cn .cn-sec { padding: 16px 14px 10px; border-radius: 14px; }
+}
