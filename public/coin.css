@@ -258,3 +258,7 @@ body.cn .quiet { color: var(--soft); }
   body.cn .art:not(.sm) .chip-ic { top: 16px; }
   body.cn .cn-sec { padding: 16px 14px 10px; border-radius: 14px; }
 }
+
+/* link out to the Benefits Maximizer */
+body.cn .cn-tabs a.cn-out { color: var(--sun); }
+body.cn .cn-max { font: 700 12px var(--sans); text-transform: uppercase; letter-spacing: .05em; color: #170A2B; background: linear-gradient(90deg, var(--sun), var(--orange)); padding: 6px 12px; border-radius: 99px; text-decoration: none; box-shadow: 0 4px 14px rgba(255,138,61,.35); }

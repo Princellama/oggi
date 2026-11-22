@@ -377,7 +377,7 @@
     (d.cards || []).forEach((c) => (c.useFor || []).forEach((u) => { if (!by.has(u)) by.set(u, []); by.get(u).push(c); }));
     if (!by.size) return "";
     const keys = [...by.keys()].sort((a, b) => (USE_ORDER.indexOf(a) + 1 || 99) - (USE_ORDER.indexOf(b) + 1 || 99));
-    const box = h("section", { class: "cn-sec", id: "which" }, h("div", { class: "cn-head" }, h("h2", { text: "Which card for what" }), h("small", { text: "Best rewards for each kind of spending" })));
+    const box = h("section", { class: "cn-sec", id: "which" }, h("div", { class: "cn-head" }, h("h2", { text: "Which card for what" }), h("a", { class: "cn-max", href: "/coin/strategy", text: "Benefits Maximizer →" })));
     keys.forEach((k) => box.append(h("div", { class: "use" },
       h("span", { class: "ic" }, icon(USE_ICON[k] || "star")),
       h("span", { class: "k", text: k }),
@@ -395,7 +395,7 @@
   // ---------------- menu ----------------
   let spy;
   function menu() {
-    const links = [...document.querySelectorAll("#tabs a")];
+    const links = [...document.querySelectorAll("#tabs a[data-sec]")];
     const secs = links.map((a) => document.getElementById(a.dataset.sec));
     links.forEach((a, i) => { a.hidden = !secs[i]; });
     const mark = (id) => links.forEach((a) => (a.dataset.sec === id ? a.setAttribute("aria-current", "true") : a.removeAttribute("aria-current")));

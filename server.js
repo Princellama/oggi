@@ -667,6 +667,7 @@ app.post("/api/coin/reimb", requireAuth, wrap(async (req, res) => {
 }));
 app.patch("/api/coin/reimb/:id", requireAuth, wrap(async (req, res) => res.json(await coinstore.updateReimb(req.params.id, reimbFields(req.body)))));
 app.get("/coin", (req, res) => { res.set("Cache-Control", "no-cache"); res.sendFile(path.join(__dirname, "public", "coin.html")); });
+app.get(["/coin/strategy", "/coin/strategy/"], (req, res) => { res.set("Cache-Control", "no-cache"); res.sendFile(path.join(__dirname, "public", "coin-strategy.html")); });
 
 // ---------- /feeding ----------
 // The Nov 11 SCE lunch for 70 at Kingdom Hall C: dishes and cooks, supplies, the timeline, notes.

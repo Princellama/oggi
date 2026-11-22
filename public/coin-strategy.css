@@ -1,0 +1,119 @@
+/* /coin/strategy — Benefits Maximizer, dressed as a classic property-trading board game:
+   board green, cream title deeds with colour bands, orange Chance cards, black outlines. */
+body.bm {
+  --board: #C8E6CF; --cream: #FBF7EA; --ink: #1B1B1B; --soft: #4A4A42; --line: #1B1B1B;
+  --brown: #8B4A2B; --ltblue: #9ED6F2; --pink: #D63E8C; --orange: #F39221; --red: #E2252B; --yellow: #F5DE19; --green: #1E9E52; --dkblue: #1460A8;
+  --chance: #F7A23B; --chest: #7EC3E6;
+  --heavy: "Arial Black", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  height: auto; min-height: 100%; overflow-x: hidden; color: var(--ink); background: var(--board);
+  background-image: linear-gradient(rgba(0,0,0,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.bm-wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+.bm-top { position: sticky; top: 0; z-index: 5; background: var(--cream); border-bottom: 3px solid var(--line); }
+.bm-bar { display: flex; align-items: center; gap: 22px; padding-top: calc(10px + env(safe-area-inset-top, 0px)); padding-bottom: 10px; }
+.bm-back { font: 800 13px var(--heavy); color: var(--ink); text-decoration: none; text-transform: uppercase; white-space: nowrap; }
+.bm-tabs { display: flex; gap: 16px; overflow-x: auto; scrollbar-width: none; }
+.bm-tabs::-webkit-scrollbar { display: none; }
+.bm-tabs a { flex: none; font: 700 12px var(--sans); text-transform: uppercase; letter-spacing: .05em; color: var(--soft); text-decoration: none; padding: 3px 0; border-bottom: 2px solid transparent; }
+.bm-tabs a:hover { color: var(--ink); border-bottom-color: var(--red); }
+.bm-main { padding-top: 22px; padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
+.bm-main section[id] { scroll-margin-top: 70px; }
+html { scroll-behavior: smooth; }
+.bm-quiet { color: var(--soft); }
+.num { font-variant-numeric: tabular-nums; }
+
+/* hero: the GO corner and a red title banner */
+.bm-hero { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 22px; align-items: center; background: var(--cream); border: 3px solid var(--line); padding: 18px; margin-bottom: 26px; box-shadow: 6px 6px 0 rgba(0,0,0,.18); }
+.bm-corner { aspect-ratio: 1; border: 3px solid var(--line); display: grid; place-content: center; text-align: center; background: var(--cream); transform: rotate(-8deg); }
+.bm-corner span { font: 800 11px var(--heavy); letter-spacing: .08em; }
+.bm-corner b { font: 900 48px/1 var(--heavy); color: var(--red); letter-spacing: -.02em; }
+.bm-kicker { margin: 0 0 6px; font: 700 12px var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--soft); }
+.bm-title { display: inline-block; margin: 0 0 10px; padding: 8px 18px; font: 900 40px/1.05 var(--heavy); text-transform: uppercase; color: #fff; background: var(--red); border: 3px solid var(--line); transform: rotate(-1.5deg); box-shadow: 4px 4px 0 var(--line); letter-spacing: -.01em; }
+.bm-lede { margin: 6px 0 0; font-size: 15px; line-height: 1.55; color: var(--soft); max-width: 60ch; }
+
+/* sections */
+.bm-sec { background: var(--cream); border: 3px solid var(--line); padding: 18px 18px 14px; margin: 0 0 26px; box-shadow: 6px 6px 0 rgba(0,0,0,.18); }
+.bm-h { margin: 0; font: 900 24px var(--heavy); text-transform: uppercase; letter-spacing: -.01em; }
+.bm-h3 { margin: 18px 0 6px; font: 800 13px var(--heavy); text-transform: uppercase; letter-spacing: .06em; color: var(--soft); }
+.bm-sub { margin: 4px 0 14px; color: var(--soft); font-size: 14px; }
+.bm-note { margin: 12px 0 0; font-size: 13px; color: var(--soft); }
+.bm-note a { color: var(--dkblue); font-weight: 700; }
+
+/* title deeds */
+.bm-deeds { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.deed { background: #fff; border: 2px solid var(--line); padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.deed-top { border: 2px solid var(--line); padding: 8px 6px; text-align: center; display: grid; gap: 1px; }
+.deed-top small { font: 700 9px var(--sans); letter-spacing: .14em; }
+.deed-top b { font: 900 16px/1.15 var(--heavy); text-transform: uppercase; }
+.deed-top span { font: 700 11px var(--sans); letter-spacing: .08em; }
+.c-brown { background: var(--brown); color: #fff; } .c-ltblue { background: var(--ltblue); } .c-pink { background: var(--pink); color: #fff; } .c-orange { background: var(--orange); }
+.c-red { background: var(--red); color: #fff; } .c-yellow { background: var(--yellow); } .c-green { background: var(--green); color: #fff; } .c-dkblue { background: var(--dkblue); color: #fff; }
+.deed-rent { width: 100%; border-collapse: collapse; font-size: 13px; }
+.deed-rent td { padding: 3px 2px; border-bottom: 1px dotted #bbb; }
+.deed-rent td:last-child { text-align: right; font-weight: 800; white-space: nowrap; }
+.deed-credits { margin: 0; padding: 0 0 0 16px; font-size: 12.5px; line-height: 1.45; color: var(--soft); }
+.deed-tip { margin: 0; font-size: 12.5px; font-style: italic; color: var(--ink); }
+.deed-foot { margin-top: auto; border-top: 2px solid var(--line); padding-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 12px; font: 700 11.5px var(--sans); text-transform: uppercase; letter-spacing: .03em; }
+.deed-foot a { margin-left: auto; color: var(--dkblue); text-decoration: none; }
+
+/* Free Parking */
+.bm-pot { display: grid; gap: 2px; text-align: center; border: 3px dashed var(--line); padding: 12px; margin-bottom: 4px; background: #fff; }
+.bm-pot span { font: 800 11px var(--heavy); letter-spacing: .14em; text-transform: uppercase; color: var(--red); }
+.bm-pot b { font: 900 30px var(--heavy); }
+.bm-pot small { color: var(--soft); }
+.pk { display: grid; grid-template-columns: 64px minmax(0, 210px) minmax(0, 1fr); gap: 12px; align-items: center; padding: 8px 2px; border-bottom: 1px solid #d6d1bd; }
+.pk-amt { font: 900 16px var(--heavy); text-align: center; background: #DDF1E1; border: 2px solid var(--line); padding: 4px 0; }
+.pk-w b { display: block; font-size: 14px; } .pk-w small { color: var(--soft); }
+.pk-how { font-size: 13px; color: var(--soft); }
+.bm-stack { margin-top: 14px; padding: 12px 14px; background: var(--yellow); border: 2px solid var(--line); }
+.bm-stack b { font: 900 14px var(--heavy); text-transform: uppercase; }
+.bm-stack p { margin: 6px 0 0; font-size: 14px; }
+
+/* Resy */
+.bm-resy { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.rz { background: #fff; border: 2px solid var(--line); border-top: 10px solid var(--pink); padding: 8px 10px; display: grid; gap: 1px; }
+.rz b { font-size: 14px; } .rz span { font-size: 12.5px; color: var(--ink); } .rz small { font-size: 12px; color: var(--soft); }
+
+/* Railroads */
+.bm-scroll { overflow-x: auto; }
+.bm-rail { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 520px; }
+.bm-rail th, .bm-rail td { border: 2px solid var(--line); padding: 6px 8px; text-align: left; }
+.bm-rail th { font: 800 11.5px var(--heavy); text-transform: uppercase; letter-spacing: .04em; background: #fff; }
+.bm-rail th.rr { text-align: center; }
+.bm-rail th.c-dkblue { background: var(--dkblue); color: #fff; } .bm-rail th.c-green { background: var(--green); color: #fff; } .bm-rail th.c-red { background: var(--red); color: #fff; }
+.bm-rail td.dot { text-align: center; font-size: 15px; font-weight: 800; }
+.bm-rail td.al { color: var(--soft); font-size: 12.5px; }
+.bm-rail tr.all3 td { background: #FFF6B8; font-weight: 700; }
+
+/* Chance */
+.bm-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+.chance { position: relative; background: var(--chance); border: 2px solid var(--line); padding: 12px 12px 10px 44px; min-height: 92px; }
+.chance .q { position: absolute; left: 10px; top: 8px; font: 900 30px/1 var(--heavy); color: #fff; -webkit-text-stroke: 1.5px var(--line); }
+.chance b { display: block; font: 900 14px var(--heavy); text-transform: uppercase; }
+.chance p { margin: 4px 0 0; font-size: 13px; }
+
+/* Community Chest */
+.bm-chest { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.cc { background: var(--chest); border: 2px solid var(--line); padding: 10px; display: grid; gap: 2px; }
+.cc span { font: 700 11px var(--sans); text-transform: uppercase; letter-spacing: .04em; }
+.cc b { font: 900 22px var(--heavy); }
+.cc small { font-size: 12px; color: #133; }
+.bm-plan { margin-top: 14px; background: #fff; border: 2px solid var(--line); padding: 12px 14px; }
+.bm-plan b { font: 900 15px var(--heavy); text-transform: uppercase; }
+.bm-plan p { margin: 6px 0; font-size: 14px; }
+.bm-plan ol { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.55; }
+
+/* Jail */
+.bm-jail { background: repeating-linear-gradient(90deg, var(--cream) 0 22px, #EFE8D2 22px 26px); }
+.jl { border: 2px solid var(--line); background: #fff; padding: 10px 12px; margin-bottom: 8px; border-left: 10px solid var(--orange); }
+.jl b { font: 900 14px var(--heavy); text-transform: uppercase; }
+.jl p { margin: 3px 0 0; font-size: 13.5px; }
+
+@media (max-width: 640px) {
+  .bm-hero { grid-template-columns: 1fr; text-align: left; }
+  .bm-corner { width: 90px; }
+  .bm-title { font-size: 28px; }
+  .pk { grid-template-columns: 56px minmax(0, 1fr); }
+  .pk-how { grid-column: 2; }
+}
