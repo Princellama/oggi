@@ -1042,7 +1042,7 @@ function cpaMeetingFields(b) {
     if (b.agenda === null) f.agenda = null;
     else { if (!Array.isArray(b.agenda) || b.agenda.length > 40) throw bad("agenda"); f.agenda = b.agenda.map((x) => ({ t: String((x && x.t) || "").slice(0, 160), done: !!(x && x.done) })).filter((x) => x.t); }
   }
-  for (const k of ["notes", "decisions", "followups"]) if (k in b) f[k] = String(b[k] || "").slice(0, 6000);
+  for (const k of ["notes", "decisions", "followups"]) if (k in b) f[k] = String(b[k] || "").slice(0, 20000);
   return f;
 }
 app.get("/api/cpa", requireAuth, wrap(async (req, res) => { res.set("Cache-Control", "no-store"); res.json(await cstore.getAll()); }));
@@ -1136,6 +1136,14 @@ app.get(["/jw", "/jw/", "/jw/p/:slug"], (req, res) => {
 app.get(["/leadhero", "/leadhero/"], (req, res) => {
   res.set("Cache-Control", "no-cache");
   res.sendFile(path.join(__dirname, "public", "leadhero.html"));
+});
+
+// /vibrations: worksheet for the Vibrations Ohana (Murat) California-move meeting, 23 Nov 2026.
+// Signed in only (client details). Saves to its CPA Meetings row through /api/cpa/meeting/:id.
+app.get(["/vibrations", "/vibrations/"], (req, res) => {
+  if (!authed(req)) return res.redirect("/");
+  res.set("Cache-Control", "no-cache").set("X-Robots-Tag", "noindex");
+  res.sendFile(path.join(__dirname, "private", "vibrations.html"));
 });
 
 // ---------- static ----------

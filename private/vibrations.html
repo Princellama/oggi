@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#F9F9F7">
+  <title>Vibrations Ohana · Oggi</title>
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/fraunces-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body.vb { background: var(--wash); color: var(--ink); font-family: var(--sans); margin: 0; }
+    .vb-wrap { max-width: 980px; margin: 0 auto; padding: 0 18px; }
+    .vb-top { position: sticky; top: 0; z-index: 5; background: rgba(249,249,247,.96); backdrop-filter: blur(6px); border-bottom: 1px solid var(--hair); }
+    .vb-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0 4px; font-size: 14px; }
+    .vb-bar a { color: var(--soft); text-decoration: none; }
+    .vb-save { color: var(--soft); font-size: 13px; }
+    .vb-save.ok { color: #3f7d4e; } .vb-save.err { color: var(--clay); }
+    h1 { font-family: var(--serif); font-weight: 600; font-size: 28px; margin: 4px 0 2px; }
+    .vb-sub { color: var(--soft); margin: 0 0 8px; font-size: 14px; }
+    .vb-toc { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 10px; }
+    .vb-toc a { flex: none; font-size: 13px; padding: 5px 10px; border: 1px solid var(--edge); border-radius: 999px; color: var(--ink); text-decoration: none; background: #fff; }
+    section { background: #fff; border: 1px solid var(--edge); border-radius: 14px; padding: 18px 20px; margin: 18px 0; scroll-margin-top: 130px; }
+    h2 { font-family: var(--serif); font-weight: 600; font-size: 21px; margin: 0 0 4px; }
+    h3 { font-size: 15px; margin: 18px 0 6px; }
+    .lede { color: var(--soft); margin: 0 0 12px; font-size: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px 16px; }
+    label { display: block; font-size: 12px; color: var(--soft); text-transform: uppercase; letter-spacing: .04em; }
+    input[type=text], textarea, select { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; color: var(--ink); border: 1px solid var(--edge); border-radius: 8px; padding: 8px 10px; background: var(--bg); margin-top: 3px; }
+    textarea { min-height: 84px; resize: vertical; line-height: 1.45; }
+    textarea.big { min-height: 140px; }
+    input:focus, textarea:focus, select:focus { outline: 2px solid var(--clay); outline-offset: 0; border-color: transparent; background: #fff; }
+    .q { margin: 12px 0; }
+    .q > .ask { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+    .q > .ask small { font-weight: 400; color: var(--soft); }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+    .chips button { font: inherit; font-size: 14px; border: 1px solid var(--edge); background: var(--bg); border-radius: 999px; padding: 5px 12px; cursor: pointer; color: var(--ink); }
+    .chips button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .check { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; border-top: 1px solid var(--hair); font-size: 15px; }
+    .check:first-of-type { border-top: 0; }
+    .check input { width: 20px; height: 20px; margin-top: 1px; flex: none; accent-color: var(--clay); }
+    .check.done span { color: var(--soft); text-decoration: line-through; }
+    .note { font-size: 14px; background: var(--wash); border-left: 3px solid var(--clay); padding: 8px 12px; border-radius: 0 8px 8px 0; margin: 8px 0; }
+    .links { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+    .links a { display: block; border: 1px solid var(--edge); border-radius: 10px; padding: 9px 12px; text-decoration: none; color: var(--ink); background: var(--bg); }
+    .links a b { display: block; font-size: 14px; }
+    .links a span { font-size: 13px; color: var(--soft); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 7px 8px; border-top: 1px solid var(--hair); vertical-align: top; }
+    th { font-size: 12px; color: var(--soft); text-transform: uppercase; letter-spacing: .04em; border-top: 0; }
+    .tw { overflow-x: auto; }
+    .route { border: 1px solid var(--edge); border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
+    .route.pick { border-color: var(--clay); box-shadow: 0 0 0 1px var(--clay); }
+    .route b { font-size: 15px; }
+    .route p { margin: 4px 0 0; font-size: 14px; color: var(--soft); }
+    .foot { color: var(--soft); font-size: 13px; padding: 10px 0 40px; }
+    @media print { .vb-top { position: static; } .vb-toc, .noprint { display: none; } section { break-inside: avoid; } textarea { border: 0; } }
+  </style>
+</head>
+<body class="vb">
+<header class="vb-top">
+  <div class="vb-wrap">
+    <div class="vb-bar">
+      <a href="/cpa">← CPA</a>
+      <span class="vb-save" id="save">Saved on this device</span>
+    </div>
+    <h1>Vibrations Ohana · moving to California</h1>
+    <p class="vb-sub">Murat · Mon 23 Nov, 1:00 pm · Vibrations, International Market Place</p>
+    <nav class="vb-toc">
+      <a href="#agenda">Agenda</a><a href="#facts">Facts</a><a href="#move">1 · Moving to CA</a><a href="#names">Name check</a><a href="#state">State info</a><a href="#tax">Tax</a><a href="#owners">2 · 50/50</a><a href="#services">3 · CPA services</a><a href="#wrap">Decisions</a>
+    </nav>
+  </div>
+</header>
+
+<main class="vb-wrap">
+
+<section id="agenda">
+  <h2>Today's three</h2>
+  <p class="lede">Tick as you cover them. These sync to the meeting's agenda in /cpa.</p>
+  <div id="agendaList"></div>
+</section>
+
+<section id="facts">
+  <h2>The facts</h2>
+  <p class="lede">Fill in as they answer. Everything saves as you type.</p>
+  <div class="grid">
+    <div><label>Legal name (Hawaii LLC)</label><input type="text" data-k="f_legal" placeholder="Vibrations Ohana LLC?"></div>
+    <div><label>Trade name / DBA</label><input type="text" data-k="f_dba"></div>
+    <div><label>Hawaii DCCA file #</label><input type="text" data-k="f_dcca"></div>
+    <div><label>EIN</label><input type="text" data-k="f_ein"></div>
+    <div><label>S election effective</label><input type="text" data-k="f_s" placeholder="year Form 2553 took effect"></div>
+    <div><label>Hawaii GE license #</label><input type="text" data-k="f_ge"></div>
+    <div><label>Hawaii withholding / UI accounts</label><input type="text" data-k="f_wh" placeholder="employees? payroll provider?"></div>
+    <div><label>Bank / merchant processor</label><input type="text" data-k="f_bank"></div>
+    <div><label>Hawaii store lease ends</label><input type="text" data-k="f_lease"></div>
+    <div><label>Last day open in Hawaii</label><input type="text" data-k="f_close"></div>
+    <div><label>California store address</label><input type="text" data-k="f_caaddr" placeholder="city + county"></div>
+    <div><label>CA store open since / opening</label><input type="text" data-k="f_caopen"></div>
+    <div><label>Who runs the CA store today?</label><input type="text" data-k="f_caentity" placeholder="this LLC? another entity? not open yet?"></div>
+    <div><label>Inventory & fixtures moving?</label><input type="text" data-k="f_inv"></div>
+    <div><label>Murat moving to CA on</label><input type="text" data-k="f_move" placeholder="date Hawaii residency ends"></div>
+    <div><label>Keeping a Hawaii home?</label><input type="text" data-k="f_home"></div>
+    <div><label>2026 revenue so far / expected</label><input type="text" data-k="f_rev"></div>
+    <div><label>Payroll: Murat's salary, other staff</label><input type="text" data-k="f_pay"></div>
+  </div>
+  <div class="q"><label>Anything else they said</label><textarea data-k="f_other"></textarea></div>
+</section>
+
+<section id="move">
+  <h2>1 · How to run the business from California</h2>
+  <p class="lede">The LLC is organized in Hawaii and taxed as an S corp. The store is closing in Hawaii and the business continues in California, and the owners are moving too.</p>
+
+  <div class="note">Confirm the city first. Notes from last week said Palm Springs (Riverside County); today you said Malibu (Los Angeles County). The county decides where the DBA is filed, the sales-tax rate and the city license.</div>
+  <div class="q"><div class="ask">California city</div>
+    <div class="chips" data-chip="m_city"><button>Malibu (LA County)</button><button>Palm Springs (Riverside County)</button><button>Other</button></div>
+    <input type="text" data-k="m_city_other" placeholder="if other, or exact address">
+  </div>
+
+  <h3>Three ways to do it</h3>
+  <div class="route" data-route="A"><b>A · Convert the Hawaii LLC into a California LLC</b> (my lean)
+    <p>One entity just changes its home state. Keeps the EIN, the S election, bank history and the books. California files the conversion as Articles of Organization – Conversion (LLC-1A); Hawaii's side ends the Hawaii registration. Federally this is a non-event. Only works if Hawaii law allows the outbound conversion, so confirm with DCCA first.</p></div>
+  <div class="route" data-route="B"><b>B · Keep the Hawaii LLC and register it in California as foreign</b>
+    <p>Fastest: one California filing (LLC-5). But they keep paying and filing in Hawaii every year (annual report, registered agent) for a company that no longer does business there. Fine as a stopgap if the CA store must open before the conversion clears.</p></div>
+  <div class="route" data-route="C"><b>C · Form a new California LLC and move the business into it</b>
+    <p>Clean slate, but new EIN, new Form 2553, new bank and merchant accounts, and moving the assets has to be planned so it isn't a taxable sale (depreciation recapture on fixtures). Then dissolve the Hawaii LLC. Most paperwork.</p></div>
+  <div class="q"><div class="ask">Route chosen</div>
+    <div class="chips" data-chip="m_route"><button>A · Convert</button><button>B · Foreign registration</button><button>C · New CA LLC</button><button>Undecided</button></div>
+  </div>
+
+  <h3>Steps for route A, in order</h3>
+  <div id="stepsList"></div>
+  <div class="q"><label>Notes on moving the business</label><textarea class="big" data-k="m_notes"></textarea></div>
+</section>
+
+<section id="names">
+  <h2>Name check: California resources</h2>
+  <p class="lede">In California the LLC name is cleared with the Secretary of State, but a trade name (DBA) is a Fictitious Business Name filed with the county where the business is, and it has to be published in a local paper for four weeks.</p>
+  <div class="links">
+    <a href="https://bizfileonline.sos.ca.gov/search/business" target="_blank" rel="noopener"><b>bizfile Online · business search</b><span>Is "Vibrations" taken as an entity name in CA?</span></a>
+    <a href="https://bizfileonline.sos.ca.gov/" target="_blank" rel="noopener"><b>bizfile Online · file</b><span>LLC-1A conversion, LLC-5 foreign registration, LLC-12, name reservation</span></a>
+    <a href="https://www.sos.ca.gov/business-programs/business-entities/name-availability" target="_blank" rel="noopener"><b>SOS name availability rules</b><span>What makes an LLC name available, and reserving one</span></a>
+    <a href="https://www.lavote.gov/home/county-clerk/fictitious-business-names" target="_blank" rel="noopener"><b>LA County · Fictitious Business Names</b><span>DBA search and filing (Malibu)</span></a>
+    <a href="https://www.rivcoacr.org/fictitious-business-names" target="_blank" rel="noopener"><b>Riverside County · Fictitious Business Names</b><span>DBA search and filing (Palm Springs)</span></a>
+    <a href="https://tmsearch.uspto.gov/" target="_blank" rel="noopener"><b>USPTO trademark search</b><span>Anyone holding "Vibrations" for retail goods?</span></a>
+    <a href="https://hbe.ehawaii.gov/documents/search.html" target="_blank" rel="noopener"><b>Hawaii business search (DCCA)</b><span>Pull the LLC's Hawaii record and trade names</span></a>
+  </div>
+  <div class="grid" style="margin-top:12px">
+    <div><label>CA SOS: "Vibrations…" available?</label><input type="text" data-k="n_sos"></div>
+    <div><label>County DBA search result</label><input type="text" data-k="n_dba"></div>
+    <div><label>USPTO result</label><input type="text" data-k="n_tm"></div>
+    <div><label>Hawaii trade names to cancel</label><input type="text" data-k="n_hi"></div>
+  </div>
+  <div class="q"><label>Name notes</label><textarea data-k="n_notes"></textarea></div>
+</section>
+
+<section id="state">
+  <h2>State information: Hawaii and California</h2>
+  <p class="lede">Does Hawaii's GE need to be unwound, and what does California have instead?</p>
+
+  <div class="note"><b>Short answer:</b> California has no GE tax. Its closest match is <b>sales and use tax</b>, run by CDTFA through a free seller's permit, collected from the customer at the register (a retail store is the textbook case). On top of that, the company pays California franchise tax as an S corp. So yes: close the Hawaii GE license once the last Hawaii sale is reported, and open a CDTFA seller's permit before the first California sale.</div>
+
+  <div class="tw"><table>
+    <tr><th></th><th>Hawaii (wind down)</th><th>California (set up)</th></tr>
+    <tr><td><b>Gross receipts / sales</b></td><td>GE tax on gross receipts, 4.5% on Oahu. Final G-45 for the last period, then the G-49 annual reconciliation, then close the license.</td><td>No GE tax. Sales tax via CDTFA seller's permit; rate depends on the exact address (look it up). Returns quarterly or annually as CDTFA assigns. Resale certificate for inventory bought to resell.</td></tr>
+    <tr><td><b>Entity tax</b></td><td>No entity-level income tax for an S corp (N-35 informational).</td><td>Form 100S: 1.5% of California net income, minimum $800 a year, due from the first year doing business there.</td></tr>
+    <tr><td><b>Registration</b></td><td>DCCA: end the Hawaii LLC (conversion out, or articles of termination), cancel trade names, close annual-report obligations.</td><td>SOS: LLC-1A (convert) or LLC-5 (foreign). Statement of Information (LLC-12) within 90 days, then every two years.</td></tr>
+    <tr><td><b>Payroll</b></td><td>Final HW-14 and HW-3, final DLIR unemployment report, close the accounts. Final HW-2s.</td><td>Register with EDD (DE 1, or e-Services). UI, ETT, SDI and PIT withholding; Murat's reasonable salary counts.</td></tr>
+    <tr><td><b>Local</b></td><td>—</td><td>City or county business license; seller's permit must be posted. Check the city.</td></tr>
+  </table></div>
+
+  <h3>Hawaii wind-down checklist</h3>
+  <div id="hiList"></div>
+  <h3>California set-up checklist</h3>
+  <div id="caList"></div>
+
+  <div class="links" style="margin-top:12px">
+    <a href="https://onlineservices.cdtfa.ca.gov/" target="_blank" rel="noopener"><b>CDTFA online services</b><span>Register for the seller's permit</span></a>
+    <a href="https://maps.cdtfa.ca.gov/" target="_blank" rel="noopener"><b>CDTFA tax rate lookup</b><span>Sales-tax rate for the store's address</span></a>
+    <a href="https://www.ftb.ca.gov/file/business/types/corporations/s-corporations.html" target="_blank" rel="noopener"><b>FTB · S corporations</b><span>100S, the 1.5% tax, $800 minimum</span></a>
+    <a href="https://edd.ca.gov/en/payroll_taxes/" target="_blank" rel="noopener"><b>EDD · payroll taxes</b><span>Employer registration</span></a>
+    <a href="https://hitax.hawaii.gov/" target="_blank" rel="noopener"><b>Hawaii Tax Online</b><span>Final G-45 / G-49, close GE and withholding</span></a>
+    <a href="https://hbe.ehawaii.gov/" target="_blank" rel="noopener"><b>Hawaii Business Express</b><span>DCCA filings for the LLC</span></a>
+  </div>
+  <div class="q"><label>State notes</label><textarea class="big" data-k="s_notes"></textarea></div>
+</section>
+
+<section id="tax">
+  <h2>Tax: Hawaii vs California</h2>
+  <p class="lede">As an S corp the profit passes through on the K-1, so what really changes is which state taxes Murat (and the new co-owner) personally, and the 1.5% California entity tax.</p>
+  <div class="tw"><table>
+    <tr><th></th><th>Hawaii</th><th>California</th></tr>
+    <tr><td><b>Entity return</b></td><td>N-35. File a final one for the year the business leaves.</td><td>100S with California K-1s. 1.5% tax, $800 minimum.</td></tr>
+    <tr><td><b>Owners, residents</b></td><td>Taxed on all income. Top rate 11%.</td><td>Taxed on all income. Top rate 13.3% (plus SDI on wages).</td></tr>
+    <tr><td><b>Move year</b></td><td>Part-year return (N-15): taxed on everything earned while a resident, then only on Hawaii-source income.</td><td>Part-year return (540NR): taxed on everything after becoming a resident, plus California-source income before.</td></tr>
+    <tr><td><b>K-1 income in the move year</b></td><td colspan="2">Hawaii-store profit is Hawaii-source; California-store profit is California-source. Dates of move, store closing and opening drive the split. Keep the books cleanly cut by store and date.</td></tr>
+    <tr><td><b>Worth a look</b></td><td>—</td><td>California's elective pass-through entity tax (PTET) can turn state tax into a deduction at the entity level. Run the numbers once the 2027 income is known.</td></tr>
+  </table></div>
+  <div class="q"><div class="ask">Residency facts for the move year</div>
+    <div class="grid">
+      <div><label>Date Murat leaves Hawaii</label><input type="text" data-k="t_leave"></div>
+      <div><label>Spouse / co-owner moving too?</label><input type="text" data-k="t_spouse"></div>
+      <div><label>CA driver's licence / voter reg / lease</label><input type="text" data-k="t_ties"></div>
+      <div><label>Hawaii ties kept (home, car, bank)</label><input type="text" data-k="t_hi"></div>
+    </div>
+  </div>
+  <div class="q"><label>Tax notes</label><textarea class="big" data-k="t_notes"></textarea></div>
+</section>
+
+<section id="owners">
+  <h2>2 · Adding owners so it's 50/50</h2>
+  <p class="lede">Today Murat owns 100%. The goal is 50/50.</p>
+  <div class="grid">
+    <div><label>Who is coming in?</label><input type="text" data-k="o_who" placeholder="name, relationship"></div>
+    <div><label>Their %</label><input type="text" data-k="o_pct" placeholder="50%"></div>
+    <div><label>US citizen or resident?</label><input type="text" data-k="o_us"></div>
+    <div><label>Gift, sale or new capital?</label><input type="text" data-k="o_how"></div>
+    <div><label>Effective date</label><input type="text" data-k="o_date" placeholder="Jan 1 keeps the K-1 split simple"></div>
+    <div><label>Will they work in the business / draw salary?</label><input type="text" data-k="o_work"></div>
+  </div>
+  <h3>What to watch</h3>
+  <div id="ownList"></div>
+  <div class="q"><label>Ownership notes</label><textarea class="big" data-k="o_notes"></textarea></div>
+</section>
+
+<section id="services">
+  <h2>3 · CPA and accounting services</h2>
+  <p class="lede">What they want from us going forward.</p>
+  <div class="q"><div class="ask">Services <small>(tap all that apply)</small></div>
+    <div class="chips multi" data-chip="c_svc"><button>Bookkeeping (monthly)</button><button>Payroll, CA</button><button>CA sales tax returns</button><button>Final Hawaii G-45 / G-49</button><button>Final N-35</button><button>1120-S + 100S</button><button>Personal returns (part-year HI / CA)</button><button>Entity conversion filings</button><button>Operating agreement (attorney)</button><button>Quarterly estimates</button><button>Advisory / tax planning</button></div>
+  </div>
+  <div class="grid">
+    <div><label>Books today (QBO? who?)</label><input type="text" data-k="c_books"></div>
+    <div><label>Payroll provider today</label><input type="text" data-k="c_payroll"></div>
+    <div><label>Fee quoted</label><input type="text" data-k="c_fee"></div>
+    <div><label>Start date</label><input type="text" data-k="c_start"></div>
+    <div><label>Documents they'll send</label><input type="text" data-k="c_docs" placeholder="operating agreement, 2553 acceptance, last returns, GE filings"></div>
+    <div><label>Engagement letter</label><input type="text" data-k="c_eng" placeholder="send via TaxDome by…"></div>
+  </div>
+  <div class="q"><label>Services notes</label><textarea data-k="c_notes"></textarea></div>
+</section>
+
+<section id="wrap">
+  <h2>Decisions and follow-ups</h2>
+  <p class="lede">These go straight into the meeting's Decisions and Follow-ups in /cpa.</p>
+  <div class="q"><label>Decisions</label><textarea class="big" data-k="decisions"></textarea></div>
+  <div class="q"><label>Follow-ups (who · what · by when)</label><textarea class="big" data-k="followups"></textarea></div>
+</section>
+
+<p class="foot">Not legal advice for the conversion filings: confirm Hawaii's outbound conversion with DCCA and have an attorney draft the amended operating agreement. Saved on this device as you type and to Notion (CPA Meetings) a moment later.</p>
+</main>
+
+<script>
+(function () {
+  var MEETING = "4218f469-b674-817e-9164-e2b0efad82bc";
+  var KEY = "oggi_vibrations_v1";
+  var AGENDA = ["1. Consulting: how to run the business from California", "2. Add two members so ownership is 50/50", "3. CPA and accounting services going forward"];
+  var LISTS = {
+    stepsList: ["Confirm Hawaii allows the LLC to convert out (DCCA) and get a certificate of good standing", "Clear the name in California (bizfile search) and reserve it if needed", "File LLC-1A (Articles of Organization – Conversion) with the CA Secretary of State", "File the Hawaii-side conversion / termination with DCCA", "Appoint a California agent for service of process", "File the Statement of Information (LLC-12) within 90 days", "Form 8822-B to the IRS for the new address (EIN and S election carry over)", "CDTFA seller's permit before the first California sale", "File the county DBA and publish it", "EDD employer account if anyone is paid in California", "City business license for the store", "Update bank, merchant processor, lease, insurance and vendors to the California entity"],
+    hiList: ["Last Hawaii sale date set", "Final G-45 for the last period", "G-49 annual reconciliation", "Close GE license on Hawaii Tax Online", "Final HW-14 / HW-3 and HW-2s, close withholding", "Final DLIR unemployment report, close UI account", "Cancel Hawaii trade names", "Final N-35 for the year the business leaves", "Hawaii lease, utilities, business insurance closed out"],
+    caList: ["Entity in good standing with CA Secretary of State", "Agent for service of process", "Statement of Information filed", "CDTFA seller's permit (posted in the store)", "Resale certificates to suppliers", "EDD employer registration", "County DBA filed and published", "City business license", "FTB: 100S calendar, $800 minimum paid by the 15th day of the 4th month", "Workers' comp policy if there are employees"],
+    ownList: ["S corp: one class of stock, so profits and distributions follow ownership 50/50, never side deals", "New owner must be a US citizen or resident (or eligible trust)", "Gift of 50%: Form 709 if over the annual exclusion, unless it's to a US-citizen spouse", "Sale of 50%: Murat reports gain on the half he sells", "Mid-year change: K-1 income is split per share per day, so a Jan 1 effective date is cleanest", "Amend the operating agreement (attorney): ownership, voting, buy-sell, distributions", "Update DCCA / CA SOS records and the bank signers", "Reasonable salary for any owner who works in the store"]
+  };
+  var FIELDS = [
+    ["Facts", ["f_legal","Legal name"],["f_dba","DBA"],["f_dcca","Hawaii DCCA #"],["f_ein","EIN"],["f_s","S election"],["f_ge","Hawaii GE #"],["f_wh","Withholding / UI"],["f_bank","Bank / processor"],["f_lease","Hawaii lease ends"],["f_close","Last day in Hawaii"],["f_caaddr","CA store"],["f_caopen","CA store opening"],["f_caentity","Who runs CA store"],["f_inv","Inventory / fixtures"],["f_move","Murat moves"],["f_home","Hawaii home"],["f_rev","Revenue"],["f_pay","Payroll"],["f_other","Other"]],
+    ["1 · Moving to California", ["m_city","City"],["m_city_other","City detail"],["m_route","Route"],["m_notes","Notes"]],
+    ["Name check", ["n_sos","CA SOS"],["n_dba","County DBA"],["n_tm","USPTO"],["n_hi","Hawaii trade names"],["n_notes","Notes"]],
+    ["State information", ["s_notes","Notes"]],
+    ["Tax", ["t_leave","Leaves Hawaii"],["t_spouse","Spouse / co-owner"],["t_ties","CA ties"],["t_hi","Hawaii ties kept"],["t_notes","Notes"]],
+    ["2 · Ownership 50/50", ["o_who","Who"],["o_pct","%"],["o_us","US citizen/resident"],["o_how","Gift / sale / capital"],["o_date","Effective"],["o_work","Works in business"],["o_notes","Notes"]],
+    ["3 · CPA services", ["c_svc","Services"],["c_books","Books"],["c_payroll","Payroll"],["c_fee","Fee"],["c_start","Start"],["c_docs","Docs"],["c_eng","Engagement"],["c_notes","Notes"]]
+  ];
+  var LIST_TITLES = { stepsList: "Route A steps done", hiList: "Hawaii wind-down done", caList: "California set-up done", ownList: "Ownership points covered" };
+
+  var st = {};
+  try { st = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { st = {}; }
+  st.v = st.v || {}; st.ck = st.ck || {}; st.ag = st.ag || [false, false, false];
+  var saveEl = document.getElementById("save");
+  function local() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function checklist(id, items, store) {
+    var box = document.getElementById(id);
+    box.innerHTML = items.map(function (t, i) { return '<label class="check"><input type="checkbox" data-i="' + i + '"><span>' + esc(t) + "</span></label>"; }).join("");
+    box.querySelectorAll("input").forEach(function (cb) {
+      var i = +cb.dataset.i; cb.checked = !!store()[i]; cb.parentNode.classList.toggle("done", cb.checked);
+      cb.addEventListener("change", function () { store()[i] = cb.checked; cb.parentNode.classList.toggle("done", cb.checked); changed(); });
+    });
+  }
+  function render() {
+    checklist("agendaList", AGENDA, function () { return st.ag; });
+    Object.keys(LISTS).forEach(function (id) { st.ck[id] = st.ck[id] || []; checklist(id, LISTS[id], function () { return st.ck[id]; }); });
+    document.querySelectorAll("[data-k]").forEach(function (el) { el.value = st.v[el.dataset.k] || ""; });
+    document.querySelectorAll("[data-chip]").forEach(function (g) {
+      var k = g.dataset.chip, multi = g.classList.contains("multi");
+      var cur = (st.v[k] || "").split(" · ").filter(Boolean);
+      if (!multi) cur = st.v[k] ? [st.v[k]] : [];
+      g.querySelectorAll("button").forEach(function (b) { b.type = "button"; b.classList.toggle("on", cur.indexOf(b.textContent) >= 0); });
+    });
+    var r = st.v.m_route || "";
+    document.querySelectorAll("[data-route]").forEach(function (d) { d.classList.toggle("pick", r.charAt(0) === d.dataset.route); });
+  }
+
+  document.addEventListener("input", function (e) { var k = e.target.dataset && e.target.dataset.k; if (k) { st.v[k] = e.target.value; changed(); } });
+  document.querySelectorAll("[data-chip]").forEach(function (g) {
+    g.addEventListener("click", function (e) {
+      var b = e.target.closest("button"); if (!b) return;
+      var k = g.dataset.chip;
+      if (g.classList.contains("multi")) {
+        var cur = (st.v[k] || "").split(" · ").filter(Boolean), i = cur.indexOf(b.textContent);
+        if (i >= 0) cur.splice(i, 1); else cur.push(b.textContent);
+        st.v[k] = cur.join(" · ");
+      } else st.v[k] = st.v[k] === b.textContent ? "" : b.textContent;
+      render(); changed();
+    });
+  });
+
+  function compile() {
+    var out = ["Worksheet: oggi.princellama.com/vibrations"];
+    FIELDS.forEach(function (sec) {
+      var lines = [];
+      sec.slice(1).forEach(function (f) { var v = (st.v[f[0]] || "").trim(); if (v) lines.push(f[1] + ": " + v); });
+      if (lines.length) out.push("", "## " + sec[0], lines.join("\n"));
+    });
+    Object.keys(LISTS).forEach(function (id) {
+      var done = LISTS[id].filter(function (_, i) { return st.ck[id] && st.ck[id][i]; });
+      if (done.length) out.push("", "## " + LIST_TITLES[id], done.map(function (t) { return "✓ " + t; }).join("\n"));
+    });
+    return out.join("\n");
+  }
+
+  var timer = null, inflight = false, again = false;
+  function changed() { st.t = Date.now(); local(); saveEl.textContent = "Saved on this device · syncing…"; saveEl.className = "vb-save"; clearTimeout(timer); timer = setTimeout(push, 1500); }
+  function push() {
+    if (inflight) { again = true; return; }
+    inflight = true;
+    var body = { notes: compile(), decisions: st.v.decisions || "", followups: st.v.followups || "", agenda: AGENDA.map(function (t, i) { return { t: t, done: !!st.ag[i] }; }) };
+    if (st.ag.every(Boolean)) body.status = "Held";
+    fetch("/api/cpa/meeting/" + MEETING, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "same-origin", body: JSON.stringify(body) })
+      .then(function (r) {
+        if (r.status === 401) throw new Error("Sign in to Oggi to sync");
+        if (!r.ok) throw new Error("Notion " + r.status);
+        saveEl.textContent = "Saved · Notion " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); saveEl.className = "vb-save ok";
+      })
+      .catch(function (e) { saveEl.textContent = "Saved on this device · " + e.message + " (will retry)"; saveEl.className = "vb-save err"; setTimeout(push, 15000); })
+      .then(function () { inflight = false; if (again) { again = false; push(); } });
+  }
+
+  // First open on a new device: rebuild from what's in Notion.
+  function hydrate(m) {
+    var labels = {}; FIELDS.forEach(function (sec) { sec.slice(1).forEach(function (f) { labels[sec[0] + "|" + f[1]] = f[0]; }); });
+    var cur = null, lastKey = null;
+    (m.notes || "").split("\n").forEach(function (line) {
+      var h = line.match(/^## (.+)$/); if (h) { cur = h[1]; lastKey = null; return; }
+      var listId = Object.keys(LIST_TITLES).filter(function (id) { return LIST_TITLES[id] === cur; })[0];
+      if (listId) { var i = LISTS[listId].indexOf(line.replace(/^✓ /, "")); if (i >= 0) { st.ck[listId] = st.ck[listId] || []; st.ck[listId][i] = true; } return; }
+      var kv = line.match(/^([^:]+): ([\s\S]*)$/), k = kv && labels[cur + "|" + kv[1]];
+      if (k) { st.v[k] = kv[2]; lastKey = k; } else if (lastKey) st.v[lastKey] += "\n" + line;
+    });
+    st.v.decisions = m.decisions || ""; st.v.followups = m.followups || "";
+    if (m.agenda) st.ag = AGENDA.map(function (t, i) { return !!(m.agenda[i] && m.agenda[i].done); });
+  }
+  render();
+  if (!st.t) {
+    fetch("/api/cpa", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      var m = d && (d.meetings || []).filter(function (x) { return x.id === MEETING; })[0];
+      if (m && !st.t) { hydrate(m); local(); render(); saveEl.textContent = "Loaded from Notion"; }
+    }).catch(function () {});
+  }
+})();
+</script>
+</body>
+</html>
