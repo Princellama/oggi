@@ -55,6 +55,29 @@
     .route b { font-size: 15px; }
     .route p { margin: 4px 0 0; font-size: 14px; color: var(--soft); }
     .foot { color: var(--soft); font-size: 13px; padding: 10px 0 40px; }
+
+    /* Route A plan */
+    .pl-filters { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px; }
+    .pl-filters button { font:inherit; font-size:13px; border:1px solid var(--edge); background:var(--bg); border-radius:999px; padding:5px 11px; cursor:pointer; color:var(--ink); }
+    .pl-filters button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+    .pl-prog { font-size:13px; color:var(--soft); margin:0 0 6px; }
+    .pl-bar { height:6px; background:var(--hair); border-radius:3px; overflow:hidden; margin-bottom:12px; }
+    .pl-bar i { display:block; height:100%; background:#3f7d4e; }
+    .pl-phase { margin:16px 0 4px; }
+    .pl-phase b { font-family:var(--serif); font-size:17px; } .pl-phase span { display:block; color:var(--soft); font-size:13px; }
+    .pl-it { display:grid; grid-template-columns:22px 92px 1fr; gap:4px 10px; padding:9px 0; border-top:1px solid var(--hair); }
+    .pl-it input { width:20px; height:20px; accent-color:var(--clay); margin-top:1px; }
+    .pl-date { font-size:13px; font-weight:600; color:var(--soft); padding-top:2px; }
+    .pl-t { font-size:15px; } .pl-it.done .pl-t { color:var(--soft); text-decoration:line-through; }
+    .pl-n { grid-column:3; font-size:13px; color:var(--soft); line-height:1.45; }
+    .pl-b { grid-column:3; display:flex; flex-wrap:wrap; gap:4px; }
+    .bd { display:inline-block; font-size:11px; line-height:1; padding:4px 7px; border-radius:999px; color:#fff; font-weight:600; letter-spacing:.02em; white-space:nowrap; }
+    .bd.p { background:#fff; border:1px solid currentColor; font-weight:500; }
+    .bd.s { background:#eee; color:#333; }
+    .pl-leg { display:flex; flex-wrap:wrap; gap:5px; margin:6px 0 2px; }
+    .pl-it.eric { background:linear-gradient(90deg, rgba(181,84,47,.06), transparent 60%); }
+    ul.pl-ul { margin:4px 0 0; padding-left:20px; font-size:14px; line-height:1.55; }
+    @media (max-width:560px) { .pl-it { grid-template-columns:22px 1fr; } .pl-date { grid-column:2; } .pl-t, .pl-n, .pl-b { grid-column:2; } }
     @media print { .vb-top { position: static; } .vb-toc, .noprint { display: none; } section { break-inside: avoid; } textarea { border: 0; } }
   </style>
 </head>
@@ -68,12 +91,33 @@
     <h1>Vibrations Ohana · moving to California</h1>
     <p class="vb-sub">Murat · Mon 23 Nov, 1:00 pm · Vibrations, International Market Place</p>
     <nav class="vb-toc">
-      <a href="#agenda">Agenda</a><a href="#facts">Facts</a><a href="#move">1 · Moving to CA</a><a href="#names">Name check</a><a href="#state">State info</a><a href="#tax">Tax</a><a href="#owners">2 · 50/50</a><a href="#services">3 · CPA services</a><a href="#wrap">Decisions</a>
+      <a href="#plan">Route A plan</a><a href="#routine">HI → CA routine</a><a href="#agenda">Agenda</a><a href="#facts">Facts</a><a href="#move">1 · Moving to CA</a><a href="#names">Name check</a><a href="#state">State info</a><a href="#tax">Tax</a><a href="#owners">2 · 50/50</a><a href="#services">3 · CPA services</a><a href="#wrap">Decisions</a>
     </nav>
   </div>
 </header>
 
 <main class="vb-wrap">
+
+<section id="plan">
+  <h2>Route A · timeline</h2>
+  <p class="lede">Murat Demirtas LLC (DBA Vibrations) converts from a Hawaii LLC to a California LLC, effective <b>Jan 1, 2027</b>. Same company, EIN, S election and trademark. You quarterback: the attorney writes the legal documents, Sterne Kessler handles the USPTO, you do the filings and the tax. Tick items as they're done; ticks sync to the meeting in /cpa.</p>
+  <p class="pl-prog" id="plProg"></p><div class="pl-bar"><i id="plBar"></i></div>
+  <div class="pl-filters" id="plFilters"></div>
+  <div class="pl-leg" id="plLegend"></div>
+  <div id="plList"></div>
+  <h3>Articles and governing documents</h3><ul class="pl-ul" id="plArticles"></ul>
+  <h3>What to cancel</h3><ul class="pl-ul" id="plCancel"></ul>
+  <div class="note"><b>Fee check (just for you):</b> $400 covers preparing and filing the LLC-1A and X-10, which is a few hours. Make that the line item in the engagement letter, and quote the rest separately: Hawaii wind-down filings (final G-45/G-49, HW-3, UC-B6, cancellations) about $500–800; California onboarding (CDTFA, EDD, FTB estimates, records updates) about $500–1,000; the new-member tax memo about $300–600; the 2026 two-state returns at your normal rates. Or one package at $2,000–3,000 with state fees passed through. The attorney bills the plan of conversion, the operating agreement and the trademark recording.</div>
+</section>
+
+<section id="routine">
+  <h2>How their routine changes: Hawaii → California</h2>
+  <p class="lede">The big one: there's no GE tax in California. Its place is taken by <b>sales tax</b>, which the store collects from the customer and pays over to CDTFA, plus a <b>1.5% / $800 company tax</b> that Hawaii never had.</p>
+  <div class="tw"><table id="plRoutine"></table></div>
+  <h3>Learning California sales tax (you've done GET, this is the CA version)</h3>
+  <ul class="pl-ul" id="plLearn"></ul>
+  <div class="note">Differences to keep in mind coming from GET: sales tax is on the <b>customer</b> and only on <b>taxable retail sales</b> (not on resale or most services); returns report gross sales, then subtract exempt and resale sales, and the local share is allocated to the selling location; a return is due even with no sales; trust-fund rules make responsible owners personally liable for unpaid tax.</div>
+</section>
 
 <section id="agenda">
   <h2>Today's three</h2>
@@ -250,124 +294,6 @@
 <p class="foot">Not legal advice for the conversion filings: confirm Hawaii's outbound conversion with DCCA and have an attorney draft the amended operating agreement. Saved on this device as you type and to Notion (CPA Meetings) a moment later.</p>
 </main>
 
-<script>
-(function () {
-  var MEETING = "4218f469-b674-817e-9164-e2b0efad82bc";
-  var KEY = "oggi_vibrations_v1";
-  var AGENDA = ["1. Consulting: how to run the business from California", "2. Add two members so ownership is 50/50", "3. CPA and accounting services going forward"];
-  var LISTS = {
-    stepsList: ["Confirm Hawaii allows the LLC to convert out (DCCA) and get a certificate of good standing", "Clear the name in California (bizfile search) and reserve it if needed", "File LLC-1A (Articles of Organization – Conversion) with the CA Secretary of State", "File the Hawaii-side conversion / termination with DCCA", "Appoint a California agent for service of process", "File the Statement of Information (LLC-12) within 90 days", "Form 8822-B to the IRS for the new address (EIN and S election carry over)", "CDTFA seller's permit before the first California sale", "File the county DBA and publish it", "EDD employer account if anyone is paid in California", "City business license for the store", "Update bank, merchant processor, lease, insurance and vendors to the California entity"],
-    hiList: ["Last Hawaii sale date set", "Final G-45 for the last period", "G-49 annual reconciliation", "Close GE license on Hawaii Tax Online", "Final HW-14 / HW-3 and HW-2s, close withholding", "Final DLIR unemployment report, close UI account", "Cancel Hawaii trade names", "Final N-35 for the year the business leaves", "Hawaii lease, utilities, business insurance closed out"],
-    caList: ["Entity in good standing with CA Secretary of State", "Agent for service of process", "Statement of Information filed", "CDTFA seller's permit (posted in the store)", "Resale certificates to suppliers", "EDD employer registration", "County DBA filed and published", "City business license", "FTB: 100S calendar, $800 minimum paid by the 15th day of the 4th month", "Workers' comp policy if there are employees"],
-    ownList: ["S corp: one class of stock, so profits and distributions follow ownership 50/50, never side deals", "New owner must be a US citizen or resident (or eligible trust)", "Gift of 50%: Form 709 if over the annual exclusion, unless it's to a US-citizen spouse", "Sale of 50%: Murat reports gain on the half he sells", "Mid-year change: K-1 income is split per share per day, so a Jan 1 effective date is cleanest", "Amend the operating agreement (attorney): ownership, voting, buy-sell, distributions", "Update DCCA / CA SOS records and the bank signers", "Reasonable salary for any owner who works in the store"]
-  };
-  var FIELDS = [
-    ["Facts", ["f_legal","Legal name"],["f_dba","DBA"],["f_dcca","Hawaii DCCA #"],["f_ein","EIN"],["f_s","S election"],["f_ge","Hawaii GE #"],["f_wh","Withholding / UI"],["f_bank","Bank / processor"],["f_lease","Hawaii lease ends"],["f_close","Last day in Hawaii"],["f_caaddr","CA store"],["f_caopen","CA store opening"],["f_caentity","Who runs CA store"],["f_inv","Inventory / fixtures"],["f_move","Murat moves"],["f_home","Hawaii home"],["f_rev","Revenue"],["f_pay","Payroll"],["f_other","Other"]],
-    ["1 · Moving to California", ["m_city","City"],["m_city_other","City detail"],["m_route","Route"],["m_notes","Notes"]],
-    ["Name check", ["n_sos","CA SOS"],["n_dba","County DBA"],["n_tm","USPTO"],["n_hi","Hawaii trade names"],["n_notes","Notes"]],
-    ["State information", ["s_notes","Notes"]],
-    ["Tax", ["t_leave","Leaves Hawaii"],["t_spouse","Spouse / co-owner"],["t_ties","CA ties"],["t_hi","Hawaii ties kept"],["t_notes","Notes"]],
-    ["2 · Ownership 50/50", ["o_who","Who"],["o_pct","%"],["o_us","US citizen/resident"],["o_how","Gift / sale / capital"],["o_date","Effective"],["o_work","Works in business"],["o_notes","Notes"]],
-    ["3 · CPA services", ["c_svc","Services"],["c_books","Books"],["c_payroll","Payroll"],["c_fee","Fee"],["c_start","Start"],["c_docs","Docs"],["c_eng","Engagement"],["c_notes","Notes"]]
-  ];
-  var LIST_TITLES = { stepsList: "Route A steps done", hiList: "Hawaii wind-down done", caList: "California set-up done", ownList: "Ownership points covered" };
-
-  var st = {};
-  try { st = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { st = {}; }
-  st.v = st.v || {}; st.ck = st.ck || {}; st.ag = st.ag || [false, false, false];
-  var saveEl = document.getElementById("save");
-  function local() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
-
-  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
-  function checklist(id, items, store) {
-    var box = document.getElementById(id);
-    box.innerHTML = items.map(function (t, i) { return '<label class="check"><input type="checkbox" data-i="' + i + '"><span>' + esc(t) + "</span></label>"; }).join("");
-    box.querySelectorAll("input").forEach(function (cb) {
-      var i = +cb.dataset.i; cb.checked = !!store()[i]; cb.parentNode.classList.toggle("done", cb.checked);
-      cb.addEventListener("change", function () { store()[i] = cb.checked; cb.parentNode.classList.toggle("done", cb.checked); changed(); });
-    });
-  }
-  function render() {
-    checklist("agendaList", AGENDA, function () { return st.ag; });
-    Object.keys(LISTS).forEach(function (id) { st.ck[id] = st.ck[id] || []; checklist(id, LISTS[id], function () { return st.ck[id]; }); });
-    document.querySelectorAll("[data-k]").forEach(function (el) { el.value = st.v[el.dataset.k] || ""; });
-    document.querySelectorAll("[data-chip]").forEach(function (g) {
-      var k = g.dataset.chip, multi = g.classList.contains("multi");
-      var cur = (st.v[k] || "").split(" · ").filter(Boolean);
-      if (!multi) cur = st.v[k] ? [st.v[k]] : [];
-      g.querySelectorAll("button").forEach(function (b) { b.type = "button"; b.classList.toggle("on", cur.indexOf(b.textContent) >= 0); });
-    });
-    var r = st.v.m_route || "";
-    document.querySelectorAll("[data-route]").forEach(function (d) { d.classList.toggle("pick", r.charAt(0) === d.dataset.route); });
-  }
-
-  document.addEventListener("input", function (e) { var k = e.target.dataset && e.target.dataset.k; if (k) { st.v[k] = e.target.value; changed(); } });
-  document.querySelectorAll("[data-chip]").forEach(function (g) {
-    g.addEventListener("click", function (e) {
-      var b = e.target.closest("button"); if (!b) return;
-      var k = g.dataset.chip;
-      if (g.classList.contains("multi")) {
-        var cur = (st.v[k] || "").split(" · ").filter(Boolean), i = cur.indexOf(b.textContent);
-        if (i >= 0) cur.splice(i, 1); else cur.push(b.textContent);
-        st.v[k] = cur.join(" · ");
-      } else st.v[k] = st.v[k] === b.textContent ? "" : b.textContent;
-      render(); changed();
-    });
-  });
-
-  function compile() {
-    var out = ["Worksheet: oggi.princellama.com/vibrations"];
-    FIELDS.forEach(function (sec) {
-      var lines = [];
-      sec.slice(1).forEach(function (f) { var v = (st.v[f[0]] || "").trim(); if (v) lines.push(f[1] + ": " + v); });
-      if (lines.length) out.push("", "## " + sec[0], lines.join("\n"));
-    });
-    Object.keys(LISTS).forEach(function (id) {
-      var done = LISTS[id].filter(function (_, i) { return st.ck[id] && st.ck[id][i]; });
-      if (done.length) out.push("", "## " + LIST_TITLES[id], done.map(function (t) { return "✓ " + t; }).join("\n"));
-    });
-    return out.join("\n");
-  }
-
-  var timer = null, inflight = false, again = false;
-  function changed() { st.t = Date.now(); local(); saveEl.textContent = "Saved on this device · syncing…"; saveEl.className = "vb-save"; clearTimeout(timer); timer = setTimeout(push, 1500); }
-  function push() {
-    if (inflight) { again = true; return; }
-    inflight = true;
-    var body = { notes: compile(), decisions: st.v.decisions || "", followups: st.v.followups || "", agenda: AGENDA.map(function (t, i) { return { t: t, done: !!st.ag[i] }; }) };
-    if (st.ag.every(Boolean)) body.status = "Held";
-    fetch("/api/cpa/meeting/" + MEETING, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "same-origin", body: JSON.stringify(body) })
-      .then(function (r) {
-        if (r.status === 401) throw new Error("Sign in to Oggi to sync");
-        if (!r.ok) throw new Error("Notion " + r.status);
-        saveEl.textContent = "Saved · Notion " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); saveEl.className = "vb-save ok";
-      })
-      .catch(function (e) { saveEl.textContent = "Saved on this device · " + e.message + " (will retry)"; saveEl.className = "vb-save err"; setTimeout(push, 15000); })
-      .then(function () { inflight = false; if (again) { again = false; push(); } });
-  }
-
-  // First open on a new device: rebuild from what's in Notion.
-  function hydrate(m) {
-    var labels = {}; FIELDS.forEach(function (sec) { sec.slice(1).forEach(function (f) { labels[sec[0] + "|" + f[1]] = f[0]; }); });
-    var cur = null, lastKey = null;
-    (m.notes || "").split("\n").forEach(function (line) {
-      var h = line.match(/^## (.+)$/); if (h) { cur = h[1]; lastKey = null; return; }
-      var listId = Object.keys(LIST_TITLES).filter(function (id) { return LIST_TITLES[id] === cur; })[0];
-      if (listId) { var i = LISTS[listId].indexOf(line.replace(/^✓ /, "")); if (i >= 0) { st.ck[listId] = st.ck[listId] || []; st.ck[listId][i] = true; } return; }
-      var kv = line.match(/^([^:]+): ([\s\S]*)$/), k = kv && labels[cur + "|" + kv[1]];
-      if (k) { st.v[k] = kv[2]; lastKey = k; } else if (lastKey) st.v[lastKey] += "\n" + line;
-    });
-    st.v.decisions = m.decisions || ""; st.v.followups = m.followups || "";
-    if (m.agenda) st.ag = AGENDA.map(function (t, i) { return !!(m.agenda[i] && m.agenda[i].done); });
-  }
-  render();
-  if (!st.t) {
-    fetch("/api/cpa", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
-      var m = d && (d.meetings || []).filter(function (x) { return x.id === MEETING; })[0];
-      if (m && !st.t) { hydrate(m); local(); render(); saveEl.textContent = "Loaded from Notion"; }
-    }).catch(function () {});
-  }
-})();
-</script>
+<script src="/vibrations.js"></script>
 </body>
 </html>

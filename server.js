@@ -1146,6 +1146,12 @@ app.get(["/vibrations", "/vibrations/"], (req, res) => {
   res.sendFile(path.join(__dirname, "private", "vibrations.html"));
 });
 
+app.get("/vibrations.js", (req, res) => {
+  if (!authed(req)) return res.status(401).end();
+  res.set("Cache-Control", "no-cache").type("application/javascript");
+  res.sendFile(path.join(__dirname, "private", "vibrations.js"));
+});
+
 // ---------- static ----------
 app.use(express.static(path.join(__dirname, "public"), {
   setHeaders(res, p) {

@@ -142,6 +142,8 @@ No database. Sign-in is a one-time emailed link (15 minutes), then a 90-day sign
 
 Meeting worksheet for Vibrations Ohana (Murat), the retail LLC moving from Hawaii to California, added 23 Nov 2026. Signed in only; the HTML lives in `private/` so it isn't served as a static file. Sections: today's three agenda items, facts, moving the business (routes A/B/C and the conversion steps), California name check links (bizfile, county FBN, USPTO), state information (Hawaii GE wind-down vs California sales tax and franchise tax), tax (HI vs CA, part-year, K-1), adding an owner to reach 50/50, CPA services, decisions and follow-ups. Typing saves to the device at once and, 1.5 s later, to its CPA Meetings row (`4218f469-b674-817e-9164-e2b0efad82bc`): Notes (compiled by section), Decisions, Follow-ups, Agenda; all three agenda items ticked sets Held. A new device with nothing saved rebuilds itself from that row.
 
+Route A plan (added 23 Nov 2026): the page opens with a filterable timeline of the Hawaii-to-California conversion (badges for parties, HI/CA/FED, CONFIRM, CANCEL, ARTICLES, ERIC CHECK-IN, DEADLINE), the articles and cancel lists, a Hawaii-to-California routine table and California sales-tax learning links. Ticks save like the other checklists ("Route A timeline done" in the row's Notes). The page script lives in `private/vibrations.js`, served signed-in at `/vibrations.js`, because the CSP blocks inline scripts. Account numbers stay in Notion, not in the repo.
+
 ## Run it locally
 
 ```
