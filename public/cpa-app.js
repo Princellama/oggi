@@ -447,7 +447,7 @@
     const ws = WORKSHEETS[String(c.id).replace(/-/g, "")];
     if (p === "loading") return '<div class="rm-card"><span class="lbl" style="margin-top:0">Plan</span><p class="quiet">Looking for a plan on the Notion page…</p></div>';
     const links = p && Array.isArray(p.links) ? p.links.filter((l) => l && /^https:\/\//.test(l.url || "")) : [];
-    const linksHtml = links.length ? '<div class="rm-card"><span class="lbl" style="margin-top:0">Links</span><ul class="rm-links">' +
+    const linksHtml = links.length ? '<div class="rm-card"><span class="lbl" style="margin-top:0">Links</span><ul class="rm-sites">' +
       links.map((l) => '<li><a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label || l.url) + "</a>" + (l.note ? '<span class="mt-sub"> · ' + esc(l.note) + "</span>" : "") + "</li>").join("") + "</ul></div>" : "";
     if (p && !Array.isArray(p.items) && links.length) return linksHtml;
     if (!p || !Array.isArray(p.items)) return ws ? '<div class="rm-card"><span class="lbl" style="margin-top:0">Worksheet</span><p><a class="btn" href="' + esc(ws) + '">Open the full worksheet</a></p></div>' : "";
