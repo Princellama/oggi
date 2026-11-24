@@ -76,6 +76,9 @@
     .bd.s { background:#eee; color:#333; }
     .pl-leg { display:flex; flex-wrap:wrap; gap:5px; margin:6px 0 2px; }
     .pl-it.eric { background:linear-gradient(90deg, rgba(181,84,47,.06), transparent 60%); }
+    .est td.a, .est th.a { text-align:right; white-space:nowrap; }
+    .est tr.tot td { font-weight:700; border-top:2px solid var(--ink); }
+    .est .disc { color:#3f7d4e; font-weight:600; }
     ul.pl-ul { margin:4px 0 0; padding-left:20px; font-size:14px; line-height:1.55; }
     @media (max-width:560px) { .pl-it { grid-template-columns:22px 1fr; } .pl-date { grid-column:2; } .pl-t, .pl-n, .pl-b { grid-column:2; } }
     @media print { .vb-top { position: static; } .vb-toc, .noprint { display: none; } section { break-inside: avoid; } textarea { border: 0; } }
@@ -91,7 +94,7 @@
     <h1>Vibrations Ohana · moving to California</h1>
     <p class="vb-sub">Murat · Mon 23 Nov, 1:00 pm · Vibrations, International Market Place · California store: 180 E Tahquitz Canyon Way, Palm Springs 92262</p>
     <nav class="vb-toc">
-      <a href="#plan">Route A plan</a><a href="#routine">HI → CA routine</a><a href="#agenda">Agenda</a><a href="#facts">Facts</a><a href="#move">1 · Moving to CA</a><a href="#names">Name check</a><a href="#state">State info</a><a href="#tax">Tax</a><a href="#owners">2 · 50/50</a><a href="#services">3 · CPA services</a><a href="#wrap">Decisions</a>
+      <a href="#plan">Route A plan</a><a href="#estimate">Estimate</a><a href="#routine">HI → CA routine</a><a href="#agenda">Agenda</a><a href="#facts">Facts</a><a href="#move">1 · Moving to CA</a><a href="#names">Name check</a><a href="#state">State info</a><a href="#tax">Tax</a><a href="#owners">2 · 50/50</a><a href="#services">3 · CPA services</a><a href="#wrap">Decisions</a>
     </nav>
   </div>
 </header>
@@ -107,7 +110,7 @@
   <div id="plList"></div>
   <h3>Articles and governing documents</h3><ul class="pl-ul" id="plArticles"></ul>
   <h3>What to cancel</h3><ul class="pl-ul" id="plCancel"></ul>
-  <div class="note"><b>Fee check (just for you):</b> $400 covers preparing and filing the LLC-1A and X-10, which is a few hours. Make that the line item in the engagement letter, and quote the rest separately: Hawaii wind-down filings (final G-45/G-49, HW-3, UC-B6, cancellations) about $500–800; California onboarding (CDTFA, EDD, FTB estimates, records updates) about $500–1,000; the new-member tax memo about $300–600; the 2026 two-state returns at your normal rates. Or one package at $2,000–3,000 with state fees passed through. The attorney bills the plan of conversion, the operating agreement and the trademark recording.</div>
+  <h3 id="estimate">Estimate</h3><div id="plEstimate"><p class="lede">Loads with the plan.</p></div>
 </section>
 
 <section id="routine">

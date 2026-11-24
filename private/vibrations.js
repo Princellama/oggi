@@ -42,7 +42,7 @@
   var FILTERS = [["all","All"],["HI","Hawaii"],["CA","California"],["FED","Federal"],["eric","Eric's check-ins"],["confirm","To confirm"],["cancel","To cancel"],["articles","Articles"],["open","Not done"]];
   function badge(label, color, cls) { return '<span class="bd' + (cls ? " " + cls : "") + '" style="' + (cls === "p" ? "color:" + color : "background:" + color) + '">' + esc(label) + "</span>"; }
   function renderPlan() {
-    if (!PLAN) { document.getElementById("plList").innerHTML = '<p class="lede">' + (planErr ? esc(planErr) : "Loading the plan from Notion…") + "</p>"; return; }
+    if (!PLAN) { var pe = document.getElementById("plEstimate"); if (pe && planErr) pe.innerHTML = ""; document.getElementById("plList").innerHTML = '<p class="lede">' + (planErr ? esc(planErr) : "Loading the plan from Notion…") + "</p>"; return; }
     var ck = st.ck.tlList = st.ck.tlList || [];
     document.getElementById("plFilters").innerHTML = FILTERS.map(function (f) { return '<button type="button" data-f="' + f[0] + '" class="' + (plFilter === f[0] ? "on" : "") + '">' + f[1] + "</button>"; }).join("");
     document.getElementById("plLegend").innerHTML = Object.keys(PLAN.flags).map(function (k) { return badge(PLAN.flags[k][0], PLAN.flags[k][1]); }).join("") + badge("HI", "", "s") + badge("CA", "", "s") + badge("FED", "", "s");
@@ -65,6 +65,18 @@
     document.getElementById("plArticles").innerHTML = PLAN.articles.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("");
     document.getElementById("plCancel").innerHTML = PLAN.cancel.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("");
     document.getElementById("plRoutine").innerHTML = "<tr><th></th><th>Hawaii (ending)</th><th>California (from Jan 1)</th></tr>" + PLAN.routines.map(function (r) { return "<tr><td><b>" + esc(r[0]) + "</b></td><td>" + esc(r[1]) + "</td><td>" + esc(r[2]) + "</td></tr>"; }).join("");
+    var E = PLAN.estimate, eb = document.getElementById("plEstimate");
+    if (E && eb) {
+      var $ = function (n) { return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+      eb.innerHTML = '<p class="lede">' + esc(E.no) + " · " + esc(E.date) + " · valid through " + esc(E.valid) + "<br><b>" + esc(E.status || "") + "</b>" + (E.file ? "<br>PDF: " + esc(E.file) : "") + "</p>" +
+        '<div class="tw"><table class="est"><tr><th>Service</th><th class="a">List</th></tr>' +
+        E.lines.map(function (l) { return "<tr><td>" + esc(l[0]) + '</td><td class="a">' + $(l[1]) + "</td></tr>"; }).join("") +
+        '<tr><td>Subtotal</td><td class="a">' + $(E.subtotal) + '</td></tr><tr class="disc"><td class="disc">' + esc(E.discount) + '</td><td class="a disc">−' + $(E.discountAmt) + "</td></tr>" +
+        '<tr><td>Professional fees</td><td class="a">' + $(E.fees) + "</td></tr><tr><td>State filing fees (" + esc(E.stateFeesNote || "") + ')</td><td class="a">' + $(E.stateFees) + "</td></tr>" +
+        '<tr class="tot"><td>Estimated total</td><td class="a">' + $(E.total) + "</td></tr></table></div>" +
+        (E.terms ? '<p class="pl-n">' + esc(E.terms) + "</p>" : "") + (E.excluded ? '<p class="pl-n">Not included: ' + esc(E.excluded) + "</p>" : "") +
+        (E.monthly ? '<h3>Monthly engagement (proposed)</h3><div class="tw"><table class="est">' + E.monthly.map(function (m) { return "<tr><td>" + esc(m[0]) + '</td><td class="a">' + esc(m[1]) + "</td></tr>"; }).join("") + "</table></div>" : "");
+    }
     document.getElementById("plLearn").innerHTML = PLAN.learn.map(function (l) { return '<li><a href="' + esc(l[1]) + '" target="_blank" rel="noopener">' + esc(l[0]) + "</a>: " + esc(l[2]) + "</li>"; }).join("");
   }
   document.getElementById("plFilters").addEventListener("click", function (e) { var b = e.target.closest("button"); if (!b) return; plFilter = b.dataset.f; renderPlan(); });

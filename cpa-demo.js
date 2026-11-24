@@ -52,6 +52,7 @@ async function clientPlan() {
     routines: [["Tax on sales", "Hawaii GET.", "California sales tax."]],
     learn: [["CDTFA classes", "https://cdtfa.ca.gov/tax-education/attend-class.aspx", "Free webinars."]],
     articles: ["Demo: California conversion form."], cancel: ["Demo: Hawaii GET license."],
+    estimate: { no: "DEMO-1", date: "Day 1", valid: "Day 15", status: "Demo estimate.", lines: [["Demo service A", 1000], ["Demo service B", 500]], subtotal: 1500, discount: "Demo discount 50%", discountAmt: 750, fees: 750, stateFees: 100, stateFeesNote: "demo", total: 850, terms: "Demo terms.", excluded: "Demo exclusions.", monthly: [["Demo monthly", "$100 / mo"]] },
   };
 }
 
