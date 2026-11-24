@@ -1048,6 +1048,13 @@ function cpaMeetingFields(b) {
 app.get("/api/cpa", requireAuth, wrap(async (req, res) => { res.set("Cache-Control", "no-store"); res.json(await cstore.getAll()); }));
 app.patch("/api/cpa/client/:id", requireAuth, wrap(async (req, res) => res.json(await cstore.updateClient(req.params.id, cpaClientFields(req.body)))));
 app.post("/api/cpa/client", requireAuth, wrap(async (req, res) => { const f = cpaClientFields(req.body); if (!f.name) throw bad("name"); res.json(await cstore.createClient({ status: "Active", ...f })); }));
+app.get("/api/cpa/client/:id/plan", requireAuth, wrap(async (req, res) => {
+  if (!/^[0-9a-f-]{32,36}$/i.test(req.params.id)) throw bad("id");
+  res.set("Cache-Control", "no-store");
+  const plan = await cstore.clientPlan(req.params.id);
+  if (!plan) return res.status(404).json({ error: "No plan on that client page" });
+  res.json(plan);
+}));
 app.patch("/api/cpa/meeting/:id", requireAuth, wrap(async (req, res) => res.json(await cstore.updateMeeting(req.params.id, cpaMeetingFields(req.body)))));
 app.post("/api/cpa/meeting", requireAuth, wrap(async (req, res) => { const f = cpaMeetingFields(req.body); if (!f.title) throw bad("title"); res.json(await cstore.createMeeting({ status: "Planned", type: "Ad hoc", ...f })); }));
 app.get(["/cpa", "/cpa/*"], (req, res) => {

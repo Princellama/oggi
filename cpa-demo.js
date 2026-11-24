@@ -38,4 +38,21 @@ async function createClient(f) { const r = { id: id(), url: null, services: [], 
 async function updateMeeting(rid, f) { return patch(state.meetings, rid, f); }
 async function createMeeting(f) { const r = { id: id(), url: null, status: "Planned", type: "Ad hoc", agenda: null, notes: "", decisions: "", followups: "", ...f }; state.meetings.push(r); return copy(r); }
 
-module.exports = { getAll, updateClient, createClient, updateMeeting, createMeeting };
+async function clientPlan() {
+  return {
+    parties: { cpa: ["Eric · CPA", "#b5542f"], own: ["Owners", "#2f5d8a"], sos: ["CA SOS", "#a8741a"], dcca: ["HI DCCA", "#2a7f62"] },
+    flags: { confirm: ["CONFIRM", "#b07d00"], cancel: ["CANCEL", "#b3261e"], articles: ["ARTICLES", "#6a4c93"], checkin: ["ERIC CHECK-IN", "#b5542f"], deadline: ["DEADLINE", "#222"], done: ["DONE", "#3f7d4e"] },
+    phases: [["now", "Now", "Demo plan: the real one loads from Notion."], ["dec", "December", "Paperwork."]],
+    items: [
+      { id: "t01", phase: "now", date: "Day 1", title: "Demo: strategy session held", who: ["cpa", "own"], st: "ALL", flags: ["done"], note: "", eric: false },
+      { id: "t02", phase: "now", date: "Day 2", title: "Demo: confirm the California registrations", who: ["cpa", "sos"], st: "CA", flags: ["confirm", "checkin"], note: "Sample note.", eric: true },
+      { id: "t03", phase: "dec", date: "Day 30", title: "Demo: file both conversion forms", who: ["cpa", "sos", "dcca"], st: "ALL", flags: ["articles", "deadline"], note: "", eric: true },
+      { id: "t04", phase: "dec", date: "Day 31", title: "Demo: cancel the Hawaii license", who: ["cpa", "dcca"], st: "HI", flags: ["cancel"], note: "", eric: true },
+    ],
+    routines: [["Tax on sales", "Hawaii GET.", "California sales tax."]],
+    learn: [["CDTFA classes", "https://cdtfa.ca.gov/tax-education/attend-class.aspx", "Free webinars."]],
+    articles: ["Demo: California conversion form."], cancel: ["Demo: Hawaii GET license."],
+  };
+}
+
+module.exports = { getAll, updateClient, createClient, updateMeeting, createMeeting, clientPlan };

@@ -88,4 +88,20 @@ async function createClient(f) { return toClient(await call("POST", "/pages", { 
 async function updateMeeting(id, f) { return toMeeting(await call("PATCH", `/pages/${id}`, { properties: meetingProps(f) })); }
 async function createMeeting(f) { return toMeeting(await call("POST", "/pages", { parent: { type: "data_source_id", data_source_id: DS.meetings }, properties: meetingProps(f) })); }
 
-module.exports = { getAll, updateClient, createClient, updateMeeting, createMeeting, DS };
+// A client's working plan (e.g. the Vibrations Route A timeline) lives in the first JSON code
+// block of its CPA Clients page body, so client details stay in Notion, not in the repo.
+async function clientPlan(id) {
+  let cursor;
+  do {
+    const res = await call("GET", `/blocks/${id}/children?page_size=100${cursor ? "&start_cursor=" + cursor : ""}`);
+    for (const b of res.results) {
+      if (b.type === "code") {
+        try { return JSON.parse((b.code.rich_text || []).map((t) => t.plain_text).join("")); } catch { return null; }
+      }
+    }
+    cursor = res.has_more ? res.next_cursor : null;
+  } while (cursor);
+  return null;
+}
+
+module.exports = { getAll, updateClient, createClient, updateMeeting, createMeeting, clientPlan, DS };
