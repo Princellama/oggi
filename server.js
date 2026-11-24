@@ -1021,6 +1021,7 @@ function cpaClientFields(b) {
   const f = {};
   if ("name" in b) { f.name = String(b.name || "").trim().slice(0, 140); if (!f.name) throw bad("name"); }
   if ("owner" in b) f.owner = String(b.owner || "").slice(0, 140);
+  if ("short" in b) { f.short = String(b.short || "").trim().slice(0, 24); if (f.short && !/^[\w .&'-]+$/.test(f.short)) throw bad("short"); }
   for (const [k, list] of [["entity", CPA.entity], ["cadence", CPA.cadence], ["status", CPA.cstatus]]) if (k in b) { if (b[k] && !list.includes(b[k])) throw bad(k); f[k] = b[k] || null; }
   if ("services" in b) f.services = (Array.isArray(b.services) ? b.services : []).filter((x) => CPA.services.includes(x));
   if ("through" in b) { if (!isDay(b.through || null)) throw bad("through"); f.through = b.through || null; }
@@ -1049,7 +1050,7 @@ app.get("/api/cpa", requireAuth, wrap(async (req, res) => { res.set("Cache-Contr
 app.patch("/api/cpa/client/:id", requireAuth, wrap(async (req, res) => res.json(await cstore.updateClient(req.params.id, cpaClientFields(req.body)))));
 app.post("/api/cpa/client", requireAuth, wrap(async (req, res) => { const f = cpaClientFields(req.body); if (!f.name) throw bad("name"); res.json(await cstore.createClient({ status: "Active", ...f })); }));
 app.get("/api/cpa/client/:id/plan", requireAuth, wrap(async (req, res) => {
-  if (!/^[0-9a-f-]{32,36}$/i.test(req.params.id)) throw bad("id");
+  if (!/^[\w-]{8,64}$/.test(req.params.id)) throw bad("id");
   res.set("Cache-Control", "no-store");
   const plan = await cstore.clientPlan(req.params.id);
   if (!plan) return res.status(404).json({ error: "No plan on that client page" });

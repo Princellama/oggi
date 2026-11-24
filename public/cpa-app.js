@@ -109,7 +109,7 @@
   }
 
   // ---------- tabs ----------
-  function tab() { const p = location.pathname.replace(/\/+$/, ""); return p.endsWith("/clients") ? "clients" : p.endsWith("/deadlines") ? "deadlines" : "meetings"; }
+  function tab() { const p = location.pathname.replace(/\/+$/, ""); return /\/clients(\/|$)/.test(p) ? "clients" : p.endsWith("/deadlines") ? "deadlines" : "meetings"; }
   document.getElementById("tabs").addEventListener("click", (e) => {
     const a = e.target.closest("a[data-tab]"); if (!a) return;
     e.preventDefault(); history.pushState(null, "", a.getAttribute("href")); showNew = null; render(); window.scrollTo(0, 0);
@@ -140,7 +140,7 @@
       "</div>" +
       (c.estimateCall ? '<span class="lbl">Estimate call</span><p class="estcall">' + esc(c.estimateCall) + "</p>" : "") +
       (watch.length ? '<span class="lbl">Needs attention</span><ul class="watch">' + watch.map((w) => "<li>" + esc(w) + "</li>").join("") + "</ul>" : "") +
-      '<p style="margin:10px 0 0"><a class="textlink" href="/cpa/clients#' + esc(c.id) + '">Edit client</a>' + (c.qbo ? ' · <a class="textlink" href="' + esc(c.qbo) + '" target="_blank" rel="noopener">QuickBooks</a>' : "") + "</p>" +
+      '<p style="margin:10px 0 0"><a class="textlink" href="' + esc(clientPath(c)) + '">Client page</a>' + (c.qbo ? ' · <a class="textlink" href="' + esc(c.qbo) + '" target="_blank" rel="noopener">QuickBooks</a>' : "") + "</p>" +
       "</div>";
   }
   function prepPrompt(m, c) {
@@ -334,6 +334,7 @@
         numField(c, "priorTax", "Prior-year total tax") + numField(c, "fedPaid", "Federal estimates paid") + numField(c, "statePaid", "Hawaii estimates paid") + numField(c, "withholding", "Withholding") +
         safeHarbor(c) +
       '</div><div>' +
+        '<label class="field">Short name (tile and link)<input type="text" data-cf="short" maxlength="24" value="' + esc(c.short || "") + '" placeholder="' + esc(codeOf(c)) + '"></label>' +
         '<div data-wrap><span class="lbl">Estimate call</span><textarea data-cf="estimateCall" placeholder="What to pay on the next voucher, and why">' + esc(c.estimateCall) + "</textarea></div>" +
         '<div data-wrap><span class="lbl">Needs attention (one per line)</span><textarea data-cf="watch" style="min-height:110px">' + esc(c.watch) + "</textarea></div>" +
         '<div data-wrap><span class="lbl">Notes</span><textarea data-cf="notes">' + esc(c.notes) + "</textarea></div>" +
@@ -346,23 +347,198 @@
     return '<form class="newform" id="newClient">' +
       '<label>Business or client name<input type="text" name="name" required maxlength="140"></label>' +
       '<label>Owner<input type="text" name="owner" maxlength="140"></label>' +
+      '<label>Short name (tile and link, e.g. JN)<input type="text" name="short" maxlength="24" pattern="[A-Za-z0-9 .&\'-]+"></label>' +
       '<label>Entity<select name="entity">' + ENTITIES.map((x) => "<option>" + esc(x) + "</option>").join("") + "</select></label>" +
       '<label>Cadence<select name="cadence">' + CADENCES.map((x) => "<option" + (x === "Quarterly" ? " selected" : "") + ">" + esc(x) + "</option>").join("") + "</select></label>" +
       '<div class="full cp-row"><button class="btn primary" type="submit">Add client</button><button class="btn" type="button" data-cancel>Cancel</button></div></form>';
   }
-  function renderClients() {
-    const list = data.clients.filter((c) => c.status !== "Former" && c.status !== "Prospect");
-    // Prospects: a proposal waiting on a yes. The Notion page holds the projection, market check and engagement letter.
-    const props = data.clients.filter((c) => c.status === "Prospect");
-    main.innerHTML = '<section class="cp-sec"><div class="cp-spread"><h2 class="cp-h2">Clients</h2><button class="btn" data-new="client">+ Add client</button></div>' +
-      (showNew === "client" ? newClientForm() : "") +
-      (list.length ? list.map(clientCard).join("") : '<p class="quiet">No clients yet.</p>') + "</section>" +
-      (props.length ? '<section class="cp-sec"><h2 class="cp-h2">Proposals</h2>' + props.map((c) =>
-        '<div class="dl"><div class="dl-d">Open</div><div><div class="dl-what">' + esc(c.name) + '</div><div class="dl-who">' +
-        esc([c.projectedNet != null ? "Year-1 net after tax reserve " + money(c.projectedNet) : "", c.notes || c.owner || ""].filter(Boolean).join(" · ")) + "</div></div>" +
-        (c.url ? '<a class="btn" href="' + esc(c.url) + '" target="_blank" rel="noopener">Open proposal</a>' : "") + "</div>").join("") + "</section>" : "");
-    if (location.hash) { const el = document.getElementById(location.hash.slice(1)); if (el) el.scrollIntoView(); }
+  // ---------- client room ----------
+  // One client at a time, made to sit open on the screen during a meeting: the pills switch clients
+  // (← → keys too), the meeting panel takes notes straight into the CPA Meetings row, Screen share hides
+  // what the client shouldn't see.
+  const WORKSHEETS = { "4228f469b67481e5ad82d75da19d3ac7": "/vibrations" }; // client row id → its own worksheet page
+  const plans = {}; // client id → plan JSON | false (none) | "loading"
+  let cur = null;
+  let shareMode = (() => { try { return localStorage.getItem("oggi_cpa_share") === "1"; } catch { return false; } })();
+  const remember = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+  document.body.classList.toggle("share", shareMode);
+
+  function roomList() {
+    const today = todayIso();
+    const nextOf = (c) => { const n = data.meetings.filter((m) => m.client === c.id && m.when && m.status !== "Cancelled" && dayOf(m.when) >= today).map((m) => dayOf(m.when)).sort()[0]; return n || "9999"; };
+    const active = data.clients.filter((c) => c.status === "Active" || c.status === "Paused").sort((a, b) => nextOf(a).localeCompare(nextOf(b)) || a.name.localeCompare(b.name));
+    const props = data.clients.filter((c) => c.status === "Prospect").sort((a, b) => a.name.localeCompare(b.name));
+    return { active, props, all: active.concat(props) };
   }
+  // Each client has a short code (Notion "Short name": Ekahi, VB, JN…) that is its link: /cpa/clients/vb.
+  const slugOf = (c) => String(c.short || String(c.name).replace(/^(dr\.?|the)\s+/i, "").split(/[\s(]/)[0] || c.id).toLowerCase().replace(/[^a-z0-9-]+/g, "");
+  const codeOf = (c) => c.short || shortName(c.name).replace(/^(Dr\.?|The)\s+/i, "").split(/[\s(]/)[0];
+  const clientPath = (c) => "/cpa/clients/" + encodeURIComponent(slugOf(c));
+  function slugFromPath() { const m = location.pathname.match(/\/clients\/([^/]+)\/?$/); return m ? decodeURIComponent(m[1]).toLowerCase() : ""; }
+  function pickCur(all) {
+    const h = decodeURIComponent(location.hash.slice(1));
+    const byHash = h && all.find((c) => c.id === h);
+    if (byHash) { history.replaceState(null, "", clientPath(byHash)); return byHash.id; } // old #id links
+    const slug = slugFromPath();
+    const hit = slug && (all.find((c) => slugOf(c) === slug) || all.find((c) => c.id === slug));
+    return hit ? hit.id : null;
+  }
+  function goClient(id) {
+    const c = clientOf(id); if (!c) return;
+    cur = id; showNew = null;
+    history.pushState(null, "", clientPath(c));
+    render(); window.scrollTo(0, 0);
+  }
+  const shortName = (n) => String(n).replace(/\s+(LLC|L\.L\.C\.|Inc\.?|Corp\.?|Co\.?)$/i, "");
+  // The meeting worth having open: today's or a recent one not yet filed, else the next one.
+  function roomMeeting(c) {
+    const today = todayIso();
+    const mine = data.meetings.filter((m) => m.client === c.id && m.status !== "Cancelled");
+    const live = mine.filter((m) => m.when && m.status !== "Followed up" && diffDays(today, dayOf(m.when)) >= 0 && diffDays(today, dayOf(m.when)) <= 3).sort((a, b) => String(b.when).localeCompare(String(a.when)))[0];
+    if (live) return { m: live, next: false };
+    const next = mine.filter((m) => !m.when || dayOf(m.when) > today).sort((a, b) => String(a.when || "9").localeCompare(String(b.when || "9")))[0];
+    return next ? { m: next, next: true } : { m: null, next: false };
+  }
+  function roomMeetingPanel(c) {
+    const { m, next } = roomMeeting(c);
+    const startBtn = (primary) => '<button type="button" class="btn' + (primary ? " clay" : "") + '" data-startnow="' + esc(c.id) + '">' + (primary ? "Start a meeting now" : "+ New meeting now") + "</button>";
+    if (!m) return '<div class="rm-card rm-empty"><span class="lbl">Meeting</span><p class="rm-big">No meeting on the books.</p><p class="mt-sub">Start one and take notes here; it saves to CPA Meetings in Notion.</p><div class="actions">' + startBtn(true) + '<button type="button" class="btn" data-schedule="' + esc(c.id) + '">Schedule the next ' + esc(c.cadence ? c.cadence.toLowerCase() : "") + " one</button></div></div>";
+    const ag = agendaOf(m);
+    const doneCount = ag.filter((x) => x.done).length;
+    const pct = ag.length ? Math.round((100 * doneCount) / ag.length) : 0;
+    return '<div class="rm-card rm-meet" data-mid="' + esc(m.id) + '">' +
+      '<div class="cp-spread"><span class="lbl" style="margin-top:0">' + (next ? "Next meeting" : "This meeting") + '</span><span class="chip t-' + esc(m.type) + '">' + esc(m.type) + "</span></div>" +
+      '<p class="rm-big">' + esc(m.title) + '</p><p class="mt-sub" style="margin:0 0 10px">' + esc(fmtWhen(m.when)) + "</p>" +
+      '<div class="steps" role="group" aria-label="Status">' + STEPS.map((s) => '<button type="button" data-status="' + esc(s) + '" aria-pressed="' + (m.status === s) + '">' + esc(s) + "</button>").join("") + "</div>" +
+      '<div class="actions">' +
+        (m.link ? '<a class="btn primary" href="' + esc(m.link) + '" target="_blank" rel="noopener">Join</a>' : "") +
+        '<button type="button" class="btn" data-print>⎙ Print to PDF</button>' +
+        '<a class="btn priv" href="' + esc(claude(prepPrompt(m, c))) + '" target="_blank" rel="noopener">Prep with Claude</a>' +
+        '<a class="btn priv" href="' + esc(claude(voicePrompt(m, c))) + '" target="_blank" rel="noopener">🎙 Voice notes</a>' +
+        '<a class="btn priv" href="' + esc(claude(filePrompt(m, c))) + '" target="_blank" rel="noopener">File with Claude</a>' +
+        (next ? startBtn(false) : "") +
+      "</div>" +
+      '<span class="lbl">Agenda · ' + doneCount + " of " + ag.length + " covered</span>" +
+      '<div class="meter rm-prog"><i style="width:' + pct + '%"></i></div>' +
+      '<ul class="agenda rm-agenda">' + ag.map((x, i) => '<li class="' + (x.done ? "done" : "") + '"><input type="checkbox" data-ag="' + i + '"' + (x.done ? " checked" : "") + ' aria-label="Covered"><span>' + esc(x.t) + '</span><button class="x" data-agdel="' + i + '" aria-label="Remove">×</button></li>').join("") + "</ul>" +
+      '<div class="addline"><input type="text" placeholder="Add an agenda item" data-agnew maxlength="160"><button class="btn" data-agadd>Add</button></div>' +
+      '<div data-wrap><span class="lbl">Notes</span><textarea class="rm-notes" data-mf="notes" placeholder="What came up">' + esc(m.notes) + "</textarea></div>" +
+      '<div data-wrap><span class="lbl">Decisions</span><textarea data-mf="decisions" placeholder="e.g. Pay $2,000 federal on the Jan 15 voucher">' + esc(m.decisions) + "</textarea></div>" +
+      '<div data-wrap><span class="lbl">Follow-ups (one per line)</span><textarea data-mf="followups" placeholder="Who does what by when">' + esc(m.followups) + "</textarea></div>" +
+      '<div class="cp-row" style="margin-top:10px"><label class="mt-sub" for="rm-type">Type</label><select id="rm-type" data-mtype style="width:auto">' + TYPES.map((t) => "<option" + (t === m.type ? " selected" : "") + ">" + esc(t) + "</option>").join("") + "</select>" +
+      '<label class="mt-sub" for="rm-when">When</label><input id="rm-when" type="datetime-local" data-mwhen style="width:auto" value="' + esc(localInput(m.when)) + '"></div>' +
+      "</div>";
+  }
+  function roomNumbers(c) {
+    const watch = (c.watch || "").split("\n").map((s) => s.trim()).filter(Boolean);
+    const margin = c.ytdRevenue ? Math.round((100 * (c.ytdNet || 0)) / c.ytdRevenue) : null;
+    const fig = (v, label) => '<div class="fig"><b>' + v + "</b><span>" + esc(label) + "</span></div>";
+    const hasFigs = c.ytdRevenue != null || c.ytdNet != null || c.projectedNet != null;
+    return '<div class="rm-card">' +
+      '<span class="lbl" style="margin-top:0">The numbers' + (c.through ? " · through " + esc(fmtDay(c.through, { month: "short", day: "numeric", year: "numeric" })) : "") + "</span>" +
+      (hasFigs ? '<div class="figs rm-figs">' + fig(money(c.ytdRevenue), "YTD revenue") + fig(money(c.ytdNet), "YTD net") + (margin != null ? fig(margin + "%", "Net margin") : "") + fig(money(c.projectedNet), "Projected full-year net") + "</div>" : '<p class="quiet">No figures yet. Add them under Edit details, or Prep with Claude from a P&L.</p>') +
+      (c.priorTax != null || c.fedPaid != null || c.statePaid != null ? '<span class="lbl">Estimates vs safe harbor</span>' + safeHarbor(c) : "") +
+      (c.estimateCall ? '<span class="lbl">Estimate call</span><p class="estcall">' + esc(c.estimateCall) + "</p>" : "") +
+      "</div>" +
+      (watch.length ? '<div class="rm-card priv"><span class="lbl" style="margin-top:0">Needs attention · just for you</span><ul class="watch">' + watch.map((w) => "<li>" + esc(w) + "</li>").join("") + "</ul></div>" : "");
+  }
+  function planHtml(c) {
+    const p = plans[c.id];
+    const ws = WORKSHEETS[String(c.id).replace(/-/g, "")];
+    if (p === "loading") return '<div class="rm-card"><span class="lbl" style="margin-top:0">Plan</span><p class="quiet">Looking for a plan on the Notion page…</p></div>';
+    if (!p || !Array.isArray(p.items)) return ws ? '<div class="rm-card"><span class="lbl" style="margin-top:0">Worksheet</span><p><a class="btn" href="' + esc(ws) + '">Open the full worksheet</a></p></div>' : "";
+    const isDone = (x) => (x.flags || []).includes("done");
+    const done = p.items.filter(isDone).length;
+    const open = p.items.filter((x) => !isDone(x)).slice(0, 5);
+    return '<div class="rm-card"><div class="cp-spread"><span class="lbl" style="margin-top:0">Plan · ' + done + " of " + p.items.length + " done</span>" + (ws ? '<a class="textlink" href="' + esc(ws) + '">Full worksheet →</a>' : "") + "</div>" +
+      '<div class="meter rm-prog"><i style="width:' + (p.items.length ? Math.round((100 * done) / p.items.length) : 0) + '%"></i></div>' +
+      '<ul class="rm-plan">' + open.map((x) => '<li><span class="rm-pd">' + esc(x.date || "") + "</span><span>" + esc(x.title) + "</span></li>").join("") + "</ul>" +
+      (p.items.length - done > open.length ? '<p class="mt-sub" style="margin:6px 0 0">and ' + (p.items.length - done - open.length) + " more</p>" : "") + "</div>";
+  }
+  function loadPlan(c) {
+    if (plans[c.id] !== undefined) return;
+    plans[c.id] = "loading";
+    fetch("/api/cpa/client/" + encodeURIComponent(c.id) + "/plan", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : false)).catch(() => false)
+      .then((p) => { plans[c.id] = p || false; const el = document.getElementById("rmPlan"); if (el && cur === c.id) el.innerHTML = planHtml(c); });
+  }
+  function roomHistory(c) {
+    const today = todayIso();
+    const { m: shown } = roomMeeting(c);
+    const past = data.meetings.filter((m) => m.client === c.id && m.status !== "Cancelled" && m !== shown && m.when && dayOf(m.when) <= today).sort((a, b) => String(b.when).localeCompare(String(a.when)));
+    if (!past.length) return "";
+    const pre = (label, s) => (String(s || "").trim() ? '<span class="lbl">' + esc(label) + '</span><p class="estcall">' + esc(String(s).trim()) + "</p>" : "");
+    return '<section class="cp-sec rm-hist"><h3 class="cp-h2" style="font-size:18px">Past meetings</h3>' + past.map((m) =>
+      '<details class="rm-past"><summary><b>' + esc(fmtDay(dayOf(m.when), { month: "short", day: "numeric", year: "numeric" })) + "</b> " + esc(m.title) + ' <span class="mt-sub">· ' + esc(m.status) + "</span></summary>" +
+      pre("Decisions", m.decisions) + pre("Follow-ups", m.followups) + '<div class="priv">' + pre("Notes", m.notes) + "</div>" +
+      '<p style="margin:8px 0 0"><button type="button" class="textlink" data-openmt="' + esc(m.id) + '">Open in Meetings</button></p></details>').join("") + "</section>";
+  }
+  function clientTile(c) {
+    const today = todayIso();
+    const mine = data.meetings.filter((m) => m.client === c.id && m.when && m.status !== "Cancelled");
+    const next = mine.filter((m) => dayOf(m.when) >= today).sort((x, y) => String(x.when).localeCompare(String(y.when)))[0];
+    const last = mine.filter((m) => dayOf(m.when) < today).sort((x, y) => String(y.when).localeCompare(String(x.when)))[0];
+    const isToday = next && dayOf(next.when) === today;
+    const open = (c.watch || "").split("\n").filter((x) => x.trim()).length;
+    return '<a class="ct' + (c.status === "Prospect" ? " prospect" : "") + (isToday ? " today" : "") + '" href="' + esc(clientPath(c)) + '" data-room="' + esc(c.id) + '">' +
+      '<span class="ct-code">' + esc(codeOf(c)) + "</span>" +
+      '<span class="ct-name">' + esc(c.name) + "</span>" +
+      '<span class="ct-meta">' + esc([c.entity, c.cadence].filter(Boolean).join(" · ")) + "</span>" +
+      '<span class="ct-when">' + (isToday ? "<b>Today " + esc(fmtWhen(next.when).split(" · ")[1] || "") + "</b>" : next ? "Next " + esc(fmtDay(dayOf(next.when), { month: "short", day: "numeric" })) : last ? "Last met " + esc(fmtDay(dayOf(last.when), { month: "short", day: "numeric" })) : "No meetings yet") +
+        (open ? '<span class="ct-flag priv">' + open + " to watch</span>" : "") + "</span>" +
+      "</a>";
+  }
+  function renderClients() {
+    const { active, props, all } = roomList();
+    cur = pickCur(all);
+    const c = clientOf(cur);
+    const share = '<label class="rm-toggle"><input type="checkbox" data-share' + (shareMode ? " checked" : "") + "> Screen share</label>";
+    if (!c) {
+      const missing = slugFromPath();
+      main.innerHTML = (missing ? '<p class="err">No client with the short name “' + esc(missing) + '”. Set it in Notion (CPA Clients → Short name).</p>' : "") +
+        '<div class="cp-spread rm-tools"><h2 class="cp-h2" style="margin:0">Clients</h2><div class="cp-row">' + share + '<button class="btn" data-new="client">+ Add client</button></div></div>' +
+        (showNew === "client" ? newClientForm() : "") +
+        (active.length ? '<div class="ct-grid">' + active.map(clientTile).join("") + "</div>" : '<p class="quiet">No clients yet. Add the first one.</p>') +
+        (props.length ? '<h3 class="ct-h">Proposals</h3><div class="ct-grid">' + props.map(clientTile).join("") + "</div>" : "");
+      return;
+    }
+    const i = all.findIndex((x) => x.id === c.id);
+    const nav = '<div class="cp-spread rm-tools"><a class="textlink rm-back" href="/cpa/clients" data-allclients>← All clients</a><div class="cp-row">' + share +
+      (all.length > 1 ? '<button type="button" class="rm-arrow" data-step="-1" aria-label="Previous client" title="' + esc(codeOf(all[(i - 1 + all.length) % all.length])) + ' (←)">‹</button><button type="button" class="rm-arrow" data-step="1" aria-label="Next client" title="' + esc(codeOf(all[(i + 1) % all.length])) + ' (→)">›</button>' : "") + "</div></div>";
+    const ws = WORKSHEETS[String(c.id).replace(/-/g, "")];
+    const { m: rm } = roomMeeting(c);
+    main.innerHTML = nav +
+      '<article class="rm" data-room-of="' + esc(c.id) + '">' +
+        '<header class="rm-head"><div>' +
+          '<p class="rm-kick"><span class="rm-code">' + esc(codeOf(c)) + "</span>" + esc([c.owner, c.entity, c.cadence && c.cadence + " meetings", c.status !== "Active" ? c.status : ""].filter(Boolean).join(" · ")) + "</p>" +
+          '<h2 class="rm-name">' + esc(c.name) + "</h2>" +
+          (c.services.length ? '<div class="rm-svcs">' + c.services.map((s) => '<span class="chip">' + esc(s) + "</span>").join("") + "</div>" : "") +
+        '</div><div class="rm-links">' +
+          (rm && rm.link ? '<a class="btn primary" href="' + esc(rm.link) + '" target="_blank" rel="noopener">Join meeting</a>' : "") +
+          (ws ? '<a class="btn" href="' + esc(ws) + '">Worksheet</a>' : "") +
+          (c.qbo ? '<a class="btn" href="' + esc(c.qbo) + '" target="_blank" rel="noopener">QuickBooks</a>' : "") +
+          (c.taxdome ? '<a class="btn" href="' + esc(c.taxdome) + '" target="_blank" rel="noopener">TaxDome</a>' : "") +
+          (c.url ? '<a class="btn priv" href="' + esc(c.url) + '" target="_blank" rel="noopener">' + (c.status === "Prospect" ? "Proposal" : "Notion") + "</a>" : "") +
+        "</div></header>" +
+        '<div class="rm-grid"><div>' + roomMeetingPanel(c) + '</div><div>' + roomNumbers(c) + '<div id="rmPlan">' + planHtml(c) + "</div>" +
+          (c.notes ? '<div class="rm-card priv"><span class="lbl" style="margin-top:0">About this client</span><p class="estcall">' + esc(c.notes) + "</p></div>" : "") +
+        "</div></div>" +
+        roomHistory(c) +
+        '<details class="rm-edit priv"' + (editOpen ? " open" : "") + "><summary>Edit details</summary>" + clientCard(c) + "</details>" +
+      "</article>";
+    loadPlan(c);
+  }
+  let editOpen = false;
+  main.addEventListener("toggle", (e) => { if (e.target.matches && e.target.matches(".rm-edit")) editOpen = e.target.open; }, true);
+  document.addEventListener("keydown", (e) => {
+    if (tab() !== "clients" || !cur || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
+    if (e.key === "Escape") { history.pushState(null, "", "/cpa/clients"); cur = null; render(); return; }
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const { all } = roomList(); if (!all.length) return;
+    const i = all.findIndex((x) => x.id === cur);
+    goClient(all[(i + (e.key === "ArrowRight" ? 1 : -1) + all.length) % all.length].id);
+  });
 
   // ---------- deadlines ----------
   function bizDay(s) { const d = parseDay(s); while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 1); return isoDay(d); }
@@ -434,6 +610,23 @@
     if (t.closest("[data-new]")) { showNew = t.closest("[data-new]").dataset.new; render(); return; }
     if (t.closest("[data-cancel]")) { showNew = null; render(); return; }
     const dlf = t.closest("[data-dlf]"); if (dlf) { dlFilter = dlf.dataset.dlf; render(); return; }
+    const room = t.closest("[data-room]"); if (room) { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); goClient(room.dataset.room); return; }
+    if (t.closest("[data-allclients]")) { e.preventDefault(); history.pushState(null, "", "/cpa/clients"); cur = null; showNew = null; render(); window.scrollTo(0, 0); return; }
+    const step = t.closest("[data-step]");
+    if (step) { const { all } = roomList(); if (!all.length) return; const i = all.findIndex((x) => x.id === cur); goClient(all[(i + Number(step.dataset.step) + all.length) % all.length].id); return; }
+    const omt = t.closest("[data-openmt]"); if (omt) { open = omt.dataset.openmt; history.pushState(null, "", "/cpa"); render(); window.scrollTo(0, 0); return; }
+    const sn = t.closest("[data-startnow]");
+    if (sn) {
+      const c = clientOf(sn.dataset.startnow); if (!c) return;
+      const type = c.status === "Active" && CAD_DAYS[c.cadence] ? nextType(c, todayIso()) : "Ad hoc";
+      sn.disabled = true;
+      try {
+        const m = await api("POST", "/api/cpa/meeting", { title: shortName(c.name) + " · " + fmtDay(todayIso(), { month: "short", day: "numeric" }), client: c.id, type, status: "Held", when: fromLocalInput(localInput(new Date().toISOString())) });
+        replace("meetings", m); render();
+        const n = main.querySelector(".rm-notes"); if (n) n.focus();
+      } catch (err) { alert(err.message); sn.disabled = false; }
+      return;
+    }
     const sched = t.closest("[data-schedule]");
     if (sched) {
       const c = clientOf(sched.dataset.schedule); if (!c) return;
@@ -443,7 +636,7 @@
       sched.disabled = true;
       try {
         const m = await api("POST", "/api/cpa/meeting", { title: c.name.replace(/\s+(LLC|Inc\.?|Corp\.?)$/i, "") + " " + type.toLowerCase() + " meeting", client: c.id, type, when });
-        replace("meetings", m); open = m.id; history.pushState(null, "", "/cpa"); render();
+        replace("meetings", m); open = m.id; if (tab() !== "clients") history.pushState(null, "", "/cpa"); render();
       } catch (err) { alert(err.message); sched.disabled = false; }
       return;
     }
@@ -467,6 +660,7 @@
   }
   main.addEventListener("change", async (e) => {
     const t = e.target;
+    if (t.matches("[data-share]")) { shareMode = t.checked; remember("oggi_cpa_share", shareMode ? "1" : "0"); document.body.classList.toggle("share", shareMode); return; }
     const card = t.closest("[data-mid]");
     if (card) {
       const m = data.meetings.find((x) => x.id === card.dataset.mid); if (!m) return;
@@ -480,6 +674,11 @@
       if (t.matches("[data-svc]")) {
         c.services = Array.from(cc.querySelectorAll("[data-svc]")).filter((x) => x.checked).map((x) => x.dataset.svc);
         try { replace("clients", await api("PATCH", "/api/cpa/client/" + c.id, { services: c.services })); } catch (err) { alert(err.message); }
+        return;
+      }
+      if (t.matches("input[type=text][data-cf]")) {
+        const k = t.dataset.cf; c[k] = t.value.trim();
+        try { replace("clients", await api("PATCH", "/api/cpa/client/" + c.id, { [k]: c[k] })); if (cur === c.id) history.replaceState(null, "", clientPath(clientOf(c.id))); render(); } catch (err) { alert(err.message); }
         return;
       }
       if (t.matches("select[data-cf], input[type=number][data-cf], input[type=date][data-cf]")) {
@@ -509,8 +708,8 @@
         const m = await api("POST", "/api/cpa/meeting", { client: c.id, type, when: fromLocalInput(fd.get("when")), title: fd.get("title") || c.name.replace(/\s+(LLC|Inc\.?|Corp\.?)$/i, "") + " " + type.toLowerCase() + " meeting", link: fd.get("link") || null });
         replace("meetings", m); open = m.id;
       } else if (f.id === "newClient") {
-        const c = await api("POST", "/api/cpa/client", { name: fd.get("name"), owner: fd.get("owner"), entity: fd.get("entity"), cadence: fd.get("cadence") });
-        replace("clients", c);
+        const c = await api("POST", "/api/cpa/client", { name: fd.get("name"), owner: fd.get("owner"), short: fd.get("short") || "", entity: fd.get("entity"), cadence: fd.get("cadence") });
+        replace("clients", c); showNew = null; goClient(c.id); return;
       }
       showNew = null; render();
     } catch (err) { alert(err.message); btn.disabled = false; }

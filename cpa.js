@@ -26,7 +26,7 @@ function toClient(pg) {
     through: read(p["Through"]), ytdRevenue: read(p["YTD revenue"]), ytdNet: read(p["YTD net"]), projectedNet: read(p["Projected net"]),
     priorTax: read(p["Prior-year tax"]), fedPaid: read(p["Fed estimates paid"]), statePaid: read(p["State estimates paid"]),
     withholding: read(p["Withholding"]), estimateCall: read(p["Estimate call"]) || "", watch: read(p["Watch"]) || "",
-    qbo: read(p["QBO"]), taxdome: read(p["TaxDome"]), notes: read(p["Notes"]) || "",
+    qbo: read(p["QBO"]), taxdome: read(p["TaxDome"]), notes: read(p["Notes"]) || "", short: read(p["Short name"]) || "",
   };
 }
 function parseAgenda(s) {
@@ -65,7 +65,7 @@ function clientProps(f) {
   if ("through" in f) o["Through"] = dateP(f.through);
   const nums = { ytdRevenue: "YTD revenue", ytdNet: "YTD net", projectedNet: "Projected net", priorTax: "Prior-year tax", fedPaid: "Fed estimates paid", statePaid: "State estimates paid", withholding: "Withholding" };
   for (const [k, name] of Object.entries(nums)) if (k in f) o[name] = { number: num(f[k]) };
-  const texts = { estimateCall: "Estimate call", watch: "Watch", notes: "Notes" };
+  const texts = { estimateCall: "Estimate call", watch: "Watch", notes: "Notes", short: "Short name" };
   for (const [k, name] of Object.entries(texts)) if (k in f) o[name] = text(f[k]);
   for (const [k, name] of [["qbo", "QBO"], ["taxdome", "TaxDome"]]) if (k in f) o[name] = { url: f[k] || null };
   return o;

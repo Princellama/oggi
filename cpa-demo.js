@@ -6,7 +6,7 @@ const copy = (x) => JSON.parse(JSON.stringify(x));
 
 const state = { clients: [], meetings: [] };
 const ekahi = {
-  id: id(), url: null, name: "Ekahi Solutions LLC", owner: "Erik Louis", entity: "S corp", cadence: "Quarterly",
+  id: id(), url: null, name: "Ekahi Solutions LLC", short: "Ekahi", owner: "Erik Louis", entity: "S corp", cadence: "Quarterly",
   services: ["Bookkeeping", "Payroll", "GE tax", "Estimates", "Business return", "Personal return"], status: "Active",
   through: iso(0), ytdRevenue: 213190.76, ytdNet: 48947.66, projectedNet: 65000, priorTax: null, fedPaid: null, statePaid: null, withholding: null,
   estimateCall: "Undecided. ~$8K tax on ~$65K, ~$4K with truck depreciation. Compare to 2025 tax and Q1–Q3 paid.",
@@ -14,12 +14,12 @@ const ekahi = {
   notes: "Pool cleaning and repair. Target margin 40%.",
 };
 const mori = {
-  id: id(), url: null, name: "Dr. Westley Mori", owner: "Westley Mori", entity: "Individual", cadence: "Annual",
+  id: id(), url: null, name: "Dr. Westley Mori", short: "Mori", owner: "Westley Mori", entity: "Individual", cadence: "Annual",
   services: ["Personal return", "GE tax"], status: "Active", through: null, ytdRevenue: null, ytdNet: null, projectedNet: null,
   priorTax: 18400, fedPaid: 9000, statePaid: 3000, withholding: 0, estimateCall: "", watch: "", qbo: null, taxdome: null, notes: "",
 };
 const prospect = {
-  id: id(), url: "https://www.notion.so/", name: "Kalani Clinic group (proposal)", owner: "Dr. Kalani", entity: null, cadence: "Monthly",
+  id: id(), url: "https://www.notion.so/", name: "Kalani Clinic group (proposal)", short: "Kalani", owner: "Dr. Kalani", entity: null, cadence: "Monthly",
   services: ["Payroll", "GE tax", "Business return"], status: "Prospect", through: null, ytdRevenue: null, ytdNet: null, projectedNet: 6153,
   priorTax: null, fedPaid: null, statePaid: null, withholding: null, estimateCall: "", watch: "", qbo: null, taxdome: null,
   notes: "Quote: $1,500/mo for 3 units; returns $4,500-6,000.",
