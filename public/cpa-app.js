@@ -446,6 +446,10 @@
     const p = plans[c.id];
     const ws = WORKSHEETS[String(c.id).replace(/-/g, "")];
     if (p === "loading") return '<div class="rm-card"><span class="lbl" style="margin-top:0">Plan</span><p class="quiet">Looking for a plan on the Notion page…</p></div>';
+    const links = p && Array.isArray(p.links) ? p.links.filter((l) => l && /^https:\/\//.test(l.url || "")) : [];
+    const linksHtml = links.length ? '<div class="rm-card"><span class="lbl" style="margin-top:0">Links</span><ul class="rm-links">' +
+      links.map((l) => '<li><a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label || l.url) + "</a>" + (l.note ? '<span class="mt-sub"> · ' + esc(l.note) + "</span>" : "") + "</li>").join("") + "</ul></div>" : "";
+    if (p && !Array.isArray(p.items) && links.length) return linksHtml;
     if (!p || !Array.isArray(p.items)) return ws ? '<div class="rm-card"><span class="lbl" style="margin-top:0">Worksheet</span><p><a class="btn" href="' + esc(ws) + '">Open the full worksheet</a></p></div>' : "";
     const isDone = (x) => (x.flags || []).includes("done");
     const done = p.items.filter(isDone).length;
@@ -453,7 +457,7 @@
     return '<div class="rm-card"><div class="cp-spread"><span class="lbl" style="margin-top:0">Plan · ' + done + " of " + p.items.length + " done</span>" + (ws ? '<a class="textlink" href="' + esc(ws) + '">Full worksheet →</a>' : "") + "</div>" +
       '<div class="meter rm-prog"><i style="width:' + (p.items.length ? Math.round((100 * done) / p.items.length) : 0) + '%"></i></div>' +
       '<ul class="rm-plan">' + open.map((x) => '<li><span class="rm-pd">' + esc(x.date || "") + "</span><span>" + esc(x.title) + "</span></li>").join("") + "</ul>" +
-      (p.items.length - done > open.length ? '<p class="mt-sub" style="margin:6px 0 0">and ' + (p.items.length - done - open.length) + " more</p>" : "") + "</div>";
+      (p.items.length - done > open.length ? '<p class="mt-sub" style="margin:6px 0 0">and ' + (p.items.length - done - open.length) + " more</p>" : "") + "</div>" + linksHtml;
   }
   function loadPlan(c) {
     if (plans[c.id] !== undefined) return;
