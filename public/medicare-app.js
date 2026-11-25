@@ -634,6 +634,7 @@
   // pn = plan name as Devoted spells it, rl = contract-plan, q = search). pn and rl are both required,
   // or the page drops back to its setup form. Honolulu County only; default plan year 2027.
   const DEVOTED_SEARCH = "https://www.devoted.com/search-providers/";
+  const DEVOTED_EYEWEAR = "https://providerdirectory.embossspecialty.com/";
   const DEVOTED_PLANS_HI = [ // 2027 Honolulu, as Devoted's own plan picker lists them
     ["H5397-004", "CORE 004 HI", "HMO"], ["H5397-001", "Giveback 001 HI", "HMO"], ["H5397-008", "Giveback Extras 008 HI", "HMO"],
     ["H5397-003", "C-SNP Plus 003 HI", "HMO"], ["H5397-006", "C-SNP Giveback Extras 006 HI", "HMO"],
@@ -666,7 +667,10 @@
     return h("div", { class: "dv-find" },
       h("p", { class: "dv-k", text: "Is their doctor in network? · 2027" }),
       q, plan,
-      h("div", { class: "mc-acts", style: "margin-top:4px" }, look, ask, ext(h("a", { class: "dv-plain", href: DEVOTED_SEARCH, text: "Open Search Providers" }))));
+      h("div", { class: "mc-acts", style: "margin-top:4px" }, look, ask, ext(h("a", { class: "dv-plain", href: DEVOTED_SEARCH, text: "Open Search Providers" }))),
+      // Devoted's HMO eyewear benefit runs through Emboss Specialty, which keeps its own directory.
+      h("p", { class: "dv-k", style: "margin-top:12px", text: "Eyewear on the HMO plans · 2027" }),
+      h("div", { class: "mc-acts" }, ext(h("a", { class: "dv-plain", href: DEVOTED_EYEWEAR, text: "Emboss eyewear provider search" }))));
   }
 
   // ---------------- carrier portals: the sites you sign in to ----------------
