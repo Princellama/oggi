@@ -223,3 +223,7 @@ body.jw {
 .jw-doc-b p { font: 15px/1.65 var(--sans); color: var(--jw-ink); margin: 14px 0 0; position: relative; padding-left: 30px; }
 .jw-doc-b p .n { position: absolute; left: 0; top: 1px; width: 21px; height: 21px; border-radius: 50%; background: rgba(111, 195, 192, .15); color: var(--jw-teal); font: 600 11.5px/21px var(--sans); text-align: center; }
 .jw-doc-b p b { color: var(--jw-teal); font-weight: 600; }
+
+/* presentations */
+.jw-intro { border-style: dashed; }
+.jw-pre { white-space: pre-wrap; font: 14px/1.6 var(--sans); color: var(--jw-ink); margin: 8px 0 0; opacity: .9; }

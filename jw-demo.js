@@ -7,6 +7,11 @@ const parts = [
   { id: "p2", name: "Sample assembly part", status: "Draft", event: "Circuit assembly", when: null, where: "Assembly hall", theme: "Sample theme, 10 minutes", link: null, order: 2,
     deliverables: "[x] Reply to accept\nPick interviewees\nDraft the part\nRehearsal", details: "Sample outline notes.\nQuestions:\n- One\n- Two" },
 ];
+const presentations = [
+  { id: "s0", name: "Why these topics", event: "Intro", theme: "A made-up intro line.", details: "Sample scripture and reasoning.", order: 0 },
+  { id: "s1", name: "Sample topic", event: "Sample season", when: new Date().toISOString().slice(0, 10), whenEnd: new Date(Date.now() + 5 * 864e5).toISOString().slice(0, 10), theme: "Sample article title", link: "https://example.com", details: "Opener:\nSample question?\n\nScripture: Sample 1:1", order: 1 },
+  { id: "s2", name: "Later topic", event: "Later season", theme: "Another article", details: "Sample outline.", order: 2 },
+];
 const items = [
   { id: "i1", key: "demo-jw", title: "Sample Kalihi task", place: "Kalihi", area: "Personal", status: "Open", sentence: "A made-up item for demo mode.", note: "", lastSeen: "2026-11-13" },
   { id: "i2", key: "demo-mail", title: "Read a sample letter", place: "Kalihi", status: "Open", sentence: "Came in by email.", link: "https://mail.google.com/mail/u/0/#inbox/x", sourcePhrase: "the email", note: "Read it, replying tomorrow", lastSeen: "2026-11-13" },
@@ -31,7 +36,7 @@ module.exports = {
   getPItem: async (id) => pitems.find((x) => x.id === id),
   updatePItem: async (id, f) => Object.assign(pitems.find((x) => x.id === id), f),
   getAccess: async () => HASH,
-  getAll: async () => ({ parts, items, literature: [{ id: "l1", item: "Sample tract", symbol: "T-0", language: "English", forWhom: "Kalihi English", quantity: 50, status: "Submitted", requested: "2026-11-13" }], events: [{ id: "e1", title: "Sample meeting", start: new Date(Date.now() + 864e5).toISOString().slice(0, 10) + "T13:00:00-10:00", where: "Kam IV", allDay: false }], projects: [project], alerts: [Object.assign({ projectId: "pr1" }, pitems[0])], due: [], dayId: null, errors: [] }),
-  getPart: async (id) => parts.find((p) => p.id === id),
-  updatePart: async (id, f) => Object.assign(parts.find((p) => p.id === id), f),
+  getAll: async () => ({ parts, items, literature: [{ id: "l1", item: "Sample tract", symbol: "T-0", language: "English", forWhom: "Kalihi English", quantity: 50, status: "Submitted", requested: "2026-11-13" }], events: [{ id: "e1", title: "Sample meeting", start: new Date(Date.now() + 864e5).toISOString().slice(0, 10) + "T13:00:00-10:00", where: "Kam IV", allDay: false }], presentations, projects: [project], alerts: [Object.assign({ projectId: "pr1" }, pitems[0])], due: [], dayId: null, errors: [] }),
+  getPart: async (id) => [...parts, ...presentations].find((p) => p.id === id),
+  updatePart: async (id, f) => Object.assign([...parts, ...presentations].find((p) => p.id === id), f),
 };

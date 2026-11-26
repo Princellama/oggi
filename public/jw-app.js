@@ -215,7 +215,7 @@
 
     main.append(h("header", { class: "jw-homehead" }, glyph(), h("div", null, h("h1", { class: "jw-title", text: "Kalihi" }),
       h("p", { class: "jw-sub", text: `${mine.length} on you · ${theirs.length} waiting on others · ${(D.projects || []).length} projects` }))));
-    main.append(jumpNav([["today", "Today"], ["mine", "On me", mine.length], ["theirs", "Waiting", theirs.length], ["projects", "Projects", (D.projects || []).length], ["parts", "Parts"], ["coming", "Calendar"], ["lit", "Literature"]]));
+    main.append(jumpNav([["today", "Today"], ["mine", "On me", mine.length], ["theirs", "Waiting", theirs.length], ["projects", "Projects", (D.projects || []).length], ["talk", "Presentations"], ["parts", "Parts"], ["coming", "Calendar"], ["lit", "Literature"]]));
     if (D.errors && D.errors.length) main.append(h("p", { class: "jw-err", text: `Couldn't read from Notion: ${D.errors.join(", ")}. Share those tables with the Oggi connection.` }));
 
     // Today: alerts, next three days, JW mail
@@ -251,6 +251,32 @@
     }
     if (!(D.projects || []).length) psec.append(h("p", { class: "jw-quiet", text: "No projects yet." }));
     main.append(psec);
+
+    // Field-service presentations: intro card, then each topic in season order; the one in season now is marked
+    const pres = (D.presentations || []).slice().sort((a, b) => a.order - b.order);
+    const intro = pres.filter((p) => p.event === "Intro"), topics = pres.filter((p) => p.event !== "Intro");
+    const t0 = today();
+    const inSeason = (p) => p.when && p.when.slice(0, 10) <= t0 && (p.whenEnd || p.when).slice(0, 10) >= t0;
+    const tsec = h("section", { class: "jw-sec", id: "talk" }, h("h2", { class: "jw-h", text: "Presentations" }));
+    for (const p of intro) tsec.append(h("div", { class: "jw-part jw-intro" }, h("h3", { class: "jw-name", text: p.name }), p.theme ? h("p", { class: "jw-p", text: p.theme }) : null, p.details ? h("pre", { class: "jw-pre", text: p.details }) : null));
+    for (const p of topics) {
+      const now = inSeason(p);
+      const card = h("div", { class: "jw-part" + (now ? " lead" : ""), id: "part-" + p.id });
+      const range = p.when ? fmtDay(p.when).replace(/, \d{4}$/, "") + (p.whenEnd ? " – " + fmtDay(p.whenEnd).replace(/, \d{4}$/, "") : "") : "";
+      card.append(h("div", { class: "jw-row" }, h("h3", { class: "jw-name", text: p.name }), now ? h("span", { class: "jw-chip next", text: "Use now" }) : null));
+      const meta = [p.event, range].filter(Boolean).join(" · ");
+      if (meta) card.append(h("p", { class: "jw-meta", text: meta }));
+      if (p.theme) card.append(h("p", { class: "jw-p", text: p.theme }));
+      if (p.details) { const d = h("details", { class: "jw-details" }, h("summary", { text: "Presentation" }), h("pre", { text: p.details })); if (now) d.open = true; card.append(d); }
+      card.append(replyBox(p.notes, (v) => api("PATCH", "/api/jw/part/" + p.id, { notes: v }).then((n) => { p.notes = n.notes; }), { label: "How it went", button: "How it went", placeholder: "What worked at the door, what to change. Claude reads this on the next run." }));
+      const links = h("div", { class: "jw-links" });
+      if (safeUrl(p.link)) links.append(ext(p.link, "Open the article ↗"));
+      if (safeUrl(p.url)) links.append(ext(p.url, "Edit in Notion ↗"));
+      if (links.childNodes.length) card.append(links);
+      tsec.append(card);
+    }
+    if (!pres.length) tsec.append(h("p", { class: "jw-quiet", text: "No presentations yet." }));
+    main.append(tsec);
 
     // Parts: the soonest one coming up, else the newest not given
     const parts = D.parts.slice().sort((a, b) => a.order - b.order);

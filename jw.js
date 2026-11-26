@@ -135,6 +135,14 @@ async function getParts() {
   });
   return rows.map(toPart);
 }
+// Field-service presentations: JW Parts rows with Kind "Presentation". Event "Intro" is the lead-in card.
+async function getPresentations() {
+  const rows = await queryAll(DS.parts, {
+    filter: { property: "Kind", select: { equals: "Presentation" } },
+    sorts: [{ property: "Order", direction: "ascending" }],
+  });
+  return rows.map(toPart);
+}
 async function getPart(id) { return toPart(await call("GET", `/pages/${id}`)); }
 async function updatePart(id, f) {
   const props = {};
@@ -172,11 +180,12 @@ async function getEvents(today) {
 async function getAll(today) {
   const errors = [];
   const safe = (name, p) => p.catch((e) => { console.error("jw", name, e.message); errors.push(name); return []; });
-  const [parts, items, literature, events, projects, alerts, due, dayId] = await Promise.all([
+  const [parts, items, literature, events, projects, alerts, due, dayId, presentations] = await Promise.all([
     safe("parts", getParts()), safe("items", getItems(today)), safe("literature", getLiterature()), safe("events", getEvents(today)), safe("projects", getProjects()),
     safe("alerts", getAlerts()), safe("due", getDue(today, 3)), getDayId(today).catch(() => null),
+    safe("presentations", getPresentations()),
   ]);
-  return { parts, items, literature, events, projects, alerts, due, dayId, errors };
+  return { parts, items, literature, events, projects, alerts, due, dayId, presentations, errors };
 }
 
 module.exports = { getAll, getAccess, getPart, updatePart, getProject, getPItem, updatePItem, DS };
