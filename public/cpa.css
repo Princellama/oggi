@@ -127,6 +127,12 @@
   #print .figs b { display: block; font-size: 13pt; font-variant-numeric: tabular-nums; }
   #print .figs span { font-size: 8.5pt; color: #6b6b66; }
   #print footer { margin-top: 18pt; font-size: 8.5pt; color: #8a8a84; }
+  #print ol { margin: 0; padding-left: 16pt; }
+  #print ol li { margin: 0 0 5pt; break-inside: avoid; }
+  #print table.lim { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+  #print table.lim th, #print table.lim td { text-align: left; vertical-align: top; padding: 3pt 5pt; border-top: 0.6pt solid #cfcfc8; }
+  #print table.lim th { width: 36%; font-weight: 600; }
+  #print table.lim tr { break-inside: avoid; }
 }
 
 /* client room: one client on screen during a meeting */

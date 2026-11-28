@@ -304,6 +304,38 @@
       .then((r) => (r.ok ? r.json() : false)).catch(() => false)
       .then((p) => { mplans[m.id] = p || false; if (tab() === "consulting") render(); });
   }
+  // Client handout: the takeaways from the talking points, the limits table, what was decided and next steps.
+  function printTakeaways(m) {
+    const p = mplans[m.id];
+    if (!p || p === "loading" || !Array.isArray(p.sections)) { alert("The talking points are still loading. Try again in a moment."); return; }
+    const c = clientOf(m.client);
+    const ch = m.choices || {};
+    const lines = (s2) => String(s2 || "").split("\n").map((x) => x.trim()).filter(Boolean);
+    const take = Array.isArray(p.takeaways) && p.takeaways.length ? p.takeaways : p.sections.filter((x) => x.kind === "talk").map((x) => (x.items || [])[0]).filter(Boolean);
+    const table = p.sections.find((x) => x.kind === "table");
+    const decided = (p.decisions || []).map((d) => { const a = ch[d.id] || {}; const v = [a.pick, a.note].filter(Boolean).join(" · "); return v ? "<li><b>" + esc(d.q) + ":</b> " + esc(v) + "</li>" : ""; }).join("");
+    const other = lines(m.decisions).filter((x) => !/:\s*$/.test(x));
+    const fu = lines(m.followups);
+    const html =
+      '<header><p class="kick">Meeting takeaways</p><h1>' + esc(m.title) + "</h1>" +
+      '<p class="meta">' + esc([c && c.owner, fmtWhen(m.when)].filter(Boolean).join(" · ")) + "</p>" +
+      (p.attendees ? '<p class="meta">With ' + esc(p.attendees.join(", ")) + "</p>" : "") + "</header>" +
+      (p.purpose ? '<p class="pre">' + esc(p.purpose) + "</p>" : "") +
+      "<h2>Key takeaways</h2><ol>" + take.map((x) => "<li>" + esc(x) + "</li>").join("") + "</ol>" +
+      (decided || other.length ? "<h2>What we decided</h2><ul>" + decided + other.map((x) => "<li>" + esc(x.replace(/^[-•]\s*/, "")) + "</li>").join("") + "</ul>" : "") +
+      (fu.length ? "<h2>Next steps</h2><ul>" + fu.map((x) => "<li>" + esc(x.replace(/^[-•]\s*/, "")) + "</li>").join("") + "</ul>" : "") +
+      (table ? "<h2>" + esc(table.title) + '</h2><table class="lim">' + table.items.map((r) => "<tr><th>" + esc(r[0]) + "</th><td>" + esc(r[1]) + "</td></tr>").join("") + "</table>" : "") +
+      "<footer>Prepared by Eric Barayuga, CPA · for discussion, not legal advice · trust documents should be prepared by an attorney</footer>";
+    let sheet = document.getElementById("print");
+    if (!sheet) { sheet = document.createElement("article"); sheet.id = "print"; document.body.appendChild(sheet); }
+    sheet.innerHTML = html;
+    const title = document.title;
+    document.title = (m.title + " - takeaways " + dayOf(m.when)).replace(/[\/\\:*?"<>|]+/g, "-");
+    document.body.classList.add("printing");
+    const done = () => { document.body.classList.remove("printing"); document.title = title; window.removeEventListener("afterprint", done); };
+    window.addEventListener("afterprint", done);
+    setTimeout(() => { window.print(); setTimeout(() => { if (!window.matchMedia("print").matches) done(); }, 1500); }, 50);
+  }
   function choicesPrint(m) {
     const p = mplans[m.id]; const ch = m.choices || {};
     if (!p || !Array.isArray(p.decisions)) return "";
@@ -350,7 +382,8 @@
       (planOk && p.purpose ? '<p class="cs-purpose">' + esc(p.purpose) + "</p>" : "") +
       '<div class="steps" role="group" aria-label="Status">' + STEPS.map((s2) => '<button type="button" data-status="' + esc(s2) + '" aria-pressed="' + (m.status === s2) + '">' + esc(s2) + "</button>").join("") + "</div>" +
       '<div class="actions">' + (m.link ? '<a class="btn primary" href="' + esc(m.link) + '" target="_blank" rel="noopener">Join</a>' : "") +
-        '<button type="button" class="btn" data-print>⎙ Print to PDF</button>' +
+        '<button type="button" class="btn primary" data-takeaways>⎙ Takeaways PDF</button>' +
+        '<button type="button" class="btn" data-print>⎙ Meeting notes PDF</button>' +
         '<a class="btn" href="' + esc(claude(voicePrompt(m, c))) + '" target="_blank" rel="noopener">🎙 Retrieve Voice Notes</a>' +
         (m.url ? '<a class="btn" href="' + esc(m.url) + '" target="_blank" rel="noopener">Notion</a>' : "") + "</div>" +
       '<div class="rm-grid"><div>' +
@@ -746,6 +779,7 @@
     if (card) {
       const m = data.meetings.find((x) => x.id === card.dataset.mid); if (!m) return;
       if (t.closest("[data-print]")) { printMeeting(m); return; }
+      if (t.closest("[data-takeaways]")) { printTakeaways(m); return; }
       const pick = t.closest("[data-pick]");
       if (pick) {
         const id = pick.closest("[data-dec]").dataset.dec; const cur0 = (m.choices || {})[id] || {};
