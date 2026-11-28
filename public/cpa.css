@@ -188,3 +188,33 @@ body.share .rm-toggle { color: var(--clay); font-weight: 600; }
   .rm-grid { grid-template-columns: 1fr; }
   .rm-name { font-size: 27px; }
 }
+
+/* ---------- consulting ---------- */
+.chip.t-Consulting { background: #F6E6EE; color: #8A3A62; }
+.cs-open { padding: 16px 18px; }
+.cs-open .rm-head { margin-bottom: 12px; }
+.cs-purpose { font-size: 15px; color: var(--ink); margin: 0 0 12px; line-height: 1.5; }
+.cs-sec > summary { cursor: pointer; list-style: none; }
+.cs-sec > summary::-webkit-details-marker { display: none; }
+.cs-h { font-family: var(--serif); font-weight: 600; font-size: 18px; color: var(--ink); }
+.cs-h::after { content: " ▾"; color: var(--grey); font-size: 13px; }
+.cs-sec:not([open]) .cs-h::after { content: " ▸"; }
+.cs-talk { margin: 10px 0 0; padding-left: 18px; }
+.cs-talk li { margin: 0 0 9px; font-size: 15px; line-height: 1.5; color: var(--ink); }
+.cs-faq { border-top: 1px solid var(--hair); padding: 9px 0; }
+.cs-faq:first-of-type { margin-top: 8px; }
+.cs-faq summary { cursor: pointer; font-weight: 600; font-size: 15px; color: var(--ink); }
+.cs-faq p { margin: 6px 0 0; font-size: 14.5px; line-height: 1.5; color: var(--soft); }
+.cs-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+.cs-table th, .cs-table td { text-align: left; vertical-align: top; padding: 7px 6px; border-top: 1px solid var(--hair); }
+.cs-table th { width: 38%; font-weight: 600; color: var(--ink); }
+.cs-table td { color: var(--soft); }
+.cs-box { border-top: 1px solid var(--hair); padding: 10px 0; }
+.cs-box:first-of-type { border-top: 0; }
+.cs-box.filled .cs-q::before { content: "✓ "; color: var(--sea); }
+.cs-q { margin: 0 0 6px; font-weight: 600; font-size: 14.5px; color: var(--ink); }
+.cs-opts { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; }
+.cs-opts button { border: 1px solid var(--hair); background: var(--bg); border-radius: 999px; padding: 5px 11px; font-size: 13.5px; color: var(--ink); cursor: pointer; }
+.cs-opts button[aria-pressed="true"] { background: var(--sea); border-color: var(--sea); color: #fff; }
+.cs-box input[type=text] { width: 100%; }
+@media (max-width: 760px) { .cs-open .rm-grid { grid-template-columns: 1fr; } }

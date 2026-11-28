@@ -24,10 +24,16 @@ const prospect = {
   priorTax: null, fedPaid: null, statePaid: null, withholding: null, estimateCall: "", watch: "", qbo: null, taxdome: null,
   notes: "Quote: $1,500/mo for 3 units; returns $4,500-6,000.",
 };
-state.clients.push(ekahi, mori, prospect);
+const family = {
+  id: id(), url: null, name: "Demo Family", short: "Demo", owner: "Parent One and Parent Two", entity: "Individual", cadence: "As needed",
+  services: ["Advisory"], status: "Prospect", through: null, ytdRevenue: null, ytdNet: null, projectedNet: null, priorTax: null, fedPaid: null, statePaid: null, withholding: null,
+  estimateCall: "", watch: "", qbo: null, taxdome: null, notes: "Consulting: trust and property tax.",
+};
+state.clients.push(ekahi, mori, prospect, family);
 state.meetings.push(
   { id: id(), url: null, title: "Ekahi Q3 review and year-end estimate", when: iso(0) + "T16:00:00.000-10:00", type: "Quarterly", status: "Prepped", link: "https://meet.google.com/", client: ekahi.id, agenda: null, notes: "", decisions: "", followups: "", brief: null },
   { id: id(), url: null, title: "Ekahi year-end: W-2s, Q4 estimate, 2027 plan", when: iso(66), type: "Year-end", status: "Planned", link: null, client: ekahi.id, agenda: null, notes: "", decisions: "", followups: "", brief: null },
+  { id: id(), url: null, title: "Demo family: trust and property tax", when: iso(0) + "T11:00:00.000-10:00", type: "Consulting", status: "Prepped", link: null, client: family.id, agenda: [{ t: "Goals for the house", done: false }, { t: "Step-up in basis", done: false }], notes: "Talking points summary.", decisions: "", followups: "", brief: null, choices: {} },
   { id: id(), url: null, title: "Ekahi Q2 check-in", when: iso(-36), type: "Quarterly", status: "Followed up", link: null, client: ekahi.id, agenda: [{ t: "YTD P&L", done: true }], notes: "Broke even for three months; expects Q3 stronger.", decisions: "Meet early November to decide the Q4 estimate.", followups: "Find the July/Sept QBO mismatch", brief: null },
 );
 
@@ -56,4 +62,10 @@ async function clientPlan() {
   };
 }
 
-module.exports = { getAll, updateClient, createClient, updateMeeting, createMeeting, clientPlan };
+const fs = require("fs");
+async function meetingPlan() {
+  // Demo: a sample consulting plan (generic content only).
+  try { return JSON.parse(fs.readFileSync(require("path").join(__dirname, "data", "consulting-demo.json"), "utf8")); } catch { return null; }
+}
+
+module.exports = { getAll, updateClient, createClient, updateMeeting, createMeeting, clientPlan, meetingPlan };

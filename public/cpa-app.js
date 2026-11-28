@@ -56,6 +56,7 @@
       "Planning ideas for the year",
     ],
     "Ad hoc": ["Purpose of the meeting", "Decisions", "Next steps"],
+    Consulting: ["Their goals", "Facts we need", "Options and trade-offs", "Decisions", "Next steps and who"],
   };
   const TYPES = Object.keys(TEMPLATES);
   const STEPS = ["Planned", "Prepped", "Held", "Followed up"];
@@ -109,7 +110,7 @@
   }
 
   // ---------- tabs ----------
-  function tab() { const p = location.pathname.replace(/\/+$/, ""); return /\/clients(\/|$)/.test(p) ? "clients" : p.endsWith("/deadlines") ? "deadlines" : "meetings"; }
+  function tab() { const p = location.pathname.replace(/\/+$/, ""); return /\/clients(\/|$)/.test(p) ? "clients" : p.endsWith("/deadlines") ? "deadlines" : /\/consulting(\/|$)/.test(p) ? "consulting" : "meetings"; }
   document.getElementById("tabs").addEventListener("click", (e) => {
     const a = e.target.closest("a[data-tab]"); if (!a) return;
     e.preventDefault(); history.pushState(null, "", a.getAttribute("href")); showNew = null; render(); window.scrollTo(0, 0);
@@ -121,7 +122,7 @@
     document.querySelectorAll("#tabs a").forEach((a) => a.setAttribute("aria-current", a.dataset.tab === t ? "page" : "false"));
     const due = deadlines(todayIso(), 30).filter((d) => d.date >= todayIso())[0];
     $("#nextdue").innerHTML = due ? "Next due <b>" + esc(fmtDay(due.date, { month: "short", day: "numeric" })) + "</b> · " + esc(due.what) : "";
-    if (t === "clients") renderClients(); else if (t === "deadlines") renderDeadlines(); else renderMeetings();
+    if (t === "clients") renderClients(); else if (t === "deadlines") renderDeadlines(); else if (t === "consulting") renderConsulting(); else renderMeetings();
   }
 
   // ---------- meetings ----------
@@ -199,7 +200,7 @@
       '<header><p class="kick">Meeting notes</p><h1>' + esc(m.title) + "</h1>" +
       '<p class="meta">' + esc([c ? c.name : "", c && c.owner, fmtWhen(m.when), m.type, m.status].filter(Boolean).join(" · ")) + "</p></header>" +
       (ag.length ? "<h2>Agenda</h2><ul class=\"ag\">" + ag.map((x) => '<li class="' + (x.done ? "done" : "") + '"><span class="box">' + (x.done ? "✓" : "") + "</span>" + esc(x.t) + "</li>").join("") + "</ul>" : "") +
-      block("Notes", m.notes) + list("Decisions", m.decisions) + list("Follow-ups", m.followups) +
+      choicesPrint(m) + block("Notes", m.notes) + list("Decisions", m.decisions) + list("Follow-ups", m.followups) +
       (c && (figs || c.estimateCall || c.watch) ? '<div class="client"><h2>' + esc(c.name) + (c.through ? " · figures through " + esc(fmtDay(c.through, { month: "short", day: "numeric", year: "numeric" })) : "") + "</h2>" +
         (figs ? '<div class="figs">' + figs + "</div>" : "") + block("Estimate call", c.estimateCall) + list("Needs attention", c.watch) + "</div>" : "") +
       '<footer>Printed ' + esc(printed) + "</footer>";
@@ -277,7 +278,7 @@
 
   function renderMeetings() {
     const today = todayIso();
-    const ms = data.meetings.filter((m) => m.status !== "Cancelled");
+    const ms = data.meetings.filter((m) => m.status !== "Cancelled" && m.type !== "Consulting");
     const upcoming = ms.filter((m) => !m.when || dayOf(m.when) >= today || (m.status !== "Followed up" && diffDays(today, dayOf(m.when)) <= 3)).sort((a, b) => String(a.when || "9").localeCompare(String(b.when || "9")));
     const past = ms.filter((m) => !upcoming.includes(m)).sort((a, b) => String(b.when).localeCompare(String(a.when)));
     if (open === null && upcoming[0]) open = upcoming[0].id;
@@ -289,6 +290,103 @@
       (owed.length ? '<section class="cp-sec"><h2 class="cp-h2">Due for a meeting</h2>' + owed.map((o) =>
         '<div class="dl"><div class="dl-d">' + esc(o.when ? fmtDay(o.when, { month: "short", day: "numeric" }) : "Now") + '</div><div><div class="dl-what">' + esc(o.c.name) + '</div><div class="dl-who">' + esc(o.c.cadence + " · " + o.why) + '</div></div><button class="btn" data-schedule="' + esc(o.c.id) + '">Schedule ' + esc(o.type.toLowerCase()) + "</button></div>").join("") + "</section>" : "") +
       '<section class="cp-sec"><h2 class="cp-h2">Past</h2>' + (past.length ? past.map((m) => meetingCard(m, false)).join("") : '<p class="quiet">None yet.</p>') + "</section>";
+  }
+
+  // ---------- consulting ----------
+  // Consulting meetings (Type "Consulting"): clients not on retainer. Each meeting's Notion page body
+  // holds a JSON plan {attendees, purpose, sections:[{title, kind: talk|faq|table, items}], decisions:[{id, q, options?|kind:"text"}]};
+  // the answers to the decision boxes save to the meeting's Choices property.
+  const mplans = {};
+  function loadMeetingPlan(m) {
+    if (mplans[m.id] !== undefined) return;
+    mplans[m.id] = "loading";
+    fetch("/api/cpa/meeting/" + encodeURIComponent(m.id) + "/plan", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : false)).catch(() => false)
+      .then((p) => { mplans[m.id] = p || false; if (tab() === "consulting") render(); });
+  }
+  function choicesPrint(m) {
+    const p = mplans[m.id]; const ch = m.choices || {};
+    if (!p || !Array.isArray(p.decisions)) return "";
+    const rows = p.decisions.map((d) => { const a = ch[d.id] || {}; const v = [a.pick, a.note].filter(Boolean).join(" · "); return "<li><b>" + esc(d.q) + ":</b> " + (v ? esc(v) : "<span style=\"color:#999\">—</span>") + "</li>"; }).join("");
+    return "<h2>Decisions made</h2><ul>" + rows + "</ul>";
+  }
+  function sectionHtml(sec, i) {
+    const items = Array.isArray(sec.items) ? sec.items : [];
+    let body = "";
+    if (sec.kind === "faq") body = items.map((x) => '<details class="cs-faq"><summary>' + esc(x[0]) + "</summary><p>" + esc(x[1]) + "</p></details>").join("");
+    else if (sec.kind === "table") body = '<table class="cs-table"><tbody>' + items.map((x) => "<tr><th>" + esc(x[0]) + "</th><td>" + esc(x[1]) + "</td></tr>").join("") + "</tbody></table>";
+    else body = '<ul class="cs-talk">' + items.map((x) => "<li>" + esc(x) + "</li>").join("") + "</ul>";
+    return '<details class="rm-card cs-sec"' + (i < 2 ? " open" : "") + '><summary class="cs-h">' + esc(sec.title) + "</summary>" + body + "</details>";
+  }
+  function decisionBoxes(m, p) {
+    const ch = m.choices || {};
+    const done = p.decisions.filter((d) => { const a = ch[d.id]; return a && (a.pick || a.note); }).length;
+    return '<div class="rm-card cs-dec"><span class="lbl" style="margin-top:0">Decisions · ' + done + " of " + p.decisions.length + " filled</span>" +
+      p.decisions.map((d) => {
+        const a = ch[d.id] || {};
+        const opts = Array.isArray(d.options) ? d.options : [];
+        return '<div class="cs-box' + (a.pick || a.note ? " filled" : "") + '" data-dec="' + esc(d.id) + '"><p class="cs-q">' + esc(d.q) + "</p>" +
+          (opts.length ? '<div class="cs-opts" role="group">' + opts.map((o) => '<button type="button" data-pick="' + esc(o) + '" aria-pressed="' + (a.pick === o) + '">' + esc(o) + "</button>").join("") + "</div>" : "") +
+          '<input type="text" data-decnote maxlength="2000" placeholder="' + (opts.length ? "Note (optional)" : "Answer") + '" value="' + esc(a.note || "") + '"></div>';
+      }).join("") + "</div>";
+  }
+  function consultCard(m, isNext) {
+    const c = clientOf(m.client);
+    const d = dayOf(m.when);
+    if (open !== m.id) {
+      return '<article class="mt' + (isNext ? " next" : "") + (m.status === "Followed up" ? " done" : "") + '"><button class="mt-head" data-open="' + esc(m.id) + '" aria-expanded="false">' +
+        '<div class="mt-date">' + (d ? "<span>" + esc(fmtDay(d, { month: "short" })) + "</span><b>" + esc(fmtDay(d, { day: "numeric" })) + "</b>" : "<b>—</b>") + "</div>" +
+        '<div><p class="mt-title">' + esc(m.title) + '</p><div class="mt-sub">' + esc([c ? c.owner || c.name : "", fmtWhen(m.when), m.status].filter(Boolean).join(" · ")) + "</div></div>" +
+        '<span class="chip t-Consulting">Consulting</span></button></article>';
+    }
+    loadMeetingPlan(m);
+    const p = mplans[m.id];
+    const ag = agendaOf(m);
+    const planOk = p && p !== "loading" && Array.isArray(p.sections);
+    return '<article class="mt cs-open" data-mid="' + esc(m.id) + '">' +
+      '<div class="rm-head"><div><p class="rm-kick">' + esc(fmtWhen(m.when)) + (c ? " · " + esc(c.owner || c.name) : "") + '</p><h2 class="rm-name">' + esc(m.title) + "</h2>" +
+        (planOk && p.attendees ? '<p class="mt-sub">With ' + esc(p.attendees.join(", ")) + "</p>" : "") + "</div>" +
+        '<button class="btn" data-open="' + esc(m.id) + '">Close</button></div>' +
+      (planOk && p.purpose ? '<p class="cs-purpose">' + esc(p.purpose) + "</p>" : "") +
+      '<div class="steps" role="group" aria-label="Status">' + STEPS.map((s2) => '<button type="button" data-status="' + esc(s2) + '" aria-pressed="' + (m.status === s2) + '">' + esc(s2) + "</button>").join("") + "</div>" +
+      '<div class="actions">' + (m.link ? '<a class="btn primary" href="' + esc(m.link) + '" target="_blank" rel="noopener">Join</a>' : "") +
+        '<button type="button" class="btn" data-print>⎙ Print to PDF</button>' +
+        '<a class="btn" href="' + esc(claude(voicePrompt(m, c))) + '" target="_blank" rel="noopener">🎙 Retrieve Voice Notes</a>' +
+        (m.url ? '<a class="btn" href="' + esc(m.url) + '" target="_blank" rel="noopener">Notion</a>' : "") + "</div>" +
+      '<div class="rm-grid"><div>' +
+        (p === "loading" ? '<p class="quiet">Loading the talking points…</p>' : planOk ? p.sections.map(sectionHtml).join("") : '<div class="rm-card"><span class="lbl" style="margin-top:0">Notes to present</span><p class="pre">' + esc(m.notes || "Nothing prepped yet.") + "</p></div>") +
+      "</div><div>" +
+        '<div class="rm-card"><span class="lbl" style="margin-top:0">Agenda</span><ul class="agenda rm-agenda">' + ag.map((x, i) => '<li class="' + (x.done ? "done" : "") + '"><input type="checkbox" data-ag="' + i + '"' + (x.done ? " checked" : "") + ' aria-label="Covered"><span>' + esc(x.t) + '</span><button class="x" data-agdel="' + i + '" aria-label="Remove">×</button></li>').join("") + "</ul>" +
+        '<div class="addline"><input type="text" placeholder="Add an agenda item" data-agnew maxlength="160"><button class="btn" data-agadd>Add</button></div></div>' +
+        (planOk && Array.isArray(p.decisions) && p.decisions.length ? decisionBoxes(m, p) : "") +
+        '<div class="rm-card"><div data-wrap><span class="lbl" style="margin-top:0">Other decisions</span><textarea data-mf="decisions">' + esc(m.decisions) + "</textarea></div>" +
+        '<div data-wrap><span class="lbl">Notes from the meeting</span><textarea data-mf="notes" class="rm-notes">' + esc(m.notes) + "</textarea></div>" +
+        '<div data-wrap><span class="lbl">Follow-ups (one per line)</span><textarea data-mf="followups" placeholder="Who does what by when">' + esc(m.followups) + "</textarea></div></div>" +
+      "</div></div></article>";
+  }
+  function newConsultForm() {
+    return '<form class="newform" id="newConsult">' +
+      '<label class="full">Client<select name="client" required>' + data.clients.filter((c) => c.status !== "Former").map((c) => '<option value="' + esc(c.id) + '">' + esc(c.name) + "</option>").join("") + "</select></label>" +
+      '<label>When<input type="datetime-local" name="when" required></label>' +
+      '<label class="full">Title<input type="text" name="title" maxlength="140" required placeholder="e.g. Family trust and property tax"></label>' +
+      '<div class="full cp-row"><button class="btn primary" type="submit">Add consulting meeting</button><button class="btn" type="button" data-cancel>Cancel</button></div></form>';
+  }
+  function renderConsulting() {
+    const today = todayIso();
+    const ms = data.meetings.filter((m) => m.type === "Consulting" && m.status !== "Cancelled");
+    const upcoming = ms.filter((m) => !m.when || dayOf(m.when) >= today || (m.status !== "Followed up" && diffDays(today, dayOf(m.when)) <= 3)).sort((a, b) => String(a.when || "9").localeCompare(String(b.when || "9")));
+    const past = ms.filter((m) => !upcoming.includes(m)).sort((a, b) => String(b.when).localeCompare(String(a.when)));
+    if ((open === null || !ms.some((m) => m.id === open)) && open !== "" && upcoming[0]) open = upcoming[0].id;
+    main.innerHTML =
+      '<section class="cp-sec"><div class="cp-spread"><h2 class="cp-h2">Consulting</h2><button class="btn" data-new="consult">+ New consulting meeting</button></div>' +
+      '<p class="mt-sub" style="margin:-4px 0 12px">Meetings with clients who aren\'t on retainer: what to present, and what they decided.</p>' +
+      (showNew === "consult" ? newConsultForm() : "") +
+      (upcoming.length ? upcoming.map((m, i) => consultCard(m, i === 0)).join("") : '<p class="quiet">Nothing scheduled.</p>') + "</section>" +
+      (past.length ? '<section class="cp-sec"><h2 class="cp-h2">Past</h2>' + past.map((m) => consultCard(m, false)).join("") + "</section>" : "");
+  }
+  async function saveChoice(m, id, patch) {
+    const ch = { ...(m.choices || {}) }; ch[id] = { ...(ch[id] || { pick: "", note: "" }), ...patch }; m.choices = ch;
+    replace("meetings", await api("PATCH", "/api/cpa/meeting/" + m.id, { choices: ch }));
   }
 
   // next meeting owed per client cadence
@@ -648,6 +746,13 @@
     if (card) {
       const m = data.meetings.find((x) => x.id === card.dataset.mid); if (!m) return;
       if (t.closest("[data-print]")) { printMeeting(m); return; }
+      const pick = t.closest("[data-pick]");
+      if (pick) {
+        const id = pick.closest("[data-dec]").dataset.dec; const cur0 = (m.choices || {})[id] || {};
+        const v = cur0.pick === pick.dataset.pick ? "" : pick.dataset.pick;
+        try { await saveChoice(m, id, { pick: v }); } catch (err) { alert(err.message); }
+        render(); return;
+      }
       const st = t.closest("[data-status]");
       if (st) { const prev = m.status; m.status = st.dataset.status; render(); try { replace("meetings", await api("PATCH", "/api/cpa/meeting/" + m.id, { status: m.status })); } catch (err) { m.status = prev; render(); alert(err.message); } return; }
       const del = t.closest("[data-agdel]");
@@ -698,6 +803,12 @@
       const m = data.meetings.find((x) => x.id === t.closest("[data-mid]").dataset.mid); const k = t.dataset.mf; m[k] = t.value;
       saveLater(m.id + k, async () => replace("meetings", await api("PATCH", "/api/cpa/meeting/" + m.id, { [k]: m[k] })), t);
     }
+    if (t.matches("[data-decnote]")) {
+      const m = data.meetings.find((x) => x.id === t.closest("[data-mid]").dataset.mid); const id = t.closest("[data-dec]").dataset.dec;
+      const ch = { ...(m.choices || {}) }; ch[id] = { ...(ch[id] || { pick: "", note: "" }), note: t.value }; m.choices = ch;
+      t.closest("[data-dec]").classList.toggle("filled", !!(ch[id].pick || ch[id].note));
+      saveLater(m.id + "choices", async () => replace("meetings", await api("PATCH", "/api/cpa/meeting/" + m.id, { choices: m.choices })), null);
+    }
     if (t.matches("textarea[data-cf]")) {
       const c = clientOf(t.closest("[data-cid]").dataset.cid); const k = t.dataset.cf; c[k] = t.value;
       saveLater(c.id + k, async () => replace("clients", await api("PATCH", "/api/cpa/client/" + c.id, { [k]: c[k] })), t);
@@ -710,6 +821,9 @@
       if (f.id === "newMeeting") {
         const c = clientOf(fd.get("client")); const type = fd.get("type");
         const m = await api("POST", "/api/cpa/meeting", { client: c.id, type, when: fromLocalInput(fd.get("when")), title: fd.get("title") || c.name.replace(/\s+(LLC|Inc\.?|Corp\.?)$/i, "") + " " + type.toLowerCase() + " meeting", link: fd.get("link") || null });
+        replace("meetings", m); open = m.id;
+      } else if (f.id === "newConsult") {
+        const m = await api("POST", "/api/cpa/meeting", { client: fd.get("client"), type: "Consulting", when: fromLocalInput(fd.get("when")), title: fd.get("title") });
         replace("meetings", m); open = m.id;
       } else if (f.id === "newClient") {
         const c = await api("POST", "/api/cpa/client", { name: fd.get("name"), owner: fd.get("owner"), short: fd.get("short") || "", entity: fd.get("entity"), cadence: fd.get("cadence") });

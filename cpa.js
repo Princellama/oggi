@@ -33,6 +33,10 @@ function parseAgenda(s) {
   if (!s) return null;
   try { const a = JSON.parse(s); return Array.isArray(a) ? a.filter((x) => x && typeof x.t === "string").map((x) => ({ t: x.t, done: !!x.done })) : null; } catch { return null; }
 }
+function parseChoices(s) {
+  if (!s) return {};
+  try { const o = JSON.parse(s); return o && typeof o === "object" && !Array.isArray(o) ? o : {}; } catch { return {}; }
+}
 function toMeeting(pg) {
   const p = pg.properties;
   const when = p["When"] && p["When"].date ? p["When"].date.start : null;
@@ -40,6 +44,7 @@ function toMeeting(pg) {
     id: pg.id, url: pg.url, title: read(p["Title"]) || "", when, type: read(p["Type"]) || "Ad hoc", status: read(p["Status"]) || "Planned",
     link: read(p["Link"]), client: (read(p["Client"]) || [])[0] || null, agenda: parseAgenda(read(p["Agenda"])),
     notes: read(p["Notes"]) || "", decisions: read(p["Decisions"]) || "", followups: read(p["Follow-ups"]) || "", brief: read(p["Brief item"]),
+    choices: parseChoices(read(p["Choices"])),
   };
 }
 
@@ -80,6 +85,7 @@ function meetingProps(f) {
   if ("client" in f) o["Client"] = { relation: f.client ? [{ id: f.client }] : [] };
   if ("agenda" in f) o["Agenda"] = text(f.agenda ? JSON.stringify(f.agenda) : "");
   for (const [k, name] of [["notes", "Notes"], ["decisions", "Decisions"], ["followups", "Follow-ups"]]) if (k in f) o[name] = text(f[k]);
+  if ("choices" in f) o["Choices"] = text(JSON.stringify(f.choices || {}));
   return o;
 }
 
@@ -88,9 +94,9 @@ async function createClient(f) { return toClient(await call("POST", "/pages", { 
 async function updateMeeting(id, f) { return toMeeting(await call("PATCH", `/pages/${id}`, { properties: meetingProps(f) })); }
 async function createMeeting(f) { return toMeeting(await call("POST", "/pages", { parent: { type: "data_source_id", data_source_id: DS.meetings }, properties: meetingProps(f) })); }
 
-// A client's working plan (e.g. the Vibrations Route A timeline) lives in the first JSON code
+// A client's working plan (or a consulting meeting's talking points and decision boxes) (e.g. the Vibrations Route A timeline) lives in the first JSON code
 // block of its CPA Clients page body, so client details stay in Notion, not in the repo.
-async function clientPlan(id) {
+async function pagePlan(id) {
   let cursor;
   do {
     const res = await call("GET", `/blocks/${id}/children?page_size=100${cursor ? "&start_cursor=" + cursor : ""}`);
@@ -104,4 +110,7 @@ async function clientPlan(id) {
   return null;
 }
 
-module.exports = { getAll, updateClient, createClient, updateMeeting, createMeeting, clientPlan, DS };
+const clientPlan = pagePlan;
+const meetingPlan = pagePlan;
+
+module.exports = { getAll, updateClient, createClient, updateMeeting, createMeeting, clientPlan, meetingPlan, DS };

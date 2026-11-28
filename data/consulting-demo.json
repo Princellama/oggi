@@ -1,0 +1,276 @@
+{
+ "attendees": [
+  "Parent One",
+  "Parent Two",
+  "Trust partner",
+  "Eric (tax)"
+ ],
+ "purpose": "Set up a trust for the house without losing the step-up in basis, and answer the family's questions on how the property is taxed now, at a sale, and when the children inherit.",
+ "sections": [
+  {
+   "title": "Open with this",
+   "kind": "talk",
+   "items": [
+    "The trust partner will walk through the trust. My job today is the tax side: making sure whatever we set up keeps the step-up in basis, so the kids don't inherit a large capital gains bill.",
+    "The one rule to remember: what you GIVE the kids while you're alive carries your old basis. What they INHERIT gets a fresh basis at the value on the day of death.",
+    "A revocable living trust keeps the step-up. An outright gift of the deed, or most irrevocable trusts, lose it. So the deed can move into the right kind of trust safely."
+   ]
+  },
+  {
+   "title": "Step-up in basis, in plain words",
+   "kind": "talk",
+   "items": [
+    "Basis is what you paid for the house plus improvements, minus depreciation taken on the rental part.",
+    "When the last owner dies, the house is revalued: the children's basis becomes the fair market value on the date of death (IRC §1014). The gain built up over the parents' lifetime is never taxed.",
+    "Example (not their numbers): bought for $200,000, worth $1,200,000 today. Gift it now and the kids' basis stays $200,000; if they sell for $1.2M they owe tax on $1,000,000 of gain: roughly $250,000–$310,000 between federal (15–20% plus 3.8% NIIT) and Hawaii (up to 7.25%). Inherit it and their basis is $1,200,000; sell soon after and the tax is about $0.",
+    "The rental part: depreciation taken lowers basis and is taxed at up to 25% when sold (unrecaptured §1250 gain). A step-up at death wipes that out too.",
+    "Married couple holding as joint tenants or tenants by the entirety: at the first death only the deceased spouse's half steps up. The second half steps up at the second death.",
+    "Hawaii is one of the few states with a Community Property Trust law (HRS ch. 510). A married couple who put the house in one can get a step-up on the WHOLE house at the first death. Worth asking the trust partner about."
+   ]
+  },
+  {
+   "title": "How to make sure the step-up happens",
+   "kind": "talk",
+   "items": [
+    "Keep ownership until death: the house must be in the parents' taxable estate. Holding it directly or in a revocable living trust both count.",
+    "Do not deed the house to the children now, and do not add them to the title as joint owners (that's a gift of part of the house, with carryover basis).",
+    "If an irrevocable trust is used (for example for Medicaid/long-term-care planning), it must be drafted so the house is still included in their estate (retained life estate or similar). Since 2023 the IRS says assets in an irrevocable trust that are outside the estate get no step-up (Rev. Rul. 2023-2).",
+    "A Hawaii transfer-on-death deed, or a life estate deed, also keeps the step-up; the trust partner picks the vehicle.",
+    "Keep records: purchase closing statement, improvement receipts, depreciation schedules for the rental. At death, get a date-of-death appraisal; that appraisal IS the children's basis."
+   ]
+  },
+  {
+   "title": "Sell or keep? (ask them)",
+   "kind": "talk",
+   "items": [
+    "Keep until both pass: best tax result. Kids inherit with stepped-up basis and can sell with little or no gain.",
+    "Sell while alive and it's their main home: up to $500,000 of gain excluded for a married couple ($250,000 single) if they lived there 2 of the last 5 years (§121). The rental part may not qualify, and depreciation is taxed.",
+    "Sell after one spouse dies: the surviving spouse has 2 years from the date of death to still use the $500,000 exclusion, on top of the half that stepped up.",
+    "Kids plan to sell after inheriting? Then the step-up is nearly everything. Kids plan to keep it as a rental? They start fresh depreciation from the stepped-up value.",
+    "Selling to a child below value is part sale, part gift: the gift part loses the step-up."
+   ]
+  },
+  {
+   "title": "Family LLC for the property",
+   "kind": "talk",
+   "items": [
+    "Like the a family LLC we set up: the LLC owns the property; family members own 'units' (shares) of the LLC instead of a piece of the deed.",
+    "Why: liability protection for the rental, one set of books, easy to pass ownership along in small pieces, an operating agreement that sets who decides and what happens if a child wants out.",
+    "Gifting units to the kids each year can use the annual exclusion ($19,000 per child per parent, $38,000 from a couple), and minority units are often valued at a discount.",
+    "The trade-off: every unit given away during life carries the old basis; no step-up on those units. Units the parents still own at death do step up (at the discounted value).",
+    "Better fit for the rental property than the home. Putting the home in an LLC can cost the Honolulu home exemption for real property tax, and can trigger the mortgage's due-on-sale clause.",
+    "The LLC can be owned by the parents' revocable trust, so the units still pass at death with a step-up.",
+    "Taxes: a multi-member LLC files a partnership return (Form 1065 / Hawaii N-20) each year; single-member or spouses-only can be simpler. GE tax on the rent continues."
+   ]
+  },
+  {
+   "title": "Real property tax (Honolulu)",
+   "kind": "talk",
+   "items": [
+    "A revocable trust where they're the beneficiaries and still live there: the home exemption normally continues; file the new deed and confirm with the City's Real Property Assessment Division.",
+    "No reassessment just because the owner changes; Honolulu values property each year at market.",
+    "Moving the deed into a revocable trust for no money is generally exempt from Hawaii conveyance tax (file the P-64B exemption form).",
+    "The rental part: rent is subject to Hawaii GE tax (4.5% on Oahu) and TAT if rented under 180 days."
+   ]
+  },
+  {
+   "title": "Family tax limits for 2026",
+   "kind": "table",
+   "items": [
+    [
+     "Federal estate & gift exemption",
+     "$15,000,000 per person ($30M a couple), made permanent by the 2025 tax law and indexed for inflation from 2027"
+    ],
+    [
+     "Federal estate/gift tax rate above that",
+     "40%"
+    ],
+    [
+     "Annual gift exclusion",
+     "$19,000 per recipient per giver; a couple can give $38,000 to each child with no gift return"
+    ],
+    [
+     "Gifts above $19,000",
+     "No tax; file Form 709 and it reduces the lifetime $15M"
+    ],
+    [
+     "Portability",
+     "The surviving spouse can keep the unused federal exemption, but only if an estate return (Form 706) is filed after the first death"
+    ],
+    [
+     "Hawaii estate tax",
+     "Exemption $5,490,000 per person; rates 10%–20% above it. Hawaii allows portability too."
+    ],
+    [
+     "Hawaii gift tax / inheritance tax",
+     "None. Hawaii taxes only estates."
+    ],
+    [
+     "Federal inheritance tax",
+     "None. Heirs owe no income tax on what they inherit; only on later gains."
+    ],
+    [
+     "Capital gains on a sale",
+     "Federal 0/15/20% plus 3.8% NIIT on higher incomes; Hawaii up to 7.25%"
+    ],
+    [
+     "Home sale exclusion",
+     "$250,000 single / $500,000 married (2 of last 5 years living there)"
+    ],
+    [
+     "Depreciation recapture (rental)",
+     "Up to 25% federal on depreciation taken"
+    ],
+    [
+     "HARPTA",
+     "If a seller is not a Hawaii resident (e.g. a child on the mainland), 7.25% of the sale price is withheld at closing"
+    ]
+   ]
+  },
+  {
+   "title": "Questions parents and children usually ask",
+   "kind": "faq",
+   "items": [
+    [
+     "Do the kids pay tax when they inherit the house?",
+     "No. There is no federal or Hawaii inheritance tax, and the estate is far below the $15M federal exemption. Hawaii estate tax only applies above $5.49M per person. The kids pay tax only if they later sell for more than the stepped-up value."
+    ],
+    [
+     "Should we just put the kids on the deed now so it's simple?",
+     "That's the costly mistake. It's a gift, the kids take your old basis, and you lose the step-up on their share. It also exposes the house to the kids' creditors, divorces and lawsuits. A revocable trust gets the same 'no probate' result without the tax cost."
+    ],
+    [
+     "Does putting the house in a living trust change our taxes now?",
+     "No. A revocable trust is ignored for income tax: same Social Security number, same return, same mortgage interest and property tax deductions, same home sale exclusion, and the step-up at death is kept."
+    ],
+    [
+     "What's the difference between revocable and irrevocable?",
+     "Revocable: you keep control, can change it, house is still in your estate (step-up kept, no protection from long-term-care costs). Irrevocable: you give up control; it can protect assets for Medicaid after 5 years, but it must be drafted carefully or the step-up is lost."
+    ],
+    [
+     "What happens at the first death?",
+     "With joint ownership, the deceased spouse's half steps up; the survivor keeps their half at the old basis. A Hawaii Community Property Trust could step up the whole house. Consider filing Form 706 to keep the unused federal exemption."
+    ],
+    [
+     "Can we give the kids money each year?",
+     "Yes. Each parent can give each child $19,000 a year ($38,000 from both) with no paperwork. Larger gifts just need a gift tax return; no tax is due until gifts pass $15M."
+    ],
+    [
+     "If the kids inherit and keep it as a rental, what happens?",
+     "They depreciate the building again from the stepped-up value, which shelters rent income. They report rent on Schedule E and keep paying GE tax on the rent."
+    ],
+    [
+     "Who pays tax on the rent while it's in the trust or LLC?",
+     "Revocable trust: the parents, same as now. Family LLC: each owner on their share through a K-1."
+    ],
+    [
+     "Does the trust avoid probate?",
+     "Yes, if the deed is actually moved into the trust. A trust with an unfunded house still goes through Hawaii probate."
+    ]
+   ]
+  },
+  {
+   "title": "Facts to get today",
+   "kind": "talk",
+   "items": [
+    "House: address, estimated current value, what they paid and the year, major improvements.",
+    "How title is held now: joint tenants, tenants by the entirety, one name, Land Court or Regular System.",
+    "Mortgage balance and lender (for the due-on-sale question).",
+    "The rental: whole house, a unit, or an ohana? Since when? Depreciation taken, who prepares the return.",
+    "Do they live there? (home exemption and $500,000 exclusion)",
+    "The two children: names, where they live (HARPTA if off-island), whether either wants the house.",
+    "Existing wills, trusts, powers of attorney, health care directives.",
+    "Long-term-care concerns or Med-QUEST planning."
+   ]
+  }
+ ],
+ "decisions": [
+  {
+   "id": "value",
+   "q": "House: estimated current value",
+   "kind": "text"
+  },
+  {
+   "id": "basis",
+   "q": "House: purchase price, year, major improvements",
+   "kind": "text"
+  },
+  {
+   "id": "title",
+   "q": "How is title held now?",
+   "options": [
+    "Joint tenants",
+    "Tenants by the entirety",
+    "One spouse's name",
+    "Not sure"
+   ]
+  },
+  {
+   "id": "plan",
+   "q": "Plan for the house",
+   "options": [
+    "Keep in family",
+    "Sell while living",
+    "Kids sell after",
+    "Not decided"
+   ]
+  },
+  {
+   "id": "deed",
+   "q": "Move the deed into the trust?",
+   "options": [
+    "Yes, revocable trust",
+    "Yes, irrevocable (step-up drafted in)",
+    "Not yet",
+    "No"
+   ]
+  },
+  {
+   "id": "cpt",
+   "q": "Hawaii Community Property Trust (double step-up)?",
+   "options": [
+    "Look into it",
+    "Yes",
+    "No"
+   ]
+  },
+  {
+   "id": "gift",
+   "q": "Any gifts of the house or shares to the kids now?",
+   "options": [
+    "No, keep step-up",
+    "Annual-exclusion gifts only",
+    "Not decided"
+   ]
+  },
+  {
+   "id": "llc",
+   "q": "Family LLC for the rental?",
+   "options": [
+    "Yes, set it up",
+    "Look into it",
+    "No"
+   ]
+  },
+  {
+   "id": "rental",
+   "q": "The rental: what part is rented, since when, depreciation taken",
+   "kind": "text"
+  },
+  {
+   "id": "trustees",
+   "q": "Trustee and successor trustee",
+   "kind": "text"
+  },
+  {
+   "id": "kids",
+   "q": "What the children want (keep, rent, sell)",
+   "kind": "text"
+  },
+  {
+   "id": "next",
+   "q": "Next step and who does it",
+   "kind": "text"
+  }
+ ]
+}

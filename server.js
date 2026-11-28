@@ -1011,7 +1011,7 @@ const CPA = {
   cadence: ["Monthly", "Quarterly", "Annual", "As needed"],
   services: ["Bookkeeping", "Payroll", "GE tax", "Estimates", "Business return", "Personal return", "Advisory", "Sales tax"],
   cstatus: ["Active", "Paused", "Former", "Prospect"],
-  type: ["Monthly", "Quarterly", "Year-end", "Annual", "Ad hoc"],
+  type: ["Monthly", "Quarterly", "Year-end", "Annual", "Ad hoc", "Consulting"],
   mstatus: ["Planned", "Prepped", "Held", "Followed up", "Cancelled"],
 };
 const bad = (m) => Object.assign(new Error(m), { status: 400 });
@@ -1044,6 +1044,16 @@ function cpaMeetingFields(b) {
     else { if (!Array.isArray(b.agenda) || b.agenda.length > 40) throw bad("agenda"); f.agenda = b.agenda.map((x) => ({ t: String((x && x.t) || "").slice(0, 160), done: !!(x && x.done) })).filter((x) => x.t); }
   }
   for (const k of ["notes", "decisions", "followups"]) if (k in b) f[k] = String(b[k] || "").slice(0, 20000);
+  if ("choices" in b) {
+    // Consulting decision boxes: {id: {pick, note}}
+    const c = b.choices && typeof b.choices === "object" && !Array.isArray(b.choices) ? b.choices : {};
+    const out = {};
+    for (const [k, v] of Object.entries(c).slice(0, 60)) {
+      if (!/^[\w-]{1,40}$/.test(k) || !v || typeof v !== "object") continue;
+      out[k] = { pick: String(v.pick || "").slice(0, 160), note: String(v.note || "").slice(0, 2000) };
+    }
+    f.choices = out;
+  }
   return f;
 }
 app.get("/api/cpa", requireAuth, wrap(async (req, res) => { res.set("Cache-Control", "no-store"); res.json(await cstore.getAll()); }));
@@ -1054,6 +1064,13 @@ app.get("/api/cpa/client/:id/plan", requireAuth, wrap(async (req, res) => {
   res.set("Cache-Control", "no-store");
   const plan = await cstore.clientPlan(req.params.id);
   if (!plan) return res.status(404).json({ error: "No plan on that client page" });
+  res.json(plan);
+}));
+app.get("/api/cpa/meeting/:id/plan", requireAuth, wrap(async (req, res) => {
+  if (!/^[\w-]{8,64}$/.test(req.params.id)) throw bad("id");
+  res.set("Cache-Control", "no-store");
+  const plan = await cstore.meetingPlan(req.params.id);
+  if (!plan) return res.status(404).json({ error: "No plan on that meeting page" });
   res.json(plan);
 }));
 app.patch("/api/cpa/meeting/:id", requireAuth, wrap(async (req, res) => res.json(await cstore.updateMeeting(req.params.id, cpaMeetingFields(req.body)))));
