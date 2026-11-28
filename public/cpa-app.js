@@ -382,8 +382,8 @@
       (planOk && p.purpose ? '<p class="cs-purpose">' + esc(p.purpose) + "</p>" : "") +
       '<div class="steps" role="group" aria-label="Status">' + STEPS.map((s2) => '<button type="button" data-status="' + esc(s2) + '" aria-pressed="' + (m.status === s2) + '">' + esc(s2) + "</button>").join("") + "</div>" +
       '<div class="actions">' + (m.link ? '<a class="btn primary" href="' + esc(m.link) + '" target="_blank" rel="noopener">Join</a>' : "") +
-        '<button type="button" class="btn primary" data-takeaways>⎙ Takeaways PDF</button>' +
-        '<button type="button" class="btn" data-print>⎙ Meeting notes PDF</button>' +
+        '<button type="button" class="btn primary" data-takeaways>⬇ Download takeaways PDF</button>' +
+        '<button type="button" class="btn" data-print>⬇ Meeting notes PDF</button>' +
         '<a class="btn" href="' + esc(claude(voicePrompt(m, c))) + '" target="_blank" rel="noopener">🎙 Retrieve Voice Notes</a>' +
         (m.url ? '<a class="btn" href="' + esc(m.url) + '" target="_blank" rel="noopener">Notion</a>' : "") + "</div>" +
       '<div class="rm-grid"><div>' +
